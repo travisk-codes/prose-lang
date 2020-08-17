@@ -1,0 +1,9 @@
+for number is 1 to 100
+	if not remainder number 15
+		print "FizzBuzz"
+	else if not remainder number 3
+		print "Fizz"
+	else if not remainder number 5
+		print "Buzz"
+	else
+		print number

@@ -1,0 +1,30 @@
+refresh_token
+
+async function fetch_new_access_token
+	try
+		response is await fetch "https://..." refresh_token
+		json is await response.json run
+		set_access_token json.access_token
+	catch e
+		print e.name e.message
+
+function use_interval takes callback, delay
+	saved_callback is React.useRef run
+
+	(remember the latest callback)
+	function first_effect
+		saved_callback.current is callback
+	dependency_array_1.1 is callback
+	useEffect first_effect, dependency_array_1
+
+	(set up the interval)
+	function second_effect
+		function tick
+			saved_callback.current run
+		if delay != null
+			id is setInterval tick, delay
+			function cleanup
+				clearInterval id
+			return cleanup
+	dependency_array_2
+	useEffect second_effect, dependency_array_2

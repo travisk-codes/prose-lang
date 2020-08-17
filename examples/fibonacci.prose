@@ -1,0 +1,5 @@
+function fibonacci takes number
+	if number < 2 return 1
+	previous is fibonacci number - 1
+	previous_again is fibonacci number - 2
+	return previous + previous_again

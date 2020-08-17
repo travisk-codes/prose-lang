@@ -1,0 +1,12 @@
+function factorial1 takes number
+	if n < 0 print "Number must be positive."
+	answer is 1
+	while number > 1
+		answer is answer * number
+		number is number - 1
+	return answer
+
+function factorial2 takes number
+	answer is 1
+	for n is 1 to number
+		answer is answer * n

@@ -1,0 +1,7 @@
+function cipher takes string, rotate
+	ciphered_string
+	for i is 1 to length string
+		char_number is char_to_number string.i
+		char_number is char_number + rotate
+		ciphered_string.i is number_to_char char_number
+	return ciphered_string
