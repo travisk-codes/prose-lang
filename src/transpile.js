@@ -45,6 +45,8 @@ function tokenize(text, line) {
   let pos = 0;
   while (pos < text.length) {
     if (/\s/.test(text[pos])) { pos++; continue; }
+    // Spacing only matters to tell `f -1` (a negative argument) from `f - 1`.
+    const spaced = pos > 0 && /\s/.test(text[pos - 1]);
     const rest = text.slice(pos);
     const number = /^(?:\d+(?:\.\d+)?)/.exec(rest);
     const word = /^[A-Za-z_][A-Za-z_0-9]*/.exec(rest);
@@ -75,6 +77,7 @@ function tokenize(text, line) {
       tokens.push({ type: "symbol", value: operator[0] });
       pos += operator[0].length;
     }
+    tokens.at(-1).spaced = spaced;
   }
   return tokens;
 }
@@ -92,14 +95,33 @@ class Expression {
     this.blockFunctions = [];
     // How many call argument lists the parser is inside, outside parentheses.
     this.argumentDepth = 0;
+    // Above zero where values sit side by side without being calls, as in `remainder a b`.
+    this.adjacentValues = 0;
+    // Whether a call by adjacency appeared, for explaining errors on if lines.
+    this.adjacentCall = false;
   }
   // Parentheses end any surrounding argument list, so commas inside them are unambiguous.
   inParentheses(parse) {
     const depth = this.argumentDepth;
+    const adjacent = this.adjacentValues;
     this.argumentDepth = 0;
+    this.adjacentValues = 0;
     const value = parse();
     this.argumentDepth = depth;
+    this.adjacentValues = adjacent;
     return value;
+  }
+  // A name, property, position, or parenthesized value directly followed by a value is called with it.
+  callsByAdjacency(left) {
+    if (this.adjacentValues || !(left.grouped || ["name", "property", "index"].includes(left.type))) return false;
+    const next = this.peek();
+    if (next.type === "symbol" && next.value === "-" && next.spaced && this.tokens[this.pos + 1] && !this.tokens[this.pos + 1].spaced) {
+      fail(this.line, "'-' here could start a negative argument or subtract. Write with before a negative argument (items:at with -1), or put spaces around a minus that subtracts.");
+    }
+    if (next.type === "number" || next.type === "string") return true;
+    if (next.type === "symbol") return next.value === "(";
+    return !reserved.has(next.value) ||
+      ["function", "new", "not", "maybe", "array", "object", "unset", "true", "false", "null"].includes(next.value);
   }
   peek() { return this.tokens[this.pos]; }
   at(value) { return this.peek()?.value === value && this.peek()?.type !== "string"; }
@@ -170,12 +192,12 @@ class Expression {
     while (this.at(",")) { this.take(","); args.push(this.parse(60)); }
     this.argumentDepth--;
     if (nested && args.length > 1) {
-      fail(this.line, "Inside another call's arguments, a call with several arguments after 'with' needs parentheses: (f with a, b).");
+      fail(this.line, "Inside another call's arguments, a call with several arguments needs parentheses: (f a, b).");
     }
-    // Readers split `f with a, b + 1` both ways, so neither reading is chosen silently.
+    // Readers split `f a, b + 1` both ways, so neither reading is chosen silently.
     const next = this.peek();
     if ((next?.type === "symbol" && "+-*/%".includes(next.value)) || isWord(next, "mod")) {
-      fail(this.line, `'${next.value}' right after 'with' arguments is ambiguous. Put the last argument in parentheses to include it, or the whole call to use its result.`);
+      fail(this.line, `'${next.value}' right after a call's arguments is ambiguous. Put the last argument in parentheses to include it, or the whole call to use its result.`);
     }
     return args;
   }
@@ -191,11 +213,13 @@ class Expression {
     } else {
       if (!params.length) this.take("run");
       this.argumentDepth++;
+      this.adjacentValues++;
       for (let index = 0; index < params.length; index++) {
         if (index) this.take(",");
-        // Calls bind before arithmetic; compound arguments require parentheses.
+        // Calls bind before arithmetic; compound arguments, including calls, require parentheses.
         args.push(this.parse(60));
       }
+      this.adjacentValues--;
       this.argumentDepth--;
     }
     return { type: "call", name, args, builtin, line: this.line };
@@ -288,7 +312,11 @@ class Expression {
     const node = { type: "lambda", params: names, types, returns, line: this.line };
     if (this.at("return")) {
       this.take("return");
+      // A function's result is its own expression, even inside a Prose call's arguments.
+      const adjacent = this.adjacentValues;
+      this.adjacentValues = 0;
       node.value = this.parse();
+      this.adjacentValues = adjacent;
     } else {
       node.body = [];
       this.blockFunctions.push(node);
@@ -329,12 +357,19 @@ class Expression {
         callee = { type: "property", object: callee, name: this.propertyName(), line: this.line };
       }
       const args = [];
-      if (this.at("with")) { this.take("with"); args.push(...this.arguments()); }
+      if (this.at("with")) {
+        this.take("with");
+        args.push(...this.arguments());
+      } else if (this.peek() && this.callsByAdjacency({ type: "name" })) {
+        args.push(...this.arguments());
+      }
       left = { type: "new", callee, args, line: this.line };
     } else if (token.value === "not" || token.value === "-") {
       left = { type: "unary", op: token.value, operand: this.parse(token.value === "not" ? 25 : 60) };
     } else if (token.value === "remainder") {
+      this.adjacentValues++;
       left = { type: "binary", op: "%", left: this.parse(60), right: this.parse(60) };
+      this.adjacentValues--;
     } else if (["true", "false", "null"].includes(token.value)) {
       left = { type: "literal", value: { true: true, false: false, null: null }[token.value] };
     } else if (token.type === "word" && !reserved.has(token.value)) {
@@ -363,6 +398,11 @@ class Expression {
       if (this.at("run") && min <= 70) {
         this.take("run");
         left = { type: "invoke", callee: left, args: [], line: this.line };
+        continue;
+      }
+      if (min <= 70 && this.callsByAdjacency(left)) {
+        this.adjacentCall = true;
+        left = { type: "invoke", callee: left, args: this.arguments(), line: this.line };
         continue;
       }
       const next = this.peek();
@@ -514,6 +554,19 @@ class Parser {
   }
   conditionalBody(expr, line, inFunction) {
     return expr.peek() ? [this.simple(expr, inFunction)] : this.body(line, inFunction);
+  }
+  // An if line's body: the rest of the line, optionally after then, or the indented lines below it.
+  ifBody(expr, line, inFunction) {
+    if (expr.at("then")) {
+      expr.take("then");
+      return this.conditionalBody(expr, line, inFunction);
+    }
+    // In `if ready count is 5`, `ready count` reads as a call, so the body needs then.
+    const next = this.lines[this.pos];
+    if (expr.adjacentCall && (expr.at("is") || (!expr.peek() && !(next?.indent > line.indent)))) {
+      fail(line.line, "This if line's condition ends in a call, so a body that starts with a name needs then before it: if ready then count is 5.");
+    }
+    return this.conditionalBody(expr, line, inFunction);
   }
   // Reads the indented lines after a line: an object literal's properties or a function's body.
   indentedValue(expr, value, line) {
@@ -671,7 +724,7 @@ class Parser {
       } else if (expr.at("if")) {
         expr.take("if");
         const condition = this.condition(expr);
-        const branches = [{ condition, body: this.conditionalBody(expr, line, inFunction) }];
+        const branches = [{ condition, body: this.ifBody(expr, line, inFunction) }];
         let otherwise = [];
         while (this.pos < this.lines.length) {
           const next = this.lines[this.pos];
@@ -682,7 +735,7 @@ class Parser {
           if (tail.at("if")) {
             tail.take("if");
             const condition = this.condition(tail);
-            branches.push({ condition, body: this.conditionalBody(tail, next, inFunction) });
+            branches.push({ condition, body: this.ifBody(tail, next, inFunction) });
           } else {
             otherwise = this.conditionalBody(tail, next, inFunction);
             break;

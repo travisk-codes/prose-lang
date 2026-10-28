@@ -210,6 +210,68 @@ test("the runtime option imports the helpers instead of embedding them", async (
   }
 });
 
+test("a value followed directly by an argument is a call, with or without with", () => {
+  assert.deepEqual(run([
+    'words is "a", "b", "c"', 'print words:join "-"', 'print words:join with "-"',
+    "print Math:max 4, 9, 2", "print (words:slice 1):join run",
+    "counts is new Map", 'counts:set "a", (2 + 1)', 'print counts:get "a"', 'print counts:get "z" otherwise 0',
+    'seen is new Set ("x", "y", "x")', "print seen:size",
+    "doubled is (1, 2):map function takes n return n * 2", "print doubled",
+    'shout is function takes text return text:toUpperCase run', 'print shout "hi"',
+    "maker is function takes n return function takes m return n + m", "print (maker 1) 2",
+    'print words:includes "b" and true', 'print (words:indexOf "c") + 1',
+    "callback is unset", 'print maybe callback "ignored"'
+  ].join("\n")), ["a-b-c", "a-b-c", 9, "b,c", 3, 0, 2, [2, 4], "HI", 3, true, 3, undefined]);
+});
+
+test("run is still needed with no arguments, and remainder keeps its two values side by side", () => {
+  assert.deepEqual(run([
+    "items is 1, 2, 3", "method is items:pop", "print length items", "items:pop run", "print length items",
+    "number is 30", "print remainder number 7", "print remainder (number + 1) 7"
+  ].join("\n")), [3, 2, 2, 3]);
+});
+
+test("Prose calls without with take single values, so calls in their arguments need parentheses", () => {
+  assert.deepEqual(run([
+    "function twice takes n", "    return n * 2",
+    "items is 4, 5", "previous is 1, 2, 3",
+    "right is 0", "if 2 <= length previous right is previous.2", "print right",
+    "print twice (items:indexOf 5)",
+    "print twice ((1, 2):map function takes n return n * 10):length"
+  ].join("\n")), [2, 2, 4]);
+  assert.throws(() => transpile("function twice takes n\n    return n * 2\nitems is 1, 2\nprint twice items:indexOf 2"), /Line 4: Unexpected token 2/);
+});
+
+test("a minus with a space before and none after is ambiguous next to a value that could be called", () => {
+  assert.throws(() => transpile("items is 1, 2\nprint items:at -1"), /Line 2: '-' here could start a negative argument or subtract/);
+  assert.throws(() => transpile("count is 3\nprint count -1"), /Line 2: '-' here could start/);
+  assert.deepEqual(run([
+    "items is 1, 2", "print items:at with -1", "print items:at (-1)", "count is 3",
+    "print count - 1", "print count-1", "print count - (1)", "print -count", "print 5 -1"
+  ].join("\n")), [2, 2, 2, 2, 2, -3, 4]);
+});
+
+test("inline if bodies may start with then, which is needed when the condition ends in a call", () => {
+  assert.deepEqual(run([
+    "ready is function return true", "count is 0", "items is 1, 2",
+    "if ready run then count is 5", "print count",
+    "if items:includes 2 then print \"has two\"",
+    "if false then print \"no\"", "else if items:includes 1 then count is 6", "print count",
+    "if count = 6 then", "    print \"then with a block\"",
+    "group is array", "if group then group:push 1", "print group"
+  ].join("\n")), [5, "has two", 6, "then with a block", [1]]);
+  for (const source of [
+    "ready is true\ncount is 0\nif ready count is 5",
+    "group is array\nitem is 1\nif group group:push item"
+  ]) assert.throws(() => transpile(source), /Line 3: This if line's condition ends in a call, so a body that starts with a name needs then/, source);
+});
+
+test("calls by adjacency follow the comma and arithmetic rules, and a missing operator fails when it runs", () => {
+  assert.throws(() => transpile("counts is new Map\ncounts:set 1, 2 + 1"), /ambiguous\. Put the last argument in parentheses/);
+  assert.throws(() => transpile("print Math:max Math:min 1, 2"), /needs parentheses: \(f a, b\)/);
+  assert.throws(() => run("total is 3\ncount is 4\nprint total count"), /Line 3: Only functions can be called/);
+});
+
 test("arithmetic right after with arguments is a compile error that suggests both readings", () => {
   for (const source of [
     "counts is new Map\ncounts:set with 1, 2 + 1",
@@ -234,7 +296,7 @@ test("a call with several with arguments inside another call's arguments needs p
     "print Math:max with 0, Math:min with 1, 2",
     "function f takes a, b\n    return a\nprint f 1, Math:min with 2, 3",
     "items is (1, 2)\nprint items:map with function takes x return Math:max with x, 1"
-  ]) assert.throws(() => transpile(source), /needs parentheses: \(f with a, b\)/, source);
+  ]) assert.throws(() => transpile(source), /needs parentheses: \(f a, b\)/, source);
   assert.deepEqual(run([
     "print Math:max with (Math:min with 1, 2), 5", "print Math:max with 0, (Math:min with 1, 2)",
     "print Math:abs with Math:min with -4", "print (Math:min with 3, 4)",
@@ -355,7 +417,7 @@ test("CLI runs the tour of every feature", () => {
     "Hello, Ada!", "Hello, Grace?", "Hello", "today.txt", "5", "😀", "65", "a", "H😀llo!", "ok",
     "London", "Eda of Paris", "later", "true", "7", "4", "3", "2", "3", "[ 30, 1, 2, 4 ]", "300",
     "[ 1, 2, 4, 30 ]", "[ 2, 4, 30 ]", "#1=1, #2=2, #3=4, #4=30", "81", "7", "81", "ran after 5",
-    "9", "3.0", "PROSE", '{"x":3,"y":4}', "2", "value!", "6", "undefined", "no city", "GRACE", "0",
+    "9", "3.0", "PROSE", '{"x":3,"y":4}', "2", "value!", "6", "1", "4", "true", "undefined", "no city", "GRACE", "0",
     "no tags", "no callback", "5", "Hello, Lin.", "42", "Tour stops: 15, tour 1"
   ]);
 });

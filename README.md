@@ -77,7 +77,7 @@ See [the extension README](editors/vscode/README.md) for development and packagi
 - Indented `while` loops, with the condition checked before each iteration.
 - Top-level functions, comma-separated parameters, and recursive calls.
 - `return expression` or bare `return` inside a function.
-- Inline conditionals such as `if number < 2 return 1`.
+- Inline conditionals such as `if number < 2 return 1`, optionally with `then`.
 - One-based Unicode string indexing and single-character indexed assignment.
 - Standard-library `length`, `char_to_number`, and `number_to_char`.
 - Standalone string expressions as comments, and unset variable declarations.
@@ -86,12 +86,13 @@ See [the extension README](editors/vscode/README.md) for development and packagi
 - `for each item in items`, including several variables for pairs: `for each name, count in counts`.
 - Inline `if ... then ... else ...` values, the `unset` value, and the `otherwise` fallback operator.
 - Functions as values, with inline (`function takes x return x * 2`) or indented bodies.
-- JavaScript globals, methods called with `with` or `run`, and `new`.
+- JavaScript globals, methods, and `new`: a value followed by arguments is a
+  call (`items:join ", "`), and `run` calls with none.
 - `maybe`, which reads through values that might be unset or `null`.
 - Modules: `use name from "path"` and `export`, plus a Vite plugin. Functions
   imported from other `.prose` files keep their argument counts.
 - Compile-time errors for names that are never assigned, imported, or provided
-  by JavaScript, and for `with` calls whose arguments could be read two ways.
+  by JavaScript, and for calls whose arguments could be read two ways.
 - Optional type annotations that generate TypeScript declaration files.
 
 ```text
@@ -366,6 +367,12 @@ label is count + " " + (if count = 1 then "entry" else "entries")
 fallback` gives `fallback` when `value` is unset or `null`, and `value`
 otherwise; unlike `or`, it keeps `0`, `""`, and `false`.
 
+An inline `if` statement may put `then` before its body: `if n < 2 then return 1`.
+`then` is required when the condition ends in a call and the body starts with
+a name, because `if ready count is 5` would read `ready count` as a call. The
+compiler says so; write `if ready then count is 5`. A `then` at the end of the
+line can also introduce an indented body.
+
 ## maybe
 
 Reading a property of unset or `null` is an error, which points at the line
@@ -391,22 +398,22 @@ line, everything after `return` (up to a comma that ends an argument) is the
 result. Without `return`, the function's body is the indented lines that follow:
 
 ```text
-doubled is values:map with function takes value return value * 2
+doubled is values:map function takes value return value * 2
 
-labels is books:map with function takes book
+labels is books:map function takes book
     if book:pages > 500 return book:title + " (long)"
     return book:title
 ```
 
 A function with an indented body can appear anywhere on a line, including
-before other arguments (`later with function, 5`), but only one per line, and
+before other arguments (`later function, 5`), but only one per line, and
 not in `if`, `while`, or `for` lines or inline conditionals. Call a function
-value with `with` and its arguments, or `run` when it takes none.
+value by putting its arguments after it (`shout "hi"`), or `run` when it takes none.
 
 Function values can read the variables around them. Like named functions,
 assigning a name inside one creates a local: it does not change an outer
 variable with the same name. Changing an outer array or object (for example,
-`seen:push with value`) does affect it.
+`seen:push value`) does affect it.
 
 ## Using JavaScript
 
@@ -414,35 +421,52 @@ When no Prose variable has the name, common JavaScript globals are available:
 `Math`, `JSON`, `Object`, `Array`, `Map`, `Set`, `Date`, `Number`, `String`,
 `Promise`, `console`, `document`, `window`, `localStorage`, `fetch`, and more.
 
-Call methods with `with` and comma-separated arguments, or `run` for none.
-Create objects with `new`:
+A name, property, position, or parenthesized value followed directly by a
+value is a call, and the value and any comma-separated values after it are its
+arguments. `run` calls with no arguments. Create objects with `new`:
 
 ```text
 print name:toUpperCase run
-print words:join with ", "
-seen is new Set with ("a", "b", "a")
-print Math:max with 3, 9, 4
+print words:join ", "
+seen is new Set ("a", "b", "a")
+print Math:max 3, 9, 4
 ```
 
-A `with` call takes every comma-separated value that follows it. Two places
-where that could be read two ways are syntax errors, so a program never
-silently means the other reading:
+Prose cannot tell whether `items:pop` is a property or a method, or how many
+arguments a JavaScript function takes, so these rules decide instead. `with`
+may still come before the arguments (`words:join with ", "`), and it is
+needed in one place: before a negative first argument. Prose reads
+`items:at -1` as ambiguous (the space before the minus but not after suggests
+a negative number) and asks for `items:at with -1`, `items:at (-1)`, or a
+spaced `items:at - 1` to subtract.
 
-- Arithmetic right after the arguments. `counts:set with key, count + 1`
+A call takes every comma-separated value that follows it. Two places where
+that could be read two ways are syntax errors, so a program never silently
+means the other reading:
+
+- Arithmetic right after the arguments. `counts:set key, count + 1`
   could add one to the count or to the call's result. Write
-  `counts:set with key, (count + 1)` or `(counts:get with key) + 1`.
-- A call with several `with` arguments inside another call's arguments.
-  `addDays with dateFromKey with key, 1` could pass the `1` to either call.
-  Write `addDays with (dateFromKey with key), 1`.
+  `counts:set key, (count + 1)` or `(counts:get key) + 1`.
+- A call with several arguments inside another call's arguments.
+  `addDays dateFromKey key, 1` could pass the `1` to either call.
+  Write `addDays (dateFromKey key), 1`.
 
 Comparisons, `and`, `or`, and `otherwise` after a call apply to its result:
-`counts:get with key otherwise 0` and `localDateKey with day = key` need no
+`counts:get key otherwise 0` and `localDateKey day = key` need no
 parentheses. To call a method of a call's result, wrap the call in
-parentheses: `(words:slice with 1):join run`. Calls without `with` keep the
-call-first rule, so `length rows + 1` means `(length rows) + 1`.
+parentheses: `(words:slice 1):join run`. Results of calls are not called again
+by values after them; write `(make_adder 1) 2`.
+
+Prose's own functions keep the call-first rule and take single values as
+arguments, so `length rows + 1` means `(length rows) + 1`, and a call inside
+their arguments needs parentheses: `twice (items:indexOf 5)`.
+
+Because any variable can hold a function, a missing operator such as
+`print total count` compiles as a call and fails when it runs: "Only functions
+can be called."
 
 JavaScript methods keep their JavaScript behavior, including zero-based
-positions: `words:slice with 0, 2` takes the first two items, while `words.1`
+positions: `words:slice 0, 2` takes the first two items, while `words.1`
 reads the first item. `:` reads properties of any value except `null` and
 unset, including strings (`name:length` is JavaScript's UTF-16 length; the
 standard-library `length` counts code points). Property assignment requires
@@ -466,7 +490,7 @@ before a top-level `function` or assignment exports it:
 use addDays, dateFromKey from "../dates"
 
 export function nextDay takes key
-    return addDays with (dateFromKey with key), 1
+    return addDays (dateFromKey key), 1
 
 export week_length is 7
 ```
@@ -482,8 +506,8 @@ print pluralize 2, "tag", "tags"
 print pluralize with 3, "entry"
 ```
 
-Names imported from JavaScript or TypeScript are values: call them with
-`with` or `run`. No imported name can be reassigned at the top level. A file
+Names imported from JavaScript or TypeScript are values: call them by
+putting arguments after them, or with `run`. No imported name can be reassigned at the top level. A file
 with `use` or `export` compiles to an ES module. Exported names keep their
 spelling, so JavaScript sees `nextDay` and `week_length`.
 

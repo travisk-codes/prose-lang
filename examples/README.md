@@ -21,8 +21,8 @@ Each program is standalone. Quoted strings on their own lines explain the code.
 | [postcard_station.prose](postcard_station.prose) | Unicode strings, `length`, character conversions, mathematical `mod`, negative rotations, string replacement/appending, unset declarations, `while`, zero-argument calls, early returns, and escapes |
 | [pascal_triangle.prose](pascal_triangle.prose) | Recursion, returning arrays, empty and one-item arrays, nested arrays, calculated indexes, and copied array arguments |
 | [copy_workshop.prose](copy_workshop.prose) | Shared arrays and objects, copying with `slice`, changes made through function arguments, empty objects, missing properties, division, `%`, and prefix `remainder` |
-| [reading_list.prose](reading_list.prose) | `for each` with several variables, inline `if`, functions as values with inline and indented bodies, JavaScript methods with `with` and `run`, `new Map`, `Math`, and `otherwise` |
-| [habits.prose](habits.prose) and [habit_rules.prose](habit_rules.prose) | The newest features: one Prose file importing another and calling its functions without `with`, optional arguments, `maybe` on properties and methods, Map entries in `for each`, and the parentheses that unambiguous `with` calls need |
+| [reading_list.prose](reading_list.prose) | `for each` with several variables, inline `if`, functions as values with inline and indented bodies, JavaScript methods called with the values after them or `run`, `new Map`, `Math`, and `otherwise` |
+| [habits.prose](habits.prose) and [habit_rules.prose](habit_rules.prose) | The newest features: one Prose file importing another and calling its functions like local ones, `with` for optional arguments, `maybe` on properties and methods, Map entries in `for each`, and the parentheses a call needs when arithmetic follows it |
 | [tour.prose](tour.prose) and [tour_helpers.prose](tour_helpers.prose) | Every construct Prose supports, section by section, including imports from Prose and from Node.js (`node:path`) and exports |
 
 `tour.prose` exercises every implemented construct: assignments; bare and

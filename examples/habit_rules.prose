@@ -2,14 +2,14 @@
 
 "The longest run of consecutive days, such as 3 for days 4, 5, and 6."
 export function longest_streak takes days
-    unique is Array:from with (new Set with days)
-    unique:sort with function takes a, b return a - b
+    unique is Array:from (new Set days)
+    unique:sort function takes a, b return a - b
     best is 0
     current is 0
     previous is unset
     for each day in unique
         current is if day = (previous otherwise -2) + 1 then current + 1 else 1
-        best is Math:max with best, current
+        best is Math:max best, current
         previous is day
     return best
 

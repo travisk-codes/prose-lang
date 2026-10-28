@@ -76,11 +76,11 @@ function announce
     return
 announce run
 
-"--- Modules: a Prose function called with or without with, an imported variable, and JavaScript."
+"--- Modules: an imported Prose function (with leaves out its optional argument), an imported variable, and JavaScript."
 print greet with "Ada"
 print greet "Grace", "?"
 print greeting
-print basename with "/notes/today.txt"
+print basename "/notes/today.txt"
 
 "--- Strings: one-based Unicode positions, the standard library, and writes."
 word is "h😀llo"
@@ -105,7 +105,7 @@ person is object
 print person:address:city
 person:address:city is "Paris"
 person:name.1 is "E"
-print person:describe with person
+print person:describe person
 empty is object
 empty:added is "later"
 print empty:added
@@ -137,37 +137,45 @@ print numbers
 print copy.1
 
 "--- Function values: inline and indented bodies, passed to methods and to Prose functions."
-sorted is numbers:toSorted with function takes a, b return a - b
+sorted is numbers:toSorted function takes a, b return a - b
 print sorted
-evens is sorted:filter with function takes n return n mod 2 = 0
+evens is sorted:filter function takes n return n mod 2 = 0
 print evens
-labels is sorted:map with function takes n, index
+labels is sorted:map function takes n, index
     prefix is "#" + (index + 1)
     return prefix + "=" + n
-print labels:join with ", "
+print labels:join ", "
 square is function takes n return n * n
-print square with 9
+print square 9
 seven is function return 7
 print seven run
 function apply_twice takes action, value
-    return action with (action with value)
+    return action (action value)
 print apply_twice square, 3
 function after takes action, delay
     return action run + " after " + delay
 print after function, 5
     return "ran"
 
-"--- JavaScript: globals, methods, new, and parentheses where with would be ambiguous."
-print Math:max with 4, 9, 2
-print (Math:round with (10 / 3)):toFixed with 1
+"--- JavaScript: globals, methods called with the values after them, run for none, and new."
+print Math:max 4, 9, 2
+print (Math:round (10 / 3)):toFixed 1
 print "Prose":toUpperCase run
-print JSON:stringify with point
-seen is new Set with ("a", "b", "a")
+print JSON:stringify point
+seen is new Set ("a", "b", "a")
 print seen:size
 lookup is new Map
-lookup:set with "key", ("val" + "ue")
-print (lookup:get with "key") + "!"
-print Math:max with (Math:min with 5, 8), 6
+lookup:set "key", ("val" + "ue")
+"Parentheses say what a call's result does next, and which call gets each argument."
+print (lookup:get "key") + "!"
+print Math:max (Math:min 5, 8), 6
+"with is optional, and needed before a negative first argument."
+print Math:min with 3, 1
+print numbers:at with -1
+"then starts an inline if's body when the condition ends in a call."
+found is false
+if seen:has "a" then found is true
+print found
 
 "--- maybe: reading through values that might be missing."
 profile is object
@@ -190,14 +198,14 @@ export type Point is object
     "Points may have a label."
     label as maybe text
 export function distance takes from_point as Point, to_point as Point, giving number
-    return Math:hypot with (to_point:x - from_point:x), (to_point:y - from_point:y)
+    return Math:hypot (to_point:x - from_point:x), (to_point:y - from_point:y)
 export function welcome takes name as text, giving Greeting
     return greet name, "."
 origin as Point is make_point 0, 0
 print distance origin, point
 print welcome "Lin"
 double is function takes n as number giving number return n * 2
-print double with 21
+print double 21
 
 "--- Exports: other modules could use these. A comment on the line just above an export documents it."
 
