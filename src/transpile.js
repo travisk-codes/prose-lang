@@ -36,8 +36,8 @@ const isWord = (token, value) => token?.type === "word" && token.value === value
 
 // Prose's words for TypeScript's basic types.
 const builtinTypes = {
-  text: "string", number: "number", boolean: "boolean", any: "any", nothing: "void",
-  unset: "undefined", null: "null", true: "true", false: "false"
+  text: "string", number: "number", boolean: "boolean", any: "any", unknown: "unknown",
+  nothing: "void", unset: "undefined", null: "null", true: "true", false: "false"
 };
 
 function tokenize(text, line) {
@@ -339,6 +339,12 @@ class Expression {
     if (word === "object") return { kind: "object" };
     if (Object.hasOwn(builtinTypes, word)) return { kind: "builtin", name: builtinTypes[word] };
     if (/^[A-Z]/.test(word)) {
+      // A type inside a namespace, such as Intl:DateTimeFormatOptions.
+      let name = word;
+      while (this.at(":")) {
+        this.take(":");
+        name += "." + this.propertyName();
+      }
       const args = [];
       if (this.at("of")) {
         this.take("of");
@@ -349,7 +355,7 @@ class Expression {
         this.take("to");
         args.push(this.singleType());
       }
-      return { kind: "named", name: word, args };
+      return { kind: "named", name, args };
     }
     if (reserved.has(word)) fail(this.line, `Expected a type, not '${word}'.`);
     // Other lowercase names are type variables, like T in TypeScript.
@@ -988,6 +994,13 @@ const docComment = (doc, indent = "") => doc ? [`${indent}/** ${doc.replace(/\*\
 // Parameter names only document a declaration, so JavaScript's reserved words get a suffix.
 const parameterName = name => /^(?:break|case|catch|class|const|continue|debugger|default|delete|do|enum|extends|finally|implements|import|instanceof|interface|let|package|private|protected|public|static|super|switch|this|throw|try|typeof|var|void|yield)$/.test(name) ? `${name}_` : name;
 
+// List parameters are declared read-only, so TypeScript callers can pass read-only arrays too.
+function parameterType(type) {
+  if (type?.kind === "list") return `readonly ${typeText(type)}`;
+  if (type?.kind === "maybe" && type.of.kind === "list") return `readonly ${typeText(type.of)} | undefined`;
+  return typeText(type);
+}
+
 function literalType(value) {
   if (value?.type !== "literal") return "any";
   return value.value === null ? "null" : typeof value.value;
@@ -1007,8 +1020,8 @@ function declarationsFor(program) {
       while (optionalFrom > 0 && (!node.types[optionalFrom - 1] || node.types[optionalFrom - 1].kind === "maybe")) optionalFrom--;
       const params = node.params.map((name, index) => {
         const type = node.types[index];
-        if (index < optionalFrom) return `${parameterName(name)}: ${typeText(type)}`;
-        return `${parameterName(name)}?: ${typeText(type?.kind === "maybe" ? type.of : type)}`;
+        if (index < optionalFrom) return `${parameterName(name)}: ${parameterType(type)}`;
+        return `${parameterName(name)}?: ${parameterType(type?.kind === "maybe" ? type.of : type)}`;
       });
       const variables = typeVariables([...node.types, node.returns]);
       lines.push(...docComment(node.doc),

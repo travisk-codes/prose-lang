@@ -638,7 +638,7 @@ line just above a declaration or field becomes its documentation.
 
 | Prose | TypeScript |
 | --- | --- |
-| `text`, `number`, `boolean`, `any` | `string`, `number`, `boolean`, `any` |
+| `text`, `number`, `boolean`, `any`, `unknown` | `string`, `number`, `boolean`, `any`, `unknown` |
 | `nothing` (a result), `unset`, `null` | `void`, `undefined`, `null` |
 | `"day"`, `7`, `true` | literal types |
 | `list of T`, `set of T`, `map from K to V` | `T[]`, `Set<T>`, `Map<K, V>` |
@@ -649,7 +649,9 @@ line just above a declaration or field becomes its documentation.
 | `object` | `object`, or an interface when `type X is object` has fields |
 
 Parentheses group types: `list of (number or unset)`. A trailing parameter that
-is untyped or `maybe` may be left out by callers. Field types written
+is untyped or `maybe` may be left out by callers. List parameters are declared
+read-only (`readonly T[]`), so TypeScript can pass read-only arrays to them.
+A type inside a namespace is written with a colon: `Intl:DateTimeFormatOptions`. Field types written
 `maybe T` make optional fields. `type Name is …` declares a type at the top
 level; type names start with a capital letter. `use type A, B from "path"`
 imports types for the declarations, from TypeScript or other Prose files.

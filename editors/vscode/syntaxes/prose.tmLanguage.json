@@ -200,7 +200,7 @@
           "include": "#numbers"
         },
         {
-          "match": "\\b(?:text|number|boolean|any|nothing|unset|null|true|false|object)\\b",
+          "match": "\\b(?:text|number|boolean|any|unknown|nothing|unset|null|true|false|object)\\b",
           "name": "support.type.prose"
         },
         {

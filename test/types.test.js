@@ -33,7 +33,7 @@ test("annotated functions declare their parameter and result types, with docs fr
     header,
     "/** 1 entry, 3 entries. */",
     "export function pluralize(count: number, singular: string, plural?: string): string;",
-    "export function words(items: string[]): string;",
+    "export function words(items: readonly string[]): string;",
     "export function nothing_back(): void;",
     ""
   ].join("\n"));
@@ -47,6 +47,23 @@ test("only a comment on the line just above a declaration documents it", () => {
   ].join("\n")).split("\n").slice(1, -1), [
     "export function first(): number;", "/** Documents second. */", "export function second(): number;"
   ]);
+});
+
+test("list parameters are read-only, results stay mutable, and unknown is a type", () => {
+  assert.deepEqual(declarations([
+    "export function sorted takes items as list of number, extra as maybe list of text, giving list of number", "    return items",
+    "export function middle takes first as maybe list of text, last as number, giving unknown", "    return first",
+    "export function parse takes stored as unknown, giving maybe list of text", "    return unset"
+  ].join("\n")).split("\n").slice(1, -1), [
+    "export function sorted(items: readonly number[], extra?: readonly string[]): number[];",
+    "export function middle(first: readonly string[] | undefined, last: number): unknown;",
+    "export function parse(stored: unknown): string[] | undefined;"
+  ]);
+});
+
+test("types inside a namespace are written with a colon", () => {
+  assert.equal(declarations("export function format takes options as maybe Intl:DateTimeFormatOptions, giving text\n    return \"\"").split("\n")[1],
+    "export function format(options?: Intl.DateTimeFormatOptions): string;");
 });
 
 test("lowercase type names become generic type variables", () => {
@@ -135,7 +152,7 @@ test("object types declare interfaces with documented and optional fields; other
     'export type Period = "day" | "week";',
     "export interface Empty {",
     "}",
-    "export function longest(runs: StreakRun[]): StreakRun | undefined;",
+    "export function longest(runs: readonly StreakRun[]): StreakRun | undefined;",
     ""
   ].join("\n"));
 });
