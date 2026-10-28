@@ -310,6 +310,13 @@ class Expression {
     if (token.type === "string" || token.type === "number") return { kind: "literal", value: token.value };
     if (token.value === "(") {
       const inner = this.typeExpression();
+      // Commas make a tuple, like Prose's own lists: (text, number) is [string, number].
+      if (this.at(",")) {
+        const items = [inner];
+        while (this.at(",")) { this.take(","); items.push(this.typeExpression()); }
+        this.take(")");
+        return { kind: "tuple", items };
+      }
       this.take(")");
       return { kind: "group", of: inner };
     }
@@ -966,6 +973,7 @@ function typeText(type) {
   if (type.kind === "variable") return type.name;
   if (type.kind === "object") return "object";
   if (type.kind === "group") return `(${typeText(type.of)})`;
+  if (type.kind === "tuple") return `[${type.items.map(typeText).join(", ")}]`;
   if (type.kind === "union") return type.options.map(inner).join(" | ");
   if (type.kind === "maybe") return `${inner(type.of)} | undefined`;
   if (type.kind === "list") {
@@ -984,7 +992,7 @@ function typeText(type) {
 function typeVariables(types, found = []) {
   for (const type of types.filter(Boolean)) {
     if (type.kind === "variable" && !found.includes(type.name)) found.push(type.name);
-    typeVariables([type.of, type.from, type.to, type.returns, ...(type.options ?? []), ...(type.params ?? []), ...(type.args ?? [])], found);
+    typeVariables([type.of, type.from, type.to, type.returns, ...(type.options ?? []), ...(type.params ?? []), ...(type.args ?? []), ...(type.items ?? [])], found);
   }
   return found;
 }

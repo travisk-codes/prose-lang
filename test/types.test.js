@@ -61,6 +61,16 @@ test("list parameters are read-only, results stay mutable, and unknown is a type
   ]);
 });
 
+test("parentheses with commas make tuple types", () => {
+  assert.deepEqual(declarations([
+    "export function ranked takes counts as map from text to number, giving list of (text, number)", "    return array",
+    "export function pair takes value as item, giving (item, maybe (text, number))", "    return unset"
+  ].join("\n")).split("\n").slice(1, -1), [
+    "export function ranked(counts: Map<string, number>): [string, number][];",
+    "export function pair<item>(value: item): [item, [string, number] | undefined];"
+  ]);
+});
+
 test("types inside a namespace are written with a colon", () => {
   assert.equal(declarations("export function format takes options as maybe Intl:DateTimeFormatOptions, giving text\n    return \"\"").split("\n")[1],
     "export function format(options?: Intl.DateTimeFormatOptions): string;");

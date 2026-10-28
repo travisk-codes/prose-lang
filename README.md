@@ -642,13 +642,15 @@ line just above a declaration or field becomes its documentation.
 | `nothing` (a result), `unset`, `null` | `void`, `undefined`, `null` |
 | `"day"`, `7`, `true` | literal types |
 | `list of T`, `set of T`, `map from K to V` | `T[]`, `Set<T>`, `Map<K, V>` |
+| `(text, number)` | `[string, number]` |
 | `A or B`, `maybe T` | `A \| B`, `T \| undefined` |
 | `function taking A and B giving C` | `(arg1: A, arg2: B) => C` |
 | `Name`, `Name of T`, `Name from K to V` | `Name`, `Name<T>`, `Name<K, V>` |
 | `item`, `key` (other lowercase names) | type parameters, as in `groupBy<item, key>` |
 | `object` | `object`, or an interface when `type X is object` has fields |
 
-Parentheses group types: `list of (number or unset)`. A trailing parameter that
+Parentheses group types: `list of (number or unset)`. With commas they make a
+tuple, like Prose's own lists: `list of (text, number)` is a list of pairs. A trailing parameter that
 is untyped or `maybe` may be left out by callers. List parameters are declared
 read-only (`readonly T[]`), so TypeScript can pass read-only arrays to them.
 A type inside a namespace is written with a colon: `Intl:DateTimeFormatOptions`. Field types written
