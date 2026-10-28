@@ -1,0 +1,50 @@
+"Arrays are copied; objects keep their identity. Compare the results."
+
+function markdown takes prices, reduction
+    for i is 1 to length prices
+        prices.i is prices.i - reduction
+    return prices
+
+function publish takes entry
+    entry:status is "published"
+
+prices is 10, 20, 30
+sale is markdown prices, 2
+print "Original first price: " + prices.1
+print "Sale first price: " + sale.1
+print "Quarter of the second price: " + (prices.2 / 4)
+
+"Nested arrays and repeated occurrences receive independent copies."
+row is 1, 2
+original is row, row
+edited is original
+edited.(1).2 is 99
+print "Original nested value: " + ((original.1).2)
+print "Edited nested value: " + ((edited.1).2)
+print "Other nested row: " + ((edited.2).2)
+
+"Objects inside copied arrays still refer to the same object."
+entry is object
+    title is "Prose field notes"
+    status is "draft"
+entries is (entry,)
+other_entries is entries
+publish other_entries.1
+print "Object status through original array: " + entries.1:status
+print "Object status through original variable: " + entry:status
+
+"An empty object can be populated with colon assignments."
+audit is object
+audit:message is "ready"
+audit:meta is object
+    verified is true
+print "Audit: " + audit:message
+print "Verified: " + audit:meta:verified
+
+missing
+print "Missing object property is unset: " + (audit:unknown = missing)
+
+"Remainder and mathematical modulo differ for negative operands."
+print "Remainder operator: " + (-1 % 26)
+print "Prefix remainder: " + (remainder -1 26)
+print "Mathematical modulo: " + (-1 mod 26)

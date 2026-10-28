@@ -1,0 +1,26 @@
+{
+  "name": "prose-lang",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An experimental Prose to JavaScript transpiler",
+  "type": "module",
+  "bin": {
+    "prose": "bin/prose.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "example": "node bin/prose.js examples/fizzbuzz.prose --run",
+    "example:fibonacci": "node bin/prose.js examples/fibonacci_demo.prose --run",
+    "example:factorial": "node bin/prose.js examples/factorial_demo.prose --run",
+    "example:cipher": "node bin/prose.js examples/caesar_cipher_demo.prose --run",
+    "example:objects": "node bin/prose.js examples/objects.prose --run",
+    "example:arrays": "node bin/prose.js examples/arrays.prose --run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
+  }
+}

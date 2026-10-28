@@ -1,0 +1,8 @@
+names is "Ada", "Grace", "Linus"
+for i is 1 to length names
+    print names.i
+
+copy is names
+copy.1 is "Changed"
+print names.1
+print copy.1

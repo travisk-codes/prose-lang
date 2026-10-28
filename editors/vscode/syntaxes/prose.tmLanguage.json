@@ -1,0 +1,188 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Prose",
+  "scopeName": "source.prose",
+  "fileTypes": [
+    "prose"
+  ],
+  "patterns": [
+    {
+      "include": "#standalone-comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#properties"
+    },
+    {
+      "include": "#function-declarations"
+    },
+    {
+      "include": "#parameters"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#punctuation"
+    },
+    {
+      "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b",
+      "name": "variable.other.readwrite.prose"
+    }
+  ],
+  "repository": {
+    "standalone-comments": {
+      "name": "comment.line.string.prose",
+      "match": "^\\s*\"(?:[^\"\\\\]|\\\\.)*\"\\s*$"
+    },
+    "strings": {
+      "name": "string.quoted.double.prose",
+      "begin": "\"",
+      "end": "(\")|$",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.prose"
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.end.prose"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape.prose",
+          "match": "\\\\(?:[\"\\\\/bfnrt]|u[0-9a-fA-F]{4})"
+        },
+        {
+          "name": "invalid.illegal.escape.prose",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "function-declarations": {
+      "match": "\\b(function)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+      "captures": {
+        "1": {
+          "name": "storage.type.function.prose"
+        },
+        "2": {
+          "name": "entity.name.function.prose"
+        }
+      }
+    },
+    "parameters": {
+      "name": "meta.function.parameters.prose",
+      "begin": "\\b(takes)\\b",
+      "end": "$",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.prose"
+        }
+      },
+      "patterns": [
+        {
+          "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b",
+          "name": "variable.parameter.prose"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator.parameters.prose"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "\\barray\\b",
+          "name": "storage.type.array.prose"
+        },
+        {
+          "match": "\\bobject\\b",
+          "name": "storage.type.object.prose"
+        },
+        {
+          "match": "\\b(?:if|else|for|while|return)\\b",
+          "name": "keyword.control.prose"
+        },
+        {
+          "match": "\\b(?:is|to|print|run)\\b",
+          "name": "keyword.other.prose"
+        },
+        {
+          "match": "\\b(?:async|await)\\b",
+          "name": "keyword.control.experimental.prose"
+        }
+      ]
+    },
+    "builtins": {
+      "match": "\\b(?:length|char_to_number|number_to_char|remainder)\\b",
+      "name": "support.function.prose"
+    },
+    "constants": {
+      "match": "\\b(?:true|false|null)\\b",
+      "name": "constant.language.prose"
+    },
+    "numbers": {
+      "match": "\\b\\d+(?:\\.\\d+)?\\b",
+      "name": "constant.numeric.prose"
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "\\b(?:and|or|not|mod)\\b",
+          "name": "keyword.operator.word.prose"
+        },
+        {
+          "match": "<=|>=|!=|[=<>+*/%\\-]",
+          "name": "keyword.operator.prose"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "match": "\\.",
+          "name": "punctuation.accessor.prose"
+        },
+        {
+          "match": "\\(",
+          "name": "punctuation.section.group.begin.prose"
+        },
+        {
+          "match": "\\)",
+          "name": "punctuation.section.group.end.prose"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator.arguments.prose"
+        }
+      ]
+    },
+    "properties": {
+      "match": "(:)\\s*([A-Za-z_][A-Za-z_0-9]*)",
+      "captures": {
+        "1": {
+          "name": "punctuation.accessor.object.prose"
+        },
+        "2": {
+          "name": "variable.other.property.prose"
+        }
+      }
+    }
+  }
+}

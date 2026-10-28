@@ -1,7 +1,13 @@
 function cipher takes string, rotate
-	ciphered_string
+	"This is a comment! a comment is also just a string expression by itself"
+	"ciphered_string is an unset value that becomes a string when set"
+	ciphered_string is ""
+	"length is a standard library function"
 	for i is 1 to length string
+		"char_to_number is also a standard library function?"
+		base_number is char_to_number "a"
 		char_number is char_to_number string.i
-		char_number is char_number + rotate
+		char_number is (char_number - base_number + rotate) mod 26 + base_number
+		"number_to_char is a stdlib func"
 		ciphered_string.i is number_to_char char_number
 	return ciphered_string
