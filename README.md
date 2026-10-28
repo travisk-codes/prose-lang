@@ -62,6 +62,12 @@ declarations and built-in calls have distinct scopes.
 tests; running the compiler and examples directly still requires only Node.js.
 See [the extension README](editors/vscode/README.md) for development and packaging.
 
+## Landing page
+
+The source of the Prose landing page, including a playground that runs this
+compiler in the browser, is in [site/](site/README.md). `npm.cmd run site`
+builds it to `site/dist/index.html`.
+
 ## Implemented subset
 
 - Assignment: `answer is 42`.

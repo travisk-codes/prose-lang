@@ -1,0 +1,197 @@
+// Builds the landing page (site/dist/index.html) from template.html. Every code sample is highlighted
+// with the VS Code extension's grammar and palette, and every output and error comes from the real compiler.
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { runInNewContext } from "node:vm";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const repo = fileURLToPath(new URL("../", import.meta.url));
+const here = new URL("./", import.meta.url);
+const require = createRequire(repo + "package.json");
+const textmate = require("vscode-textmate");
+const oniguruma = require("vscode-oniguruma");
+const { compile } = await import(pathToFileURL(repo + "src/transpile.js").href);
+
+const wasm = readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm"));
+await oniguruma.loadWASM(wasm.buffer.slice(wasm.byteOffset, wasm.byteOffset + wasm.byteLength));
+const manifest = JSON.parse(readFileSync(repo + "editors/vscode/package.json", "utf8"));
+const rules = manifest.contributes.configurationDefaults["editor.tokenColorCustomizations"].textMateRules;
+const grammarPath = repo + "editors/vscode/syntaxes/prose.tmLanguage.json";
+const registry = new textmate.Registry({
+  theme: { settings: [{ settings: { foreground: "#D4D4D4", background: "#1F1F1F" } }, ...rules] },
+  onigLib: Promise.resolve({
+    createOnigScanner: patterns => new oniguruma.OnigScanner(patterns),
+    createOnigString: value => new oniguruma.OnigString(value)
+  }),
+  loadGrammar: async scope => scope === "source.prose" ? textmate.parseRawGrammar(readFileSync(grammarPath, "utf8"), grammarPath) : null
+});
+const grammar = await registry.loadGrammar("source.prose");
+const colorMap = registry.getColorMap();
+
+// Palette colors become class names, so the page's CSS tokens own the actual values.
+const names = {
+  "#F87171": "red", "#FB923C": "orange", "#FBBF24": "amber", "#FDE047": "yellow", "#A3E635": "lime",
+  "#4ADE80": "green", "#34D399": "emerald", "#2DD4BF": "teal", "#5EEAD4": "teal2", "#22D3EE": "cyan",
+  "#60A5FA": "blue", "#BFDBFE": "pale", "#818CF8": "indigo", "#C084FC": "purple", "#F472B6": "pink",
+  "#FB7185": "rose", "#8B96B5": "comment", "#A2ACC8": "punct", "#F43F5E": "invalid", "#D4D4D4": "plain"
+};
+const escape = text => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function highlight(source) {
+  let stack = textmate.INITIAL;
+  return source.split("\n").map(line => {
+    const { tokens, ruleStack } = grammar.tokenizeLine2(line, stack);
+    stack = ruleStack;
+    let html = "";
+    for (let i = 0; i < tokens.length; i += 2) {
+      const end = i + 2 < tokens.length ? tokens[i + 2] : line.length;
+      const meta = tokens[i + 1];
+      const color = colorMap[(meta >>> 15) & 511].toUpperCase();
+      if (!names[color]) throw new Error(`No class for ${color}`);
+      const style = (meta >>> 11) & 15;
+      const classes = [`c-${names[color]}`, style & 1 ? "it" : "", style & 2 ? "bd" : ""].filter(Boolean).join(" ");
+      html += `<span class="${classes}">${escape(line.slice(tokens[i], end))}</span>`;
+    }
+    return html;
+  }).join("\n");
+}
+
+// Wraps the nth span whose text is exactly `token` in a proofreader's mark.
+function mark(html, token, nth = 1) {
+  let seen = 0;
+  const marked = html.replace(new RegExp(`(<span class="[^"]*">)(${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})(</span>)`, "g"),
+    (all, open, text, close) => ++seen === nth ? `${open}<mark class="erratum">${text}</mark>${close}` : all);
+  if (!seen) throw new Error(`Token ${token} not found`);
+  return marked;
+}
+
+function check(source, prefix = "") {
+  compile(prefix + source);
+  return source;
+}
+const body = code => code.split("\n").filter(line => !line.startsWith("import {")).join("\n").trim();
+function errorOf(source) {
+  try { compile(source); } catch (error) { return error.message; }
+  throw new Error(`Expected an error: ${source}`);
+}
+function runtimeErrorOf(source) {
+  try { runInNewContext(compile(source).code, { console: { log() {} } }); } catch (error) { return error.message; }
+  throw new Error(`Expected a runtime error: ${source}`);
+}
+function outputOf(source) {
+  const lines = [];
+  runInNewContext(compile(source).code, { console: { log: value => lines.push(String(value)) } });
+  return lines.join("\n");
+}
+
+const hero = readFileSync(new URL("hero.prose", here), "utf8").trim();
+// The hero compares Prose with JavaScript as a person would write it, so both must print the same thing.
+const heroJsPath = new URL("hero.js", here);
+const heroJs = readFileSync(heroJsPath, "utf8").trim();
+const heroJsOutput = execFileSync(process.execPath, [fileURLToPath(heroJsPath)], { encoding: "utf8" }).trim();
+if (heroJsOutput !== outputOf(hero)) throw new Error(`hero.js prints:\n${heroJsOutput}\nbut the Prose prints:\n${outputOf(hero)}`);
+
+const features = {
+  words: check('label is if pages > 500 then "long" else "short"\nif count = 1 then print "one entry"', "pages is 1\ncount is 1\n"),
+  loops: check('for each name, score in scores\n    print name + ": " + score', "scores is new Map\n"),
+  functions: check('function pluralize takes count, word\n    return count + " " + (if count = 1 then word else word + "s")\n\nprint pluralize 3, "book"'),
+  maybe: check('city is maybe person:address:city otherwise "unknown"', "person is null\n"),
+  positions: check('word is "a😀z"\nprint word.2\nprint length word'),
+  values: check("long_books is books:filter function takes book return book:pages > 500", "books is array\n")
+};
+const positionsOutput = outputOf(features.positions);
+
+const interop = check([
+  'use addDays, dateFromKey, localDateKey from "./dates.js"',
+  "",
+  '"The day after a YYYY-MM-DD key."',
+  "export function nextDay takes key as text, giving text",
+  "    return localDateKey (addDays (dateFromKey key), 1)",
+  "",
+  'seen is new Set ("a", "b", "a")',
+  'print Math:max 4, 9, 2',
+  'document:title is "Written in Prose"'
+].join("\n"));
+
+const typed = check([
+  '"A run of consecutive days."',
+  "export type StreakRun is object",
+  '    "First and last day, as YYYY-MM-DD."',
+  "    start as text",
+  "    end as text",
+  "    length as number",
+  "",
+  '"Every run, longest first."',
+  "export function streakRuns takes days as list of text, giving list of StreakRun",
+  "    return array"
+].join("\n"));
+const declarations = compile(typed).declarations.split("\n").slice(1).join("\n").trim();
+
+const errata = [
+  { source: "total is 3\nprint totl", token: "totl", message: errorOf("total is 3\nprint totl"),
+    note: "Every name has to be assigned, imported, or part of JavaScript, so a typo stops the build." },
+  { source: 'counts is new Map\ncount is 0\ncounts:set "read", count + 1', token: "+", message: errorOf('counts is new Map\ncount is 0\ncounts:set "read", count + 1'),
+    note: "Does the 1 go to the count, or to the result? Prose asks instead of guessing." },
+  { source: "ready is true\nif ready count is 5", token: "count", message: errorOf("ready is true\nif ready count is 5"),
+    note: "The error message includes the fix." },
+  { source: "person is null\nprint person:name", token: "name", message: runtimeErrorOf("person is null\nprint person:name"),
+    note: "This one happens while the program runs, still with its line. Write maybe person:name when a value can be missing." }
+];
+
+// The compiler itself, for the playground: runtime and transpiler in one script, exporting compile.
+const strip = file => readFileSync(repo + file, "utf8").split("\n").filter(line => !line.startsWith("import ")).join("\n").replace(/^export /gm, "");
+const compiler = `const Prose = (() => {\n${strip("src/runtime.js")}\n${strip("src/transpile.js")}\nreturn { compile };\n})();`;
+
+const examples = [
+  { name: "Reading list", source: readFileSync(new URL("play.prose", here), "utf8").trim() },
+  { name: "FizzBuzz", source: readFileSync(repo + "examples/fizzbuzz.prose", "utf8").trim() },
+  { name: "Caesar cipher", source: readFileSync(repo + "examples/caesar_cipher_demo.prose", "utf8").trim() },
+  { name: "Pascal's triangle", source: readFileSync(repo + "examples/pascal_triangle.prose", "utf8").trim() }
+];
+for (const example of examples) {
+  example.source = example.source.replace(/\r\n/g, "\n");
+  compile(example.source);
+}
+
+// The page states how many tests pass, so the build runs them; a failing suite stops the build.
+const testReport = execFileSync(process.execPath, ["--test"], { cwd: repo, encoding: "utf8" });
+const testCount = Number(/^ℹ pass (\d+)$/m.exec(testReport)[1]);
+const play = examples[0].source;
+const values = {
+  play_source: escape(play),
+  play_output: escape(outputOf(play)),
+  play_js: escape(body(compile(play, { runtime: "prose-runtime" }).code)),
+  hero_prose: highlight(hero),
+  hero_js: escape(heroJs),
+  hero_output: escape(outputOf(hero)),
+  f_words: highlight(features.words),
+  f_loops: highlight(features.loops),
+  f_functions: highlight(features.functions),
+  f_maybe: highlight(features.maybe),
+  f_positions: highlight(features.positions),
+  f_positions_output: escape(positionsOutput.replace(/\n/g, ", ")),
+  f_values: highlight(features.values),
+  interop_prose: highlight(interop),
+  types_prose: highlight(typed),
+  types_dts: escape(declarations),
+  errata: errata.map(({ source, token, message, note }) => {
+    const [, line, text] = /^Line (\d+): (.*)$/.exec(message);
+    return `<li class="erratum-entry">
+          <pre class="code slab"><code>${mark(highlight(source), token)}</code></pre>
+          <div class="note"><span class="note-line">Line ${line}</span><blockquote>${escape(text)}</blockquote><p>${escape(note)}</p></div>
+        </li>`;
+  }).join("\n        "),
+  test_count: String(testCount),
+  compiler: compiler.replace(/<\//g, "<\\/"),
+  examples: JSON.stringify(examples).replace(/<\//g, "<\\/")
+};
+
+let page = readFileSync(new URL("template.html", here), "utf8");
+page = page.replace(/\{\{(\w+)\}\}/g, (all, key) => {
+  if (!(key in values)) throw new Error(`Unknown placeholder ${key}`);
+  return values[key];
+});
+mkdirSync(new URL("dist/", here), { recursive: true });
+writeFileSync(new URL("dist/index.html", here), page);
+console.log(`Wrote site/dist/index.html (${Math.round(page.length / 1024)} KB, ${testCount} tests passing)`);

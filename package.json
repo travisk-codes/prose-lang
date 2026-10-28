@@ -21,7 +21,8 @@
     "example:arrays": "node bin/prose.js examples/arrays.prose --run",
     "example:reading": "node bin/prose.js examples/reading_list.prose --run",
     "example:habits": "node bin/prose.js examples/habits.prose --run",
-    "example:tour": "node bin/prose.js examples/tour.prose --run"
+    "example:tour": "node bin/prose.js examples/tour.prose --run",
+    "site": "node site/build.mjs"
   },
   "engines": {
     "node": ">=20.6"

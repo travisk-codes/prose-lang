@@ -1,0 +1,806 @@
+<title>The Prose Programming Language</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Prose is a small programming language made of plain English words that compiles to JavaScript.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;0,800;1,400;1,500;1,700&family=Alegreya+Sans+SC:wght@500;700&family=Victor+Mono:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  /* Layout: a book spread laid on paper. Facing pages pair Prose with the JavaScript it becomes,
+     small-caps running heads label each page, and a rainbow ribbon is the one bright mark. */
+  :root {
+    /* Paper and ink: one deliberate look, the same in light and dark mode. */
+    --paper: #F1E7D3;
+    --paper-deep: #E8DBC1;
+    --rule: #D3C2A3;
+    --ink: #2B241D;
+    --ink-soft: #6B5B49;
+    --accent: #3B3A8E;
+    --proof: #A3281E;
+    /* The dark pages that hold code, and the VS Code palette that colors it. */
+    --slab: #1E1D27;
+    --slab-edge: #353343;
+    --slab-ink: #D4D4D4;
+    --slab-soft: #A9A6B4;
+    --c-red: #F87171; --c-orange: #FB923C; --c-amber: #FBBF24; --c-yellow: #FDE047;
+    --c-lime: #A3E635; --c-green: #4ADE80; --c-emerald: #34D399; --c-teal: #2DD4BF;
+    --c-teal2: #5EEAD4; --c-cyan: #22D3EE; --c-blue: #60A5FA; --c-pale: #BFDBFE;
+    --c-indigo: #818CF8; --c-purple: #C084FC; --c-pink: #F472B6; --c-rose: #FB7185;
+    --c-comment: #8B96B5; --c-punct: #A2ACC8; --c-invalid: #F43F5E; --c-plain: #D4D4D4;
+    --display: "Alegreya", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --label: "Alegreya Sans SC", "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "Victor Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35 0 0 0 0 .27 0 0 0 0 .18 0 0 0 .1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    background-color: var(--paper);
+    background-image: var(--grain);
+    color: var(--ink);
+    font: 400 1.1875rem/1.6 var(--display);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+  h1 { font-weight: 800; font-size: clamp(2.75rem, 7.5vw, 5.25rem); line-height: 1; letter-spacing: -0.015em; }
+  h1 em { font-weight: 500; }
+  h2 { font-weight: 800; font-size: clamp(1.9rem, 4.2vw, 2.85rem); line-height: 1.08; }
+  h3 { font-weight: 700; font-size: 1.3rem; line-height: 1.25; }
+  p { margin: 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .eyebrow, .running-head, .label {
+    font-family: var(--label);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    font-size: 1rem;
+    color: var(--ink-soft);
+  }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  code, pre { font-family: var(--mono); }
+  .code { margin: 0; font-size: 0.82rem; line-height: 1.65; tab-size: 4; white-space: pre; }
+  .slab {
+    background: var(--slab);
+    color: var(--slab-ink);
+    border-radius: 4px;
+    padding: 1rem 1.15rem;
+    overflow-x: auto;
+    min-width: 0;
+  }
+  .translation, .translation code { color: var(--slab-soft); }
+  .slab, .page .code, .result, .editor-input { scrollbar-width: thin; scrollbar-color: var(--slab-edge) transparent; }
+  /* The compiler's side of a spread wraps instead of scrolling; it is read, not edited. */
+  .spread .translation { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  /* Code colors from the Prose palette for VS Code. */
+  .c-red { color: var(--c-red); } .c-orange { color: var(--c-orange); } .c-amber { color: var(--c-amber); }
+  .c-yellow { color: var(--c-yellow); } .c-lime { color: var(--c-lime); } .c-green { color: var(--c-green); }
+  .c-emerald { color: var(--c-emerald); } .c-teal { color: var(--c-teal); } .c-teal2 { color: var(--c-teal2); }
+  .c-cyan { color: var(--c-cyan); } .c-blue { color: var(--c-blue); } .c-pale { color: var(--c-pale); }
+  .c-indigo { color: var(--c-indigo); } .c-purple { color: var(--c-purple); } .c-pink { color: var(--c-pink); }
+  .c-rose { color: var(--c-rose); } .c-comment { color: var(--c-comment); } .c-punct { color: var(--c-punct); }
+  .c-invalid { color: var(--c-invalid); text-decoration: underline; } .c-plain { color: var(--c-plain); }
+  .it { font-style: italic; } .bd { font-weight: 600; }
+  mark.erratum {
+    background: none;
+    color: inherit;
+    text-decoration: underline wavy var(--c-red);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 4px;
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.7rem 1.2rem;
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    font-family: var(--label);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.05em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .button.primary { background: var(--ink); color: var(--paper); }
+  @media (prefers-reduced-motion: no-preference) {
+    .button { transition: transform 120ms ease, box-shadow 120ms ease; }
+    .button:hover { transform: translateY(-1px); box-shadow: 0 3px 0 var(--rule); }
+  }
+
+  /* Masthead */
+  .masthead { border-bottom: 1px solid var(--rule); }
+  .masthead-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 2rem; padding-block: 1.1rem; }
+  .wordmark { font-family: var(--display); font-weight: 800; font-style: italic; font-size: 1.75rem; color: var(--ink); text-decoration: none; letter-spacing: -0.01em; }
+  .masthead nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1.4rem; }
+  .masthead nav a { font-family: var(--label); font-weight: 700; letter-spacing: 0.06em; color: var(--ink-soft); text-decoration: none; }
+  .masthead nav a:hover { color: var(--ink); }
+
+  /* Hero */
+  .hero { padding-block: clamp(3rem, 8vw, 6rem) clamp(3.5rem, 8vw, 6rem); }
+  .hero-text { display: grid; gap: 1.25rem; max-width: 46rem; }
+  .lede { font-size: clamp(1.2rem, 2.2vw, 1.4rem); line-height: 1.5; color: var(--ink-soft); max-width: 38rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
+
+  /* A book spread: Prose on the left page, its JavaScript on the right. */
+  .spread {
+    position: relative;
+    margin: clamp(2.75rem, 6vw, 4rem) 0 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    background: var(--slab);
+    border-radius: 4px;
+    color: var(--slab-ink);
+    box-shadow: 0 30px 50px -30px rgba(43, 36, 29, 0.55), 0 2px 0 var(--rule);
+  }
+  .page { display: flex; flex-direction: column; gap: 0.9rem; padding: 1.1rem 1.6rem 0.9rem; min-width: 0; }
+  .page .code { overflow-x: auto; padding-block: 0.25rem; flex: 1; }
+  .verso { background: linear-gradient(to left, rgba(0, 0, 0, 0.38), transparent 2.75rem); }
+  .recto { background: linear-gradient(to right, rgba(0, 0, 0, 0.38), transparent 2.75rem); }
+  .page .running-head { color: var(--slab-soft); text-align: center; font-size: 0.95rem; }
+  .folio { font-family: var(--display); font-size: 0.9rem; color: var(--slab-soft); font-variant-numeric: oldstyle-nums; }
+  .recto .folio { text-align: right; }
+  .ribbon {
+    position: absolute;
+    top: -0.55rem;
+    right: calc(50% + 2.4rem);
+    width: 0.95rem;
+    height: 5.75rem;
+    background: linear-gradient(var(--c-red), var(--c-orange), var(--c-yellow), var(--c-green), var(--c-cyan), var(--c-indigo), var(--c-purple));
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 85%, 0 100%);
+  }
+  .spread figcaption {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem 2rem;
+    padding: 0.9rem 1.6rem 1.1rem;
+    border-top: 1px solid var(--slab-edge);
+    color: var(--slab-soft);
+    font-style: italic;
+    font-size: 1rem;
+  }
+  .printout { display: flex; flex-wrap: wrap; gap: 0.35rem 1.25rem; align-items: baseline; margin-top: 1.25rem; }
+  .printout pre { margin: 0; font-size: 0.85rem; line-height: 1.6; color: var(--ink); white-space: pre-wrap; }
+
+  /* Sections */
+  .section { padding-block: clamp(4rem, 9vw, 6.5rem); }
+  .band { background: var(--paper-deep); border-block: 1px solid var(--rule); }
+  .section-head { display: grid; gap: 0.9rem; max-width: 40rem; margin-bottom: clamp(2rem, 5vw, 3rem); }
+  .section-head p:not(.eyebrow) { color: var(--ink-soft); }
+
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 2.75rem 2.25rem; }
+  .feature { display: flex; flex-direction: column; gap: 0.65rem; min-width: 0; }
+  .feature p { color: var(--ink-soft); }
+  .feature .slab { margin-top: 0.35rem; }
+  .feature code.inline, .section-head code.inline, .step code.inline {
+    font-size: 0.85em;
+    background: var(--paper-deep);
+    padding: 0.05em 0.3em;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  /* Playground */
+  .playground { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1rem; }
+  .pg-pane { background: var(--slab); border-radius: 4px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .pg-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.55rem 0.75rem 0.55rem 1.15rem; border-bottom: 1px solid var(--slab-edge); }
+  .pg-bar .running-head { color: var(--slab-soft); font-size: 0.95rem; }
+  .pg-bar select {
+    font: 700 0.95rem var(--label);
+    letter-spacing: 0.04em;
+    color: var(--slab-ink);
+    background: var(--slab-edge);
+    border: 0;
+    border-radius: 3px;
+    padding: 0.3rem 0.5rem;
+  }
+  .editor { position: relative; height: clamp(17rem, 46vh, 25rem); }
+  .editor-layer, .editor-input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 1rem 1.15rem;
+    border: 0;
+    font: 400 0.82rem/1.65 var(--mono);
+    tab-size: 4;
+    white-space: pre;
+    overflow: auto;
+    letter-spacing: normal;
+  }
+  .editor-layer { pointer-events: none; overflow: hidden; color: var(--slab-ink); }
+  .editor-input {
+    resize: none;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--c-yellow);
+    outline: none;
+  }
+  .editor-input::selection { background: rgba(253, 224, 71, 0.22); color: transparent; }
+  .editor:focus-within { box-shadow: inset 0 0 0 2px var(--c-yellow); }
+  .tabs { display: flex; gap: 0.25rem; }
+  .tabs button {
+    font: 700 0.95rem var(--label);
+    letter-spacing: 0.06em;
+    color: var(--slab-soft);
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.3rem 0.45rem;
+    cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { color: var(--slab-ink); border-bottom-color: var(--c-yellow); }
+  .tabs button:focus-visible, .pg-bar select:focus-visible, .copy:focus-visible { outline-color: var(--c-yellow); }
+  .result { padding: 1rem 1.15rem; overflow: auto; flex: 1; min-height: 12rem; max-height: clamp(17rem, 46vh, 25rem); color: var(--slab-ink); }
+  .result.translation { color: var(--slab-soft); }
+  .pg-status { min-height: 1.6em; padding: 0.55rem 1.15rem 0.8rem; border-top: 1px solid var(--slab-edge); font-style: italic; font-size: 1rem; color: var(--slab-soft); }
+  .pg-status.error { color: var(--c-red); }
+
+  /* JavaScript interop */
+  .split { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: clamp(2rem, 5vw, 4rem); align-items: start; }
+  .split .section-head { margin-bottom: 0; }
+  .stack { display: grid; gap: 1rem; min-width: 0; }
+  .stack .label { margin-bottom: -0.5rem; }
+
+  /* Errata */
+  .errata { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem; }
+  .erratum-entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem 2.25rem; align-items: center; }
+  .note { display: grid; gap: 0.4rem; }
+  .note-line { font-family: var(--label); font-weight: 700; letter-spacing: 0.08em; color: var(--proof); }
+  .note blockquote { margin: 0; font-style: italic; font-size: 1.15rem; line-height: 1.45; }
+  .note blockquote::before { content: "\201C"; }
+  .note blockquote::after { content: "\201D"; }
+  .note p { color: var(--ink-soft); font-size: 1rem; }
+
+  /* Price */
+  .price { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 26rem); gap: clamp(2rem, 6vw, 5rem); align-items: center; }
+  .price .section-head { margin-bottom: 0; }
+  .edition { background: var(--paper); background-image: var(--grain); border: 1px solid var(--ink); border-radius: 4px; padding: 1.75rem; display: grid; gap: 1rem; box-shadow: 6px 6px 0 var(--rule); }
+  .edition-amount { font-weight: 800; font-size: 4.5rem; line-height: 0.9; font-variant-numeric: oldstyle-nums; }
+  .edition ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.45rem; border-top: 1px solid var(--rule); padding-top: 1rem; }
+  .edition li { padding-left: 1.4rem; position: relative; font-size: 1.05rem; }
+  .edition li::before { content: "\2014"; position: absolute; left: 0; color: var(--ink-soft); }
+  .edition .button { justify-self: start; }
+
+  /* Getting started: a real sequence, so the steps are numbered. */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 2.5rem 2rem; counter-reset: step; }
+  .step { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; counter-increment: step; }
+  .step::before { content: counter(step); font-weight: 800; font-size: 2.6rem; line-height: 1; font-variant-numeric: oldstyle-nums; color: var(--proof); }
+  .step p { color: var(--ink-soft); }
+  .command { position: relative; margin-top: 0.35rem; }
+  .command .slab { padding-right: 4.75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .copy {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    font: 700 0.85rem var(--label);
+    letter-spacing: 0.06em;
+    color: var(--slab-ink);
+    background: var(--slab-edge);
+    border: 0;
+    border-radius: 3px;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+  }
+
+  /* Forthcoming chapters, set like a table of contents. */
+  .toc { list-style: none; margin: 0; padding: 0; max-width: 44rem; display: grid; gap: 0.6rem; }
+  .toc li { display: flex; align-items: baseline; gap: 0.75rem; font-size: 1.15rem; }
+  .toc .leader { flex: 1; border-bottom: 2px dotted var(--rule); transform: translateY(-0.3rem); }
+  .toc .when { font-style: italic; color: var(--ink-soft); font-size: 1rem; }
+
+  /* Colophon */
+  .colophon { border-top: 1px solid var(--rule); padding-block: 2.5rem 3rem; }
+  .colophon .wrap { display: grid; gap: 0.6rem; max-width: 72rem; }
+  .colophon p:not(.eyebrow) { color: var(--ink-soft); font-size: 1rem; max-width: 40rem; }
+
+  @media (max-width: 52rem) {
+    .playground, .split, .price, .erratum-entry { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 47.5rem) {
+    .spread { grid-template-columns: minmax(0, 1fr); }
+    .verso { background: none; border-bottom: 1px solid var(--slab-edge); }
+    .recto { background: none; }
+    .recto .folio { text-align: left; }
+    .ribbon { right: 1.25rem; height: 2.6rem; }
+    .page { padding-inline: 1.15rem; }
+    .spread figcaption { padding-inline: 1.15rem; }
+  }
+</style>
+
+<header class="masthead">
+  <div class="wrap masthead-row">
+    <a class="wordmark" href="#top">Prose</a>
+    <nav aria-label="Sections">
+      <a href="#features">Features</a>
+      <a href="#try">Try it</a>
+      <a href="#types">Types</a>
+      <a href="#price">Price</a>
+      <a href="#start">Get started</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-text">
+        <p class="eyebrow">A programming language</p>
+        <h1>Code you can <em>read aloud.</em></h1>
+        <p class="lede">Prose is a small programming language made of plain English words. It compiles to ordinary JavaScript, so it runs anywhere JavaScript runs and works alongside the code you already have.</p>
+        <div class="actions">
+          <a class="button primary" href="#try">Try it in your browser</a>
+          <a class="button" href="https://github.com/travisk-codes/prose-lang">Get Prose on GitHub</a>
+        </div>
+      </div>
+
+      <figure class="spread">
+        <span class="ribbon" aria-hidden="true"></span>
+        <div class="page verso">
+          <div class="running-head">Prose</div>
+          <pre class="code"><code>{{hero_prose}}</code></pre>
+          <div class="folio">14</div>
+        </div>
+        <div class="page recto">
+          <div class="running-head">JavaScript</div>
+          <pre class="code translation"><code>{{hero_js}}</code></pre>
+          <div class="folio">15</div>
+        </div>
+        <figcaption><span>The same program on both pages: Prose, and JavaScript as you'd write it by hand.</span><span>Both print the two lines below.</span></figcaption>
+      </figure>
+      <div class="printout">
+        <span class="label">Output</span>
+        <pre>{{hero_output}}</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Features</p>
+        <h2>Words where other languages use symbols.</h2>
+        <p>Braces, semicolons, and arrows become words you already know. What's left is short enough to read in one breath.</p>
+      </div>
+      <div class="features">
+        <article class="feature">
+          <h3>Plain words for decisions</h3>
+          <p><code class="inline">is</code> stores a value and <code class="inline">=</code> compares. An <code class="inline">if</code> can fill in a value or run a line.</p>
+          <pre class="code slab"><code>{{f_words}}</code></pre>
+        </article>
+        <article class="feature">
+          <h3>Loops that name what they visit</h3>
+          <p><code class="inline">for each</code> walks lists, text, and maps, and takes pairs apart into names.</p>
+          <pre class="code slab"><code>{{f_loops}}</code></pre>
+        </article>
+        <article class="feature">
+          <h3>Functions without the punctuation</h3>
+          <p>Say what a function takes. Call it by writing the values after its name.</p>
+          <pre class="code slab"><code>{{f_functions}}</code></pre>
+        </article>
+        <article class="feature">
+          <h3>Missing values, said out loud</h3>
+          <p>Reading through something missing stops with the line number, unless you write <code class="inline">maybe</code>.</p>
+          <pre class="code slab"><code>{{f_maybe}}</code></pre>
+        </article>
+        <article class="feature">
+          <h3>Text that counts like a person</h3>
+          <p>Positions start at 1, and an emoji is one character. This prints {{f_positions_output}}.</p>
+          <pre class="code slab"><code>{{f_positions}}</code></pre>
+        </article>
+        <article class="feature">
+          <h3>Functions are values</h3>
+          <p>Hand a function to any JavaScript method that wants one, written on one line or indented below.</p>
+          <pre class="code slab"><code>{{f_values}}</code></pre>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="try" class="section band">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Try it</p>
+        <h2>Write some Prose.</h2>
+        <p>This is the real compiler, running in your browser. Change the program and the output follows as you type. The Compiled tab shows the JavaScript the compiler writes, with the checks that report line numbers.</p>
+      </div>
+      <div class="playground">
+        <div class="pg-pane">
+          <div class="pg-bar">
+            <span class="running-head">Your program</span>
+            <label><span class="visually-hidden">Example program</span><select id="example"></select></label>
+          </div>
+          <div class="editor">
+            <pre class="editor-layer" id="highlight" aria-hidden="true"></pre>
+            <textarea class="editor-input" id="source" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Prose program">{{play_source}}</textarea>
+          </div>
+        </div>
+        <div class="pg-pane">
+          <div class="pg-bar">
+            <div class="tabs" role="tablist" aria-label="Result">
+              <button type="button" role="tab" id="tab-output" aria-selected="true" aria-controls="output">Output</button>
+              <button type="button" role="tab" id="tab-compiled" aria-selected="false" aria-controls="compiled">Compiled</button>
+            </div>
+          </div>
+          <pre class="code result" id="output" role="tabpanel" aria-labelledby="tab-output">{{play_output}}</pre>
+          <pre class="code result translation" id="compiled" role="tabpanel" aria-labelledby="tab-compiled" hidden>{{play_js}}</pre>
+          <p class="pg-status" id="status" role="status" aria-live="polite">Compiled and ran.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="javascript" class="section">
+    <div class="wrap split">
+      <div class="section-head">
+        <p class="eyebrow">Works with JavaScript</p>
+        <h2>Bring your libraries. Keep your build.</h2>
+        <p>Prose calls JavaScript methods, creates JavaScript objects, and imports from JavaScript and TypeScript files. Its arrays and objects are JavaScript's own, so libraries that compare them by identity, like React, see the same values.</p>
+        <p>A Vite plugin compiles <code class="inline">.prose</code> files as they're imported, in development, in builds, and in Vitest.</p>
+      </div>
+      <div class="stack">
+        <span class="label">next-day.prose</span>
+        <pre class="code slab"><code>{{interop_prose}}</code></pre>
+        <span class="label">vite.config.ts</span>
+        <pre class="code slab translation"><code>import prose from 'prose-lang/vite'
+
+export default defineConfig({
+  plugins: [prose({ declarations: true })],
+})</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="types" class="section band">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Types</p>
+        <h2>Types when you want them.</h2>
+        <p>Add <code class="inline">as</code> and <code class="inline">giving</code> where they help. Prose writes the TypeScript declaration file for you, so TypeScript that imports your module is fully checked. Leave them out and everything still runs.</p>
+      </div>
+      <figure class="spread">
+        <div class="page verso">
+          <div class="running-head">streaks.prose</div>
+          <pre class="code"><code>{{types_prose}}</code></pre>
+          <div class="folio">88</div>
+        </div>
+        <div class="page recto">
+          <div class="running-head">streaks.d.prose.ts</div>
+          <pre class="code translation"><code>{{types_dts}}</code></pre>
+          <div class="folio">89</div>
+        </div>
+        <figcaption><span>Comments above a declaration become its documentation.</span><span>Generated by <code>prose types</code>.</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="errata" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Errata</p>
+        <h2>A compiler that proofreads.</h2>
+        <p>Mistakes come back with their line number and a sentence about what to do. These are the compiler's own words.</p>
+      </div>
+      <ol class="errata">
+        {{errata}}
+      </ol>
+    </div>
+  </section>
+
+  <section id="price" class="section band">
+    <div class="wrap price">
+      <div class="section-head">
+        <p class="eyebrow">Price</p>
+        <h2>One edition, and it's free.</h2>
+        <p>Prose is open source under the MIT license. Use it at work, change it, and ship what you build with it.</p>
+      </div>
+      <div class="edition">
+        <p class="label">The complete edition</p>
+        <p class="edition-amount">$0</p>
+        <ul>
+          <li>The compiler and command-line tool</li>
+          <li>A Vite plugin for development, builds, and Vitest</li>
+          <li>TypeScript declarations written from your annotations</li>
+          <li>A VS Code extension with the rainbow palette on this page</li>
+          <li>Example programs, including a tour of every feature</li>
+          <li>{{test_count}} tests that keep all of it honest</li>
+        </ul>
+        <a class="button primary" href="https://github.com/travisk-codes/prose-lang">Get Prose on GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="start" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Get started</p>
+        <h2>Three steps to your first page.</h2>
+        <p>You need Node.js 20.6 or newer. There is nothing else to install.</p>
+      </div>
+      <ol class="steps">
+        <li class="step">
+          <h3>Get the code</h3>
+          <p>Clone the repository.</p>
+          <div class="command">
+            <pre class="code slab" id="cmd-clone">git clone https://github.com/travisk-codes/prose-lang.git</pre>
+            <button type="button" class="copy" data-copy="cmd-clone">Copy</button>
+          </div>
+        </li>
+        <li class="step">
+          <h3>Run the tour</h3>
+          <p>One program that uses every feature, section by section.</p>
+          <div class="command">
+            <pre class="code slab" id="cmd-tour">cd prose-lang
+node bin/prose.js examples/tour.prose --run</pre>
+            <button type="button" class="copy" data-copy="cmd-tour">Copy</button>
+          </div>
+        </li>
+        <li class="step">
+          <h3>Write your own</h3>
+          <p>Save a <code class="inline">.prose</code> file and run it the same way, or import it from a Vite project.</p>
+          <div class="command">
+            <pre class="code slab" id="cmd-import">import { nextDay } from './next-day.prose'</pre>
+            <button type="button" class="copy" data-copy="cmd-import">Copy</button>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="next" class="section band">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Forthcoming chapters</p>
+        <h2>Still being written.</h2>
+        <p>Prose is young. These are next.</p>
+      </div>
+      <ol class="toc">
+        <li><span>Async and await</span><span class="leader" aria-hidden="true"></span><span class="when">forthcoming</span></li>
+        <li><span>Try and catch</span><span class="leader" aria-hidden="true"></span><span class="when">forthcoming</span></li>
+        <li><span>Regular expressions</span><span class="leader" aria-hidden="true"></span><span class="when">forthcoming</span></li>
+        <li><span>Spread and destructuring</span><span class="leader" aria-hidden="true"></span><span class="when">forthcoming</span></li>
+        <li><span>Type checking inside Prose itself</span><span class="leader" aria-hidden="true"></span><span class="when">forthcoming</span></li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer class="colophon">
+  <div class="wrap">
+    <p class="eyebrow">Colophon</p>
+    <p>Set in Alegreya and Victor Mono. Code is colored with the Prose palette for VS Code. Prose is released under the MIT license.</p>
+    <p><a href="https://github.com/travisk-codes/prose-lang">github.com/travisk-codes/prose-lang</a></p>
+  </div>
+</footer>
+
+<script>
+{{compiler}}
+</script>
+<script type="application/json" id="examples">{{examples}}</script>
+<script>
+(() => {
+  // Highlighting for the editor, matching the VS Code grammar's main rules.
+  const control = new Set(["if", "then", "else", "for", "each", "in", "while", "return"]);
+  const languageWords = new Set(["is", "to", "print", "run", "with", "new", "use", "export", "takes", "type"]);
+  const operatorWords = new Set(["and", "or", "not", "mod", "otherwise", "maybe"]);
+  const constants = new Set(["true", "false", "null", "unset"]);
+  const builtins = new Set(["length", "char_to_number", "number_to_char", "remainder"]);
+  const typeWords = new Set(["list", "set", "map", "of", "from", "to", "taking", "giving", "or", "and", "maybe", "function"]);
+  const escapeHtml = text => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const wrap = (classes, text) => `<span class="${classes}">${escapeHtml(text)}</span>`;
+
+  function highlightLine(line) {
+    if (/^\s*"(?:[^"\\]|\\.)*"\s*$/.test(line)) return wrap("c-comment it", line);
+    const binding = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s+(?:is|as)\b/d.exec(line);
+    const bindingAt = binding ? binding.indices[1][0] : -1;
+    const pattern = /("(?:[^"\\]|\\.)*"?)|(\d+(?:\.\d+)?)|([A-Za-z_][A-Za-z_0-9]*)|(<=|>=|!=|[=<>+*\/%-])|([:.])|([(),])|(\s+)|([\s\S])/g;
+    let html = "", match, previous = "", inParams = false, inType = false, inLoop = false, loopNext = false, afterFunction = false;
+    while ((match = pattern.exec(line))) {
+      const [text, string, number, word, operator, accessor, punct, space] = match;
+      if (space) { html += text; continue; }
+      let classes = "c-plain";
+      if (string) classes = "c-green";
+      else if (number) classes = "c-orange";
+      else if (operator) classes = "c-pink";
+      else if (accessor) classes = "c-teal2";
+      else if (punct) {
+        classes = "c-punct";
+        if (text === ",") inType = false;
+      } else if (word) {
+        if (inType && (word === "is" || word === "return")) inType = false;
+        if (match.index === bindingAt) classes = "c-blue";
+        else if (inType) classes = typeWords.has(word) ? "c-purple" : /^[A-Z]/.test(word) || ["text", "number", "boolean", "any", "nothing", "object"].includes(word) || constants.has(word) ? "c-rose" : "c-rose it";
+        else if (previous === ":") classes = "c-teal";
+        else if (afterFunction && !["takes", "return", "giving"].includes(word)) classes = "c-yellow bd";
+        else if (control.has(word)) classes = "c-red";
+        else if (word === "function") classes = "c-yellow";
+        else if (word === "as" || word === "giving") { classes = "c-purple"; inType = true; }
+        else if (languageWords.has(word)) classes = "c-purple";
+        else if (operatorWords.has(word)) classes = "c-pink";
+        else if (constants.has(word)) classes = "c-amber";
+        else if (builtins.has(word)) classes = "c-cyan";
+        else if (word === "object" || word === "array") classes = "c-indigo";
+        else if (inParams) classes = "c-lime it";
+        else if (inLoop || loopNext) classes = "c-lime";
+        else if (/^[A-Z]/.test(word)) classes = "c-rose";
+        else classes = "c-pale";
+        afterFunction = word === "function";
+        if (word === "takes") inParams = true;
+        if (word === "return") inParams = false;
+        if (word === "each" && previous === "for") inLoop = true;
+        if (word === "in") inLoop = false;
+        loopNext = word === "for";
+      }
+      if (!word) afterFunction = loopNext = false;
+      html += wrap(classes, text);
+      previous = text;
+    }
+    return html;
+  }
+
+  const source = document.getElementById("source");
+  const highlight = document.getElementById("highlight");
+  const output = document.getElementById("output");
+  const compiled = document.getElementById("compiled");
+  const status = document.getElementById("status");
+  const picker = document.getElementById("example");
+  const examples = JSON.parse(document.getElementById("examples").textContent);
+
+  for (const [index, example] of examples.entries()) picker.add(new Option(example.name, String(index)));
+
+  function render() {
+    highlight.innerHTML = source.value.split("\n").map(highlightLine).join("\n") + "\n";
+    highlight.scrollTop = source.scrollTop;
+    highlight.scrollLeft = source.scrollLeft;
+  }
+  source.addEventListener("scroll", () => {
+    highlight.scrollTop = source.scrollTop;
+    highlight.scrollLeft = source.scrollLeft;
+  });
+  source.addEventListener("keydown", event => {
+    if (event.key !== "Tab" || event.shiftKey) return;
+    event.preventDefault();
+    const { selectionStart, selectionEnd, value } = source;
+    source.value = value.slice(0, selectionStart) + "    " + value.slice(selectionEnd);
+    source.selectionStart = source.selectionEnd = selectionStart + 4;
+    render();
+    schedule();
+  });
+
+  function setStatus(text, isError) {
+    status.textContent = text;
+    status.classList.toggle("error", Boolean(isError));
+  }
+
+  // Programs run in a worker, so an endless loop can be stopped without freezing the page.
+  const workerSource = `
+    const show = (value, nested, depth) => {
+      if (typeof value === "string") return nested ? "'" + value + "'" : value;
+      if (value === undefined) return "undefined";
+      if (typeof value === "function") return "[Function]";
+      if (depth > 3) return "…";
+      if (Array.isArray(value)) return value.length ? "[ " + value.map(item => show(item, true, depth + 1)).join(", ") + " ]" : "[]";
+      if (value instanceof Map) return "Map(" + value.size + ") { " + [...value].map(([key, item]) => show(key, true, depth + 1) + " => " + show(item, true, depth + 1)).join(", ") + " }";
+      if (value instanceof Set) return "Set(" + value.size + ") { " + [...value].map(item => show(item, true, depth + 1)).join(", ") + " }";
+      if (value && typeof value === "object") {
+        const entries = Object.entries(value);
+        return entries.length ? "{ " + entries.map(([key, item]) => key + ": " + show(item, true, depth + 1)).join(", ") + " }" : "{}";
+      }
+      return String(value);
+    };
+    self.onmessage = event => {
+      const lines = [];
+      const log = (...values) => { if (lines.length < 2000) lines.push(values.map(value => show(value, false, 0)).join(" ")); };
+      try {
+        new Function("console", event.data)({ log });
+        self.postMessage({ lines });
+      } catch (error) {
+        self.postMessage({ lines, error: String((error && error.message) || error), name: error && error.name });
+      }
+    };`;
+  let workerUrl = null;
+  try { workerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" })); } catch {}
+  let worker = null;
+
+  function run(code) {
+    if (worker) worker.terminate();
+    let current;
+    try {
+      current = worker = new Worker(workerUrl);
+    } catch {
+      worker = null;
+      setStatus("Programs can't run in this browser frame, but the Compiled tab shows the JavaScript yours becomes.");
+      return;
+    }
+    const stop = setTimeout(() => {
+      current.terminate();
+      if (worker !== current) return;
+      worker = null;
+      setStatus("Stopped after 2 seconds. Is there a loop that never ends?", true);
+    }, 2000);
+    current.onmessage = ({ data }) => {
+      clearTimeout(stop);
+      current.terminate();
+      if (worker !== current) return;
+      worker = null;
+      output.textContent = data.lines.join("\n");
+      if (!data.error) setStatus(data.lines.length ? "Compiled and ran." : "Compiled and ran. Nothing was printed.");
+      else if (data.name === "EvalError" || /unsafe-eval|Content Security Policy/i.test(data.error)) {
+        setStatus("Programs can't run in this browser frame, but the Compiled tab shows the JavaScript yours becomes.");
+      } else setStatus(data.error, true);
+    };
+    current.postMessage(code);
+  }
+
+  function update() {
+    const program = source.value;
+    let shown, runnable;
+    try {
+      shown = Prose.compile(program, { runtime: "prose-runtime" });
+      runnable = Prose.compile(program);
+    } catch (error) {
+      setStatus(error.message, true);
+      return;
+    }
+    compiled.textContent = shown.code.split("\n").filter(line => !line.startsWith("import {")).join("\n").trim();
+    if (runnable.module) {
+      setStatus("Programs with use or export need a bundler to run. The Compiled tab shows the JavaScript this one becomes.");
+      return;
+    }
+    run(runnable.code);
+  }
+
+  let timer = null;
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(update, 250);
+  }
+  source.addEventListener("input", () => { render(); schedule(); });
+  picker.addEventListener("change", () => {
+    source.value = examples[Number(picker.value)].source;
+    source.scrollTop = 0;
+    render();
+    update();
+  });
+
+  for (const tab of document.querySelectorAll('[role="tab"]')) {
+    tab.addEventListener("click", () => {
+      for (const other of document.querySelectorAll('[role="tab"]')) {
+        const selected = other === tab;
+        other.setAttribute("aria-selected", String(selected));
+        document.getElementById(other.getAttribute("aria-controls")).hidden = !selected;
+      }
+    });
+  }
+
+  for (const button of document.querySelectorAll("[data-copy]")) {
+    button.addEventListener("click", async () => {
+      const target = document.getElementById(button.dataset.copy);
+      try {
+        await navigator.clipboard.writeText(target.textContent);
+        button.textContent = "Copied";
+      } catch {
+        const range = document.createRange();
+        range.selectNodeContents(target);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        button.textContent = "Selected";
+      }
+      setTimeout(() => { button.textContent = "Copy"; }, 1600);
+    });
+  }
+
+  render();
+  update();
+})();
+</script>

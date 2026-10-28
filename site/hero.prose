@@ -1,0 +1,5 @@
+"A reading list, in Prose."
+books is ("Middlemarch", 880), ("Piranesi", 272)
+for each title, pages in books
+    size is if pages > 500 then "long" else "short"
+    print title + " is a " + size + " book."

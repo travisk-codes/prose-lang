@@ -1,0 +1,11 @@
+"Edit me. Prose compiles as you type."
+shelf is ("Middlemarch", 880, true), ("Piranesi", 272, false), ("Beloved", 324, true)
+
+for each title, pages, done in shelf
+    status is if done then "read" else "unread"
+    print title + ": " + pages + " pages, " + status
+
+total is 0
+for each book in shelf
+    total is total + book.2
+print "Average: " + (Math:round (total / length shelf)) + " pages"
