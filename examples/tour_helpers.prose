@@ -1,7 +1,10 @@
-"A module for tour.prose: an exported variable and an exported function with an optional argument."
+"A module for tour.prose: an exported type, an exported variable, and an exported function with an optional argument."
 
-export greeting is "Hello"
+"Greetings are text."
+export type Greeting is text
 
-export function greet takes name, punctuation
+export greeting as Greeting is "Hello"
+
+export function greet takes name as text, punctuation as maybe text, giving Greeting
     if punctuation = unset punctuation is "!"
     return greeting + ", " + name + punctuation

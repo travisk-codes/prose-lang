@@ -161,6 +161,35 @@ test("for each loops, inline if, unset, and otherwise have syntax scopes", () =>
   }
 });
 
+test("type annotations, type declarations, and type imports have type scopes only where types are written", () => {
+  const header = "export function groupBy takes items as Iterable of item, keyOf as function taking item giving key, giving map from key to list of item";
+  hasScope(header, "items", "variable.parameter.prose");
+  hasScope(header, "as Iterable", "keyword.other.prose");
+  hasScope(header, "Iterable", "entity.name.type.prose");
+  hasScope(header, "of item", "keyword.other.prose");
+  hasScope(header, "item,", "entity.name.type.parameter.prose");
+  hasScope(header, "keyOf", "variable.parameter.prose");
+  hasScope(header, "taking", "keyword.other.prose");
+  hasScope(header, "giving map", "keyword.other.prose");
+  hasScope("plural as maybe text, giving text", "text", "support.type.prose");
+  hasScope("plural as maybe text, giving text", "maybe", "keyword.other.prose");
+  hasScope("export limit as number is 3", "limit", "variable.other.binding.prose");
+  hasScope("export limit as number is 3", "number", "support.type.prose");
+  hasScope("export limit as number is 3", "3", "constant.numeric.prose");
+  hasScope("double is function takes n as number giving number return n * 2", "n * 2", "variable.other.readwrite.prose");
+  hasScope("double is function takes n as number giving number return n * 2", "return", "keyword.control.prose");
+  const declaration = 'export type Period is "day" or "week"';
+  hasScope(declaration, "type", "storage.type.prose");
+  hasScope(declaration, "Period", "entity.name.type.prose");
+  hasScope(declaration, "day", "string.quoted.double.prose");
+  hasScope("    start as text", "start", "variable.other.binding.prose");
+  hasScope("    start as text", "text", "support.type.prose");
+  hasScope('use type Datum from "../types"', "type", "keyword.other.prose");
+  hasScope("for number is 1 to 10", "number", "variable.other.iterator.prose");
+  hasScope("print text + number", "number", "variable.other.readwrite.prose");
+  hasScope('type is "plain"', "type", "variable.other.binding.prose");
+});
+
 test("array keywords and comma lists have syntax scopes without turning literals into comments", () => {
   hasScope("items is array", "array", "storage.type.array.prose");
   hasScope('names is "Ada", "Grace"', "Ada", "string.quoted.double.prose");

@@ -138,6 +138,27 @@
             }
           },
           {
+            "name": "Prose: Types",
+            "scope": [
+              "source.prose support.type.prose",
+              "source.prose entity.name.type.prose"
+            ],
+            "settings": {
+              "foreground": "#F2CDCD",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Type variables",
+            "scope": [
+              "source.prose entity.name.type.parameter.prose"
+            ],
+            "settings": {
+              "foreground": "#F2CDCD",
+              "fontStyle": "italic"
+            }
+          },
+          {
             "name": "Prose: Standard library",
             "scope": [
               "source.prose support.function.prose"

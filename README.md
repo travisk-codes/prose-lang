@@ -34,6 +34,7 @@ node fizzbuzz.js
 The CLI writes JavaScript to standard output by default. Add `--run` to
 execute it with Node.js; any `.prose` files it imports are compiled as they
 load. Run programs you trust; execution has ordinary Node.js permissions.
+`node bin/prose.js types <folder>` writes TypeScript declarations; see [Types](#types).
 
 `examples/tour.prose` uses every feature below in one program, and
 `examples/habits.prose` shows the newest ones across two files.
@@ -91,6 +92,7 @@ See [the extension README](editors/vscode/README.md) for development and packagi
   imported from other `.prose` files keep their argument counts.
 - Compile-time errors for names that are never assigned, imported, or provided
   by JavaScript, and for `with` calls whose arguments could be read two ways.
+- Optional type annotations that generate TypeScript declaration files.
 
 ```text
 total is 0
@@ -500,8 +502,9 @@ export default defineConfig({
 Import Prose modules with their extension: `import { nextDay } from './dates.prose'`.
 The plugin compiles each file and shares one copy of the runtime helpers among
 them. When a Prose file's exported functions change, the files that import it
-are recompiled. For TypeScript, write a declaration file beside each Prose file, such as
-`dates.d.prose.ts`, and enable `allowArbitraryExtensions` in `tsconfig.json`.
+are recompiled. For TypeScript, generate a declaration file beside each Prose
+file, such as `dates.d.prose.ts` (see [Types](#types)), and enable
+`allowArbitraryExtensions` in `tsconfig.json`.
 
 `compile(source, options)` returns `{ code, module }`; `transpile(source, options)`
 returns only the code. Options:
@@ -514,6 +517,65 @@ returns only the code. Options:
 
 To run `.prose` files in your own Node.js program, register the module hook in
 `src/node-hooks.js` with `module.register`; the CLI's `--run` does this.
+
+## Types
+
+Annotations are optional and change nothing about how a program runs. They
+describe a module's exports to TypeScript: the compiler turns them into a
+declaration file (`text.d.prose.ts` beside `text.prose`), so TypeScript code
+that imports the module is type-checked. Prose code itself is not checked yet.
+
+```text
+use type Datum from "../types"
+
+"1 entry, 3 entries. The plural defaults to the singular plus an s."
+export function pluralize takes count as number, singular as text, plural as maybe text, giving text
+    if plural = unset plural is singular + "s"
+    return count + " " + (if count = 1 then singular else plural)
+
+"A run of consecutive days."
+export type StreakRun is object
+    "First and last day, as YYYY-MM-DD."
+    start as text
+    end as text
+    length as number
+
+export week_length as number is 7
+```
+
+`as` follows a parameter or an exported variable; `giving` gives a function's
+result type, after a comma when parameters come first. A quoted comment on the
+line just above a declaration or field becomes its documentation.
+
+| Prose | TypeScript |
+| --- | --- |
+| `text`, `number`, `boolean`, `any` | `string`, `number`, `boolean`, `any` |
+| `nothing` (a result), `unset`, `null` | `void`, `undefined`, `null` |
+| `"day"`, `7`, `true` | literal types |
+| `list of T`, `set of T`, `map from K to V` | `T[]`, `Set<T>`, `Map<K, V>` |
+| `A or B`, `maybe T` | `A \| B`, `T \| undefined` |
+| `function taking A and B giving C` | `(arg1: A, arg2: B) => C` |
+| `Name`, `Name of T`, `Name from K to V` | `Name`, `Name<T>`, `Name<K, V>` |
+| `item`, `key` (other lowercase names) | type parameters, as in `groupBy<item, key>` |
+| `object` | `object`, or an interface when `type X is object` has fields |
+
+Parentheses group types: `list of (number or unset)`. A trailing parameter that
+is untyped or `maybe` may be left out by callers. Field types written
+`maybe T` make optional fields. `type Name is …` declares a type at the top
+level; type names start with a capital letter. `use type A, B from "path"`
+imports types for the declarations, from TypeScript or other Prose files.
+Function values may be annotated too (`function takes n as number giving number
+return n * 2`); those annotations are not used yet.
+
+Write or refresh the declaration files with the `types` command, and add
+`--check` to fail when one is out of date:
+
+```sh
+node bin/prose.js types src
+node bin/prose.js types src --check
+```
+
+The Vite plugin can also keep them current as files compile: `prose({ declarations: true })`.
 
 ## Objects
 

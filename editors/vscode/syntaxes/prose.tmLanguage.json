@@ -25,7 +25,13 @@
       "include": "#loop-iterators"
     },
     {
+      "include": "#type-declarations"
+    },
+    {
       "include": "#bindings"
+    },
+    {
+      "include": "#type-annotations"
     },
     {
       "include": "#keywords"
@@ -102,6 +108,9 @@
       },
       "patterns": [
         {
+          "include": "#type-annotations"
+        },
+        {
           "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b",
           "name": "variable.parameter.prose"
         },
@@ -111,8 +120,78 @@
         }
       ]
     },
+    "type-annotations": {
+      "begin": "\\b(as|giving)\\b",
+      "end": "(?=,|\\bis\\b|\\breturn\\b|$)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.prose"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#types"
+        }
+      ]
+    },
+    "type-declarations": {
+      "begin": "^\\s*(?:(export)\\s+)?(type)\\s+([A-Z][A-Za-z_0-9]*)\\s+(is)\\b",
+      "end": "$",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.prose"
+        },
+        "2": {
+          "name": "storage.type.prose"
+        },
+        "3": {
+          "name": "entity.name.type.prose"
+        },
+        "4": {
+          "name": "keyword.other.prose"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#types"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#numbers"
+        },
+        {
+          "match": "\\b(?:text|number|boolean|any|nothing|unset|null|true|false|object)\\b",
+          "name": "support.type.prose"
+        },
+        {
+          "match": "\\b(?:list|set|map|maybe|function|of|from|to|taking|giving|or|and)\\b",
+          "name": "keyword.other.prose"
+        },
+        {
+          "match": "\\b[A-Z][A-Za-z_0-9]*\\b",
+          "name": "entity.name.type.prose"
+        },
+        {
+          "match": "\\b[a-z_][A-Za-z_0-9]*\\b",
+          "name": "entity.name.type.parameter.prose"
+        },
+        {
+          "include": "#punctuation"
+        }
+      ]
+    },
     "keywords": {
       "patterns": [
+        {
+          "match": "(?<=\\buse\\s)type\\b",
+          "name": "keyword.other.prose"
+        },
         {
           "match": "\\barray\\b",
           "name": "storage.type.array.prose"
@@ -130,7 +209,7 @@
           "name": "keyword.control.prose"
         },
         {
-          "match": "\\b(?:is|to|print|run|with|new|use|export)\\b|\\bfrom(?=\\s*\")",
+          "match": "\\b(?:is|to|print|run|with|new|use|export|as|giving)\\b|\\bfrom(?=\\s*\")",
           "name": "keyword.other.prose"
         },
         {
@@ -237,7 +316,7 @@
       ]
     },
     "bindings": {
-      "match": "^\\s*(?:(export)\\s+)?([A-Za-z_][A-Za-z_0-9]*)(?=\\s+is\\b)",
+      "match": "^\\s*(?:(export)\\s+)?([A-Za-z_][A-Za-z_0-9]*)(?=\\s+(?:is|as)\\b)",
       "captures": {
         "1": {
           "name": "keyword.other.prose"

@@ -4,7 +4,8 @@ const reserved = new Set([
   "if", "else", "for", "is", "to", "print", "and", "or", "not",
   "true", "false", "null", "remainder", "function", "return", "while",
   "async", "await", "takes", "run", "mod", "object", "array",
-  "with", "new", "each", "in", "then", "use", "export", "unset", "otherwise", "maybe"
+  "with", "new", "each", "in", "then", "use", "export", "unset", "otherwise", "maybe",
+  "as", "giving"
 ]);
 
 // JavaScript's own values, which a name refers to when no Prose variable has that name.
@@ -32,6 +33,12 @@ function fail(line, message) {
 }
 
 const isWord = (token, value) => token?.type === "word" && token.value === value;
+
+// Prose's words for TypeScript's basic types.
+const builtinTypes = {
+  text: "string", number: "number", boolean: "boolean", any: "any", nothing: "void",
+  unset: "undefined", null: "null", true: "true", false: "false"
+};
 
 function tokenize(text, line) {
   const tokens = [];
@@ -193,12 +200,92 @@ class Expression {
     }
     return { type: "call", name, args, builtin, line: this.line };
   }
-  lambda() {
-    const node = { type: "lambda", params: [], line: this.line };
+  // `takes` names, each optionally followed by `as` and a type, then an optional `giving` type.
+  parameters() {
+    const names = [];
+    const types = [];
     if (this.at("takes")) {
       this.take("takes");
-      node.params = this.names("parameter");
+      while (true) {
+        names.push(this.variableName());
+        types.push(this.optionalType());
+        if (!this.at(",")) break;
+        this.take(",");
+        if (this.at("giving")) break;
+      }
     }
+    if (new Set(names).size !== names.length) fail(this.line, "Duplicate parameter name.");
+    let returns;
+    if (this.at("giving")) {
+      this.take("giving");
+      returns = this.typeExpression();
+    }
+    return { names, types, returns };
+  }
+  optionalType() {
+    if (!this.at("as")) return undefined;
+    this.take("as");
+    return this.typeExpression();
+  }
+  typeExpression() {
+    const options = [this.singleType()];
+    while (this.at("or")) { this.take("or"); options.push(this.singleType()); }
+    return options.length === 1 ? options[0] : { kind: "union", options };
+  }
+  singleType() {
+    const token = this.tokens[this.pos++];
+    if (!token) fail(this.line, "Expected a type.");
+    if (token.type === "string" || token.type === "number") return { kind: "literal", value: token.value };
+    if (token.value === "(") {
+      const inner = this.typeExpression();
+      this.take(")");
+      return { kind: "group", of: inner };
+    }
+    const word = token.type === "word" ? token.value : fail(this.line, `Unexpected ${JSON.stringify(token.value)} in a type.`);
+    if (word === "maybe") return { kind: "maybe", of: this.singleType() };
+    if (word === "list" || word === "set") {
+      this.take("of");
+      return { kind: word, of: this.singleType() };
+    }
+    if (word === "map") {
+      this.take("from");
+      const from = this.singleType();
+      this.take("to");
+      return { kind: "map", from, to: this.singleType() };
+    }
+    if (word === "function") {
+      const params = [];
+      if (this.at("taking")) {
+        this.take("taking");
+        params.push(this.singleType());
+        while (this.at("and")) { this.take("and"); params.push(this.singleType()); }
+      }
+      let returns;
+      if (this.at("giving")) { this.take("giving"); returns = this.singleType(); }
+      return { kind: "function", params, returns };
+    }
+    if (word === "object") return { kind: "object" };
+    if (Object.hasOwn(builtinTypes, word)) return { kind: "builtin", name: builtinTypes[word] };
+    if (/^[A-Z]/.test(word)) {
+      const args = [];
+      if (this.at("of")) {
+        this.take("of");
+        args.push(this.singleType());
+      } else if (this.at("from")) {
+        this.take("from");
+        args.push(this.singleType());
+        this.take("to");
+        args.push(this.singleType());
+      }
+      return { kind: "named", name: word, args };
+    }
+    if (reserved.has(word)) fail(this.line, `Expected a type, not '${word}'.`);
+    // Other lowercase names are type variables, like T in TypeScript.
+    return { kind: "variable", name: word };
+  }
+  lambda() {
+    const { names, types, returns } = this.parameters();
+    const node = { type: "lambda", params: names, types, returns, line: this.line };
     if (this.at("return")) {
       this.take("return");
       node.value = this.parse();
@@ -293,15 +380,9 @@ function functionHeader(tokens, line) {
   if (expr.at("export")) expr.take("export");
   expr.take("function");
   const name = expr.name();
-  const params = [];
-  if (expr.at("takes")) {
-    expr.take("takes");
-    params.push(expr.name());
-    while (expr.at(",")) { expr.take(","); params.push(expr.name()); }
-  }
+  const { names: params, types, returns } = expr.parameters();
   expr.end();
-  if (new Set(params).size !== params.length) fail(line, "Duplicate parameter name.");
-  return { name, params };
+  return { name, params, types, returns };
 }
 
 const startsFunction = tokens => isWord(tokens[isWord(tokens[0], "export") ? 1 : 0], "function");
@@ -321,13 +402,17 @@ function markMaybe(node) {
 function useStatement(tokens, line) {
   const expr = new Expression(tokens, line);
   expr.take("use");
+  // `use type A from "path"` imports TypeScript types for declarations; it emits no JavaScript.
+  const typeOnly = isWord(expr.peek(), "type") && expr.tokens[expr.pos + 1]?.type === "word" &&
+    !isWord(expr.tokens[expr.pos + 1], "from");
+  if (typeOnly) expr.take("type");
   const names = expr.names("imported");
   if (!expr.at("from")) fail(line, "Expected 'from' and a quoted module path.");
   expr.take("from");
   const source = expr.tokens[expr.pos++];
   if (source?.type !== "string") fail(line, "Expected a quoted module path after 'from'.");
   expr.end();
-  return { type: "use", names, source: source.value, line };
+  return { type: "use", names, source: source.value, typeOnly, line };
 }
 
 // The functions (with their parameters) and variables a Prose module exports, from its export lines.
@@ -340,7 +425,7 @@ function exportsOf(source) {
     if (isWord(tokens[1], "function")) {
       const header = functionHeader(tokens, index + 1);
       functions.set(header.name, header);
-    } else if (tokens[1]?.type === "word" && isWord(tokens[2], "is")) {
+    } else if (tokens[1]?.type === "word" && (isWord(tokens[2], "is") || isWord(tokens[2], "as"))) {
       values.add(tokens[1].value);
     }
   });
@@ -390,6 +475,7 @@ class Parser {
     const values = [];
     for (const line of this.lines.filter(line => line.indent === 0 && isWord(line.tokens[0], "use"))) {
       const use = useStatement(line.tokens, line.line);
+      if (use.typeOnly) continue;
       const exported = use.source.endsWith(".prose") ? readExports(use, options.readModule) : null;
       for (const name of use.names) {
         const header = exported?.functions.get(name);
@@ -438,6 +524,41 @@ class Parser {
     if (functions.length) functions[0].body = this.body(line, true);
     else if (value?.type === "object") this.objectBody(value, line);
   }
+  typeDeclaration(expr, line, exported, doc) {
+    expr.take("type");
+    const name = expr.name();
+    if (!/^[A-Z]/.test(name)) fail(line.line, "Type names start with a capital letter, like StreakRun.");
+    expr.take("is");
+    const value = expr.typeExpression();
+    expr.end();
+    const fields = value.kind === "object" ? this.typeFields(line) : null;
+    return { type: "typeDeclaration", name, exported, doc, value, fields, line: line.line };
+  }
+  // The indented `name as type` lines of an object type; a quoted line documents the next field.
+  typeFields(parent) {
+    const fields = [];
+    const next = this.lines[this.pos];
+    if (!next || next.indent <= parent.indent) return fields;
+    let doc;
+    while (this.pos < this.lines.length) {
+      const line = this.lines[this.pos];
+      if (line.indent < next.indent) break;
+      if (line.indent > next.indent) fail(line.line, "Unexpected indentation in a type.");
+      this.pos++;
+      if (line.tokens.length === 1 && line.tokens[0].type === "string") {
+        doc = line.tokens[0].value;
+        continue;
+      }
+      const expr = this.expression(line);
+      const name = expr.propertyName();
+      if (!expr.at("as")) fail(line.line, "Object types contain only fields written as name as type.");
+      expr.take("as");
+      fields.push({ name, type: expr.typeExpression(), doc });
+      expr.end();
+      doc = undefined;
+    }
+    return fields;
+  }
   objectBody(object, parent) {
     const next = this.lines[this.pos];
     if (!next || next.indent <= parent.indent) return;
@@ -473,7 +594,8 @@ class Parser {
           token.value === "is" && expr.tokens[index - 1]?.value !== ":")) {
       const name = expr.variableName();
       let target = { type: "name", value: name, line: expr.line };
-      while (expr.at(":") || expr.at(".")) {
+      const declaredType = expr.optionalType();
+      while (!declaredType && (expr.at(":") || expr.at("."))) {
         if (expr.at(":")) {
           expr.take(":");
           target = { type: "property", object: target, name: expr.propertyName(), line: expr.line };
@@ -486,7 +608,7 @@ class Parser {
       if (target.type === "index" && !expr.peek()) fail(expr.line, "Indexed assignment requires a value.");
       const value = expr.peek() ? expr.list() : { type: "unset" };
       node = target.type === "name"
-        ? { type: "assign", name, value }
+        ? { type: "assign", name, value, declaredType }
         : { type: "assignTarget", target, value };
     } else if (first?.type === "string") {
       node = { type: "expression", value: expr.list() };
@@ -523,17 +645,26 @@ class Parser {
       const topLevel = indent === 0 && !inFunction;
       const exported = expr.at("export");
       if (exported) {
-        if (!topLevel) fail(line.line, "Only top-level functions and variables can be exported.");
+        if (!topLevel) fail(line.line, "Only top-level functions, variables, and types can be exported.");
         expr.take("export");
       }
+      // A quoted comment on the line just above a declaration documents it in generated declarations.
+      const previous = result.at(-1);
+      const doc = previous?.type === "expression" && previous.line === line.line - 1 &&
+        previous.value.type === "literal" && typeof previous.value.value === "string" ? previous.value.value : undefined;
+      const declaresType = isWord(expr.peek(), "type") && expr.tokens[expr.pos + 1]?.type === "word" &&
+        !isWord(expr.tokens[expr.pos + 1], "is");
       if (expr.at("function")) {
         if (!topLevel) fail(line.line, "Functions must be declared at the top level.");
         const header = functionHeader(line.tokens, line.line);
-        result.push({ type: "function", ...header, exported, line: line.line, body: this.body(line, true) });
+        result.push({ type: "function", ...header, exported, doc, line: line.line, body: this.body(line, true) });
+      } else if (declaresType) {
+        if (!topLevel) fail(line.line, "Types must be declared at the top level.");
+        result.push(this.typeDeclaration(expr, line, exported, doc));
       } else if (exported) {
         const node = this.simple(expr, inFunction, line);
-        if (node.type !== "assign") fail(line.line, "Only functions and variables can be exported.");
-        result.push({ ...node, exported });
+        if (node.type !== "assign") fail(line.line, "Only functions, variables, and types can be exported.");
+        result.push({ ...node, exported, doc });
       } else if (expr.at("use")) {
         if (!topLevel) fail(line.line, "'use' is only allowed at the top level.");
         result.push(useStatement(line.tokens, line.line));
@@ -631,10 +762,96 @@ function rebindable(node, scope) {
   fail(node.line, `'${node.value}' belongs to JavaScript, so its positions can't be assigned.`);
 }
 
-/** Compile Prose to JavaScript: a script, or an ES module if it uses modules or imports its runtime. */
+// A type as TypeScript writes it.
+function typeText(type) {
+  if (!type) return "any";
+  // Function types inside unions, lists, and maybe need parentheses to keep their return type separate.
+  const inner = child => child.kind === "function" ? `(${typeText(child)})` : typeText(child);
+  if (type.kind === "builtin") return type.name;
+  if (type.kind === "literal") return JSON.stringify(type.value);
+  if (type.kind === "variable") return type.name;
+  if (type.kind === "object") return "object";
+  if (type.kind === "group") return `(${typeText(type.of)})`;
+  if (type.kind === "union") return type.options.map(inner).join(" | ");
+  if (type.kind === "maybe") return `${inner(type.of)} | undefined`;
+  if (type.kind === "list") {
+    return ["union", "maybe", "function"].includes(type.of.kind) ? `(${typeText(type.of)})[]` : `${typeText(type.of)}[]`;
+  }
+  if (type.kind === "set") return `Set<${typeText(type.of)}>`;
+  if (type.kind === "map") return `Map<${typeText(type.from)}, ${typeText(type.to)}>`;
+  if (type.kind === "function") {
+    const params = type.params.map((param, index) => `arg${index + 1}: ${typeText(param)}`).join(", ");
+    return `(${params}) => ${type.returns ? typeText(type.returns) : "void"}`;
+  }
+  return type.args.length ? `${type.name}<${type.args.map(typeText).join(", ")}>` : type.name;
+}
+
+// The type variables in some types, in order of first appearance, for a generic signature.
+function typeVariables(types, found = []) {
+  for (const type of types.filter(Boolean)) {
+    if (type.kind === "variable" && !found.includes(type.name)) found.push(type.name);
+    typeVariables([type.of, type.from, type.to, type.returns, ...(type.options ?? []), ...(type.params ?? []), ...(type.args ?? [])], found);
+  }
+  return found;
+}
+
+const generic = variables => variables.length ? `<${variables.join(", ")}>` : "";
+const docComment = (doc, indent = "") => doc ? [`${indent}/** ${doc.replace(/\*\//g, "*\\/")} */`] : [];
+// Parameter names only document a declaration, so JavaScript's reserved words get a suffix.
+const parameterName = name => /^(?:break|case|catch|class|const|continue|debugger|default|delete|do|enum|extends|finally|implements|import|instanceof|interface|let|package|private|protected|public|static|super|switch|this|throw|try|typeof|var|void|yield)$/.test(name) ? `${name}_` : name;
+
+function literalType(value) {
+  if (value?.type !== "literal") return "any";
+  return value.value === null ? "null" : typeof value.value;
+}
+
+// A TypeScript declaration file for a module's exports, or null when it exports nothing.
+function declarationsFor(program) {
+  if (!program.some(node => node.exported)) return null;
+  const lines = ["// Generated by Prose from the .prose file of the same name. Edit that file instead."];
+  for (const use of program.filter(node => node.type === "use" && node.typeOnly)) {
+    lines.push(`import type { ${use.names.join(", ")} } from ${JSON.stringify(use.source)};`);
+  }
+  for (const node of program) {
+    if (node.type === "function" && node.exported) {
+      // Trailing parameters that are untyped or maybe can be left out, as Prose's with calls allow.
+      let optionalFrom = node.params.length;
+      while (optionalFrom > 0 && (!node.types[optionalFrom - 1] || node.types[optionalFrom - 1].kind === "maybe")) optionalFrom--;
+      const params = node.params.map((name, index) => {
+        const type = node.types[index];
+        if (index < optionalFrom) return `${parameterName(name)}: ${typeText(type)}`;
+        return `${parameterName(name)}?: ${typeText(type?.kind === "maybe" ? type.of : type)}`;
+      });
+      const variables = typeVariables([...node.types, node.returns]);
+      lines.push(...docComment(node.doc),
+        `export function ${node.name}${generic(variables)}(${params.join(", ")}): ${typeText(node.returns)};`);
+    } else if (node.type === "assign" && node.exported) {
+      lines.push(...docComment(node.doc),
+        `export let ${node.name}: ${node.declaredType ? typeText(node.declaredType) : literalType(node.value)};`);
+    } else if (node.type === "typeDeclaration") {
+      const prefix = node.exported ? "export " : "";
+      if (node.fields) {
+        lines.push(...docComment(node.doc), `${prefix}interface ${node.name}${generic(typeVariables(node.fields.map(field => field.type)))} {`);
+        for (const field of node.fields) {
+          const optional = field.type.kind === "maybe";
+          lines.push(...docComment(field.doc, "  "), `  ${field.name}${optional ? "?" : ""}: ${typeText(optional ? field.type.of : field.type)};`);
+        }
+        lines.push("}");
+      } else {
+        lines.push(...docComment(node.doc), `${prefix}type ${node.name}${generic(typeVariables([node.value]))} = ${typeText(node.value)};`);
+      }
+    }
+  }
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * Compile Prose to JavaScript: a script, or an ES module if it uses modules or imports its runtime.
+ * `declarations` is a TypeScript declaration file for the module's exports, or null.
+ */
 export function compile(source, options = {}) {
   const program = new Parser(source, options).block();
-  const imports = program.filter(node => node.type === "use");
+  const imports = program.filter(node => node.type === "use" && !node.typeOnly);
   const programScope = createScope([], program, null);
   for (const node of imports) {
     for (const name of node.names) {
@@ -645,7 +862,7 @@ export function compile(source, options = {}) {
     }
   }
   const exports = new Map();
-  for (const node of program.filter(node => node.exported)) {
+  for (const node of program.filter(node => node.exported && node.type !== "typeDeclaration")) {
     if (exports.has(node.name)) fail(node.line, `'${node.name}' is already exported.`);
     exports.set(node.name, variable(node.name));
   }
@@ -712,7 +929,7 @@ export function compile(source, options = {}) {
   function emitBlock(nodes, scope, depth) {
     const indent = pad(depth);
     const emit = node => expression(node, scope, depth);
-    return nodes.filter(node => node.type !== "use").map(node => {
+    return nodes.filter(node => node.type !== "use" && node.type !== "typeDeclaration").map(node => {
       if (node.type === "function") {
         const inner = createScope(node.params, node.body, scope);
         return `${indent}function ${variable(node.name)}(${node.params.map(variable).join(", ")}) {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
@@ -751,7 +968,8 @@ export function compile(source, options = {}) {
   }
 
   const body = emitScope(program, programScope, 0);
-  const module = Boolean(options.runtime) || imports.length > 0 || exports.size > 0;
+  const module = Boolean(options.runtime) || imports.length > 0 || exports.size > 0 ||
+    program.some(node => node.typeOnly || (node.type === "typeDeclaration" && node.exported));
   const code = [
     module ? "" : '"use strict";',
     options.runtime ? `import { ${runtimeHelpers.join(", ")} } from ${JSON.stringify(options.runtime)};` : "",
@@ -761,7 +979,7 @@ export function compile(source, options = {}) {
     body,
     exports.size ? `export { ${[...exports].map(([name, local]) => `${local} as ${name}`).join(", ")} };` : ""
   ].filter(Boolean).join("\n") + "\n";
-  return { code, module };
+  return { code, module, declarations: declarationsFor(program) };
 }
 
 /**

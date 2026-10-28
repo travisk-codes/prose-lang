@@ -1,6 +1,7 @@
 "A tour of everything Prose supports. Run it with: node bin/prose.js examples/tour.prose --run"
 
 use greet, greeting from "./tour_helpers.prose"
+use type Greeting from "./tour_helpers.prose"
 use basename from "node:path"
 
 "--- Values. A quoted string on its own line, like this one, is a comment."
@@ -181,8 +182,27 @@ callback is unset
 maybe callback run
 print (maybe callback run) otherwise "no callback"
 
-"--- Exports: other modules could use these."
-export function stop_count
-    return 14
-export version is "tour 1"
+"--- Types: optional annotations that describe exports to TypeScript. They don't change what runs."
+"A point on a grid."
+export type Point is object
+    x as number
+    y as number
+    "Points may have a label."
+    label as maybe text
+export function distance takes from_point as Point, to_point as Point, giving number
+    return Math:hypot with (to_point:x - from_point:x), (to_point:y - from_point:y)
+export function welcome takes name as text, giving Greeting
+    return greet name, "."
+origin as Point is make_point 0, 0
+print distance origin, point
+print welcome "Lin"
+double is function takes n as number giving number return n * 2
+print double with 21
+
+"--- Exports: other modules could use these. A comment on the line just above an export documents it."
+
+"How many sections the tour has."
+export function stop_count giving number
+    return 15
+export version as text is "tour 1"
 print "Tour stops: " + (stop_count run) + ", " + version

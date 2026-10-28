@@ -356,7 +356,7 @@ test("CLI runs the tour of every feature", () => {
     "London", "Eda of Paris", "later", "true", "7", "4", "3", "2", "3", "[ 30, 1, 2, 4 ]", "300",
     "[ 1, 2, 4, 30 ]", "[ 2, 4, 30 ]", "#1=1, #2=2, #3=4, #4=30", "81", "7", "81", "ran after 5",
     "9", "3.0", "PROSE", '{"x":3,"y":4}', "2", "value!", "6", "undefined", "no city", "GRACE", "0",
-    "no tags", "no callback", "Tour stops: 14, tour 1"
+    "no tags", "no callback", "5", "Hello, Lin.", "42", "Tour stops: 15, tour 1"
   ]);
 });
 
@@ -374,8 +374,8 @@ test("CLI runs the reading list example", () => {
 test("module statements report misuse with source lines", () => {
   for (const [source, expected] of [
     ["function f\n    use a from \"x\"\n    return 1", /Line 2: 'use' is only allowed at the top level/],
-    ["function f\n    export x is 1\n    return 1", /Line 2: Only top-level functions and variables can be exported/],
-    ["export print 1", /Line 1: Only functions and variables can be exported/],
+    ["function f\n    export x is 1\n    return 1", /Line 2: Only top-level functions, variables, and types can be exported/],
+    ["export print 1", /Line 1: Only functions, variables, and types can be exported/],
     ["use a from x", /Line 1: Expected a quoted module path/],
     ["use a \"x\"", /Line 1: Expected 'from'/],
     ["use a from \"x\"\na is 1", /Line 2: 'a' is imported/],
