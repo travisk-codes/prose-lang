@@ -30,10 +30,12 @@ empty-`is` unset declarations; numbers, strings with escapes, booleans, null,
 and `unset`; arithmetic, comparison, logical, and `otherwise` operators;
 parentheses; ordinary and zero-argument functions; expression returns and bare
 returns; recursion; `if`/`else if`/`else`; inline conditionals and inline `if`
-values; `for`, `for each`, and `while`; property-only object bodies; `:`
-property access; one-based `.` indexing; comma arrays; string and array writes;
-functions as values; JavaScript globals, methods, and `new`; `maybe`; `use`
-and `export`; and the three standard-library string functions.
+values; `for`, `for each`, and `while` with `skip` and `stop`; indented and
+one-line objects with `like`; `:` property access; one-based `.` indexing;
+comma arrays with `each of` spreading and `are` destructuring; string and array
+writes; functions as values; JavaScript globals, methods, and `new`; `maybe`;
+patterns; types; `use` and `export`; and the three standard-library string
+functions.
 
 ## Things to notice
 

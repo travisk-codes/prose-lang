@@ -144,7 +144,7 @@ test("function locals and reassigned parameters do not overwrite outer bindings"
 test("zero-argument calls and early or implicit returns", () => {
   assert.deepEqual(run([
     "function hello", '    print "hello"', "hello run",
-    "function stop", "    return", '    print "unreachable"', "print stop run",
+    "function halt", "    return", '    print "unreachable"', "print halt run",
     "function implicit", "    x is 1", "print implicit run",
     "function search takes limit", "    for n is 1 to limit",
     "        if n = 3 return n", "    return 0", "print search 5"

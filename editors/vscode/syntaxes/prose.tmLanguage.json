@@ -10,6 +10,9 @@
       "include": "#standalone-comments"
     },
     {
+      "include": "#patterns"
+    },
+    {
       "include": "#strings"
     },
     {
@@ -61,6 +64,33 @@
     }
   ],
   "repository": {
+    "patterns": {
+      "name": "string.regexp.prose",
+      "begin": "\\b(pattern)\\s*(\")",
+      "end": "(\")((?:\\s+(?:everywhere|ignoring\\s+case|by\\s+line))*)|$",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.prose"
+        },
+        "2": {
+          "name": "punctuation.definition.string.begin.prose"
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.end.prose"
+        },
+        "2": {
+          "name": "keyword.other.prose"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape.prose",
+          "match": "\\\\."
+        }
+      ]
+    },
     "standalone-comments": {
       "name": "comment.line.string.prose",
       "match": "^\\s*\"(?:[^\"\\\\]|\\\\.)*\"\\s*$"
@@ -209,11 +239,11 @@
           "name": "storage.type.function.prose"
         },
         {
-          "match": "\\b(?:if|then|else|for|each|in|while|return)\\b",
+          "match": "\\b(?:if|then|else|for|each|in|while|return|skip|stop)\\b|(?<=\\beach\\s)of\\b",
           "name": "keyword.control.prose"
         },
         {
-          "match": "\\b(?:is|to|print|run|with|new|use|export|as|giving)\\b|\\bfrom(?=\\s*\")",
+          "match": "\\b(?:is|are|to|print|run|with|new|use|export|as|giving|like)\\b|\\bfrom(?=\\s*\")",
           "name": "keyword.other.prose"
         },
         {

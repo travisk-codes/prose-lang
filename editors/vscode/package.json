@@ -191,6 +191,16 @@
             }
           },
           {
+            "name": "Prose: Patterns",
+            "scope": [
+              "source.prose string.regexp.prose"
+            ],
+            "settings": {
+              "foreground": "#E879F9",
+              "fontStyle": ""
+            }
+          },
+          {
             "name": "Prose: String escapes",
             "scope": [
               "source.prose constant.character.escape.prose"

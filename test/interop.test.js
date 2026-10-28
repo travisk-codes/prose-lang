@@ -418,7 +418,8 @@ test("CLI runs the tour of every feature", () => {
     "London", "Eda of Paris", "later", "true", "7", "4", "3", "2", "3", "[ 30, 1, 2, 4 ]", "300",
     "[ 1, 2, 4, 30 ]", "[ 2, 4, 30 ]", "#1=1, #2=2, #3=4, #4=30", "81", "7", "81", "ran after 5",
     "9", "3.0", "PROSE", '{"x":3,"y":4}', "2", "value!", "6", "1", "4", "true", "undefined", "no city", "GRACE", "0",
-    "no tags", "no callback", "5", "Hello, Lin.", "42", "Tour stops: 15, tour 1"
+    "no tags", "no callback", '{"title":"Dr.","name":"Ada","lines":3}', "2", "[ 30, 1, 2, 4, 9, 4 ]", "1",
+    "[ 1, 3 ]", "2026/10", "a b c", "true", "5", "Hello, Lin.", "42", "Tour stops: 18, tour 1"
   ]);
 });
 

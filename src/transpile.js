@@ -5,7 +5,7 @@ const reserved = new Set([
   "true", "false", "null", "remainder", "function", "return", "while",
   "async", "await", "takes", "run", "mod", "object", "array",
   "with", "new", "each", "in", "then", "use", "export", "unset", "otherwise", "maybe",
-  "as", "giving"
+  "as", "giving", "are", "skip", "stop"
 ]);
 
 // JavaScript's own values, which a name refers to when no Prose variable has that name.
@@ -66,6 +66,11 @@ function tokenize(text, line) {
         else if (char === '"') { closed = true; break; }
       }
       if (!closed) fail(line, "Unterminated string.");
+      if (isWord(tokens.at(-1), "pattern")) {
+        // After `pattern` the text is a regular expression, kept as typed except that \" is a quote.
+        tokens[tokens.length - 1] = { type: "pattern", value: text.slice(start + 1, pos - 1).replace(/\\(.)/g, (all, char) => char === '"' ? '"' : all) };
+        continue;
+      }
       try {
         tokens.push({ type: "string", value: JSON.parse(text.slice(start, pos)) });
       } catch {
@@ -120,11 +125,51 @@ class Expression {
     }
     if (next.type === "number" || next.type === "string") return true;
     if (next.type === "symbol") return next.value === "(";
+    if (next.type === "pattern") return true;
     return !reserved.has(next.value) ||
-      ["function", "new", "not", "maybe", "array", "object", "unset", "true", "false", "null"].includes(next.value);
+      ["function", "new", "not", "maybe", "array", "object", "unset", "true", "false", "null", "each"].includes(next.value);
+  }
+  // An inline object's entries: `name is value`, a bare name, or `like other`. Like a call, it takes every comma.
+  objectEntries() {
+    const depth = this.argumentDepth;
+    const adjacent = this.adjacentValues;
+    this.argumentDepth = depth + 1;
+    this.adjacentValues = 0;
+    const properties = [this.objectEntry()];
+    while (this.at(",")) {
+      this.take(",");
+      properties.push(this.objectEntry());
+    }
+    this.argumentDepth = depth;
+    this.adjacentValues = adjacent;
+    return properties;
+  }
+  objectEntry() {
+    const named = isWord(this.tokens[this.pos + 1], "is");
+    if (this.at("like") && !named) {
+      this.take("like");
+      return { spread: true, value: this.parse(60), line: this.line };
+    }
+    if (named) {
+      const name = this.propertyName();
+      this.take("is");
+      return { name, value: this.parse() };
+    }
+    if (this.peek()?.type !== "word") fail(this.line, "Expected an object entry: name is value, a name, or like another object.");
+    const name = this.variableName();
+    return { name, value: { type: "name", value: name, line: this.line } };
+  }
+  // Whether `object` is followed by entries on its line, rather than ending or leading into other syntax.
+  startsObjectEntries() {
+    const next = this.peek();
+    return next?.type === "word" &&
+      (next.value === "like" || !reserved.has(next.value) || isWord(this.tokens[this.pos + 1], "is"));
   }
   peek() { return this.tokens[this.pos]; }
-  at(value) { return this.peek()?.value === value && this.peek()?.type !== "string"; }
+  at(value) {
+    const token = this.peek();
+    return token?.value === value && (token.type === "word" || token.type === "symbol");
+  }
   take(value) {
     if (!this.at(value)) fail(this.line, `Expected '${value}'.`);
     return this.tokens[this.pos++];
@@ -222,6 +267,9 @@ class Expression {
       this.adjacentValues--;
       this.argumentDepth--;
     }
+    if (args.some(arg => arg.type === "spread")) {
+      fail(this.line, `'${name}' takes a fixed number of arguments, so 'each of' can't spread a list into it.`);
+    }
     return { type: "call", name, args, builtin, line: this.line };
   }
   // `takes` names, each optionally followed by `as` and a type, then an optional `giving` type.
@@ -307,6 +355,23 @@ class Expression {
     // Other lowercase names are type variables, like T in TypeScript.
     return { kind: "variable", name: word };
   }
+  // `pattern "..."` with optional flag words; the pattern is checked now, so mistakes report their line.
+  pattern(source) {
+    let flags = "u";
+    while (true) {
+      if (this.at("everywhere")) { this.take("everywhere"); flags += "g"; }
+      else if (this.at("ignoring") && isWord(this.tokens[this.pos + 1], "case")) { this.pos += 2; flags += "i"; }
+      else if (this.at("by") && isWord(this.tokens[this.pos + 1], "line")) { this.pos += 2; flags += "m"; }
+      else break;
+    }
+    let regex;
+    try {
+      regex = new RegExp(source, flags);
+    } catch (error) {
+      fail(this.line, `This pattern isn't a valid regular expression: ${error.message}`);
+    }
+    return { type: "pattern", literal: `/${regex.source}/${regex.flags}` };
+  }
   lambda() {
     const { names, types, returns } = this.parameters();
     const node = { type: "lambda", params: names, types, returns, line: this.line };
@@ -329,6 +394,8 @@ class Expression {
     let left;
     if (token.type === "number" || token.type === "string") {
       left = { type: "literal", value: token.value };
+    } else if (token.type === "pattern") {
+      left = this.pattern(token.value);
     } else if (token.value === "(") {
       left = this.inParentheses(() => this.list(true));
       this.take(")");
@@ -337,6 +404,13 @@ class Expression {
       left = { type: "array", elements: [] };
     } else if (token.value === "object") {
       left = { type: "object", properties: [] };
+      if (this.startsObjectEntries()) {
+        left.properties = this.objectEntries();
+        left.inline = true;
+      }
+    } else if (token.value === "each") {
+      this.take("of");
+      left = { type: "spread", value: this.parse(60), line: this.line };
     } else if (token.value === "unset") {
       left = { type: "unset" };
     } else if (token.value === "maybe") {
@@ -406,7 +480,8 @@ class Expression {
         continue;
       }
       const next = this.peek();
-      const priority = next.type === "string" || !Object.hasOwn(precedence, next.value) ? undefined : precedence[next.value];
+      const operator = (next.type === "word" || next.type === "symbol") && Object.hasOwn(precedence, next.value);
+      const priority = operator ? precedence[next.value] : undefined;
       if (priority === undefined || priority < min) break;
       this.pos++;
       left = { type: "binary", op: next.value, left, right: this.parse(priority + 1), line: this.line };
@@ -489,9 +564,40 @@ function readExports(use, readModule) {
   }
 }
 
+// Whether the tokens from pos are an assignment target (a name, then any :property and .position steps)
+// followed by is or as. Only this shape is an assignment, so `runs:push object start is key` is a call.
+function assignsAt(tokens, pos) {
+  if (tokens[pos]?.type !== "word") return false;
+  pos++;
+  while (tokens[pos]?.type === "symbol" && (tokens[pos].value === ":" || tokens[pos].value === ".")) {
+    pos++;
+    if (tokens[pos]?.type === "symbol" && tokens[pos].value === "(") {
+      for (let depth = 0; pos < tokens.length; pos++) {
+        if (tokens[pos].type !== "symbol") continue;
+        if (tokens[pos].value === "(") depth++;
+        else if (tokens[pos].value === ")" && --depth === 0) break;
+      }
+    }
+    pos++;
+  }
+  return isWord(tokens[pos], "is") || isWord(tokens[pos], "as");
+}
+
+// Whether the tokens from pos are names separated by commas, then `are`.
+function destructuresAt(tokens, pos) {
+  while (tokens[pos]?.type === "word") {
+    if (isWord(tokens[pos + 1], "are")) return true;
+    if (tokens[pos + 1]?.type !== "symbol" || tokens[pos + 1].value !== ",") return false;
+    pos += 2;
+  }
+  return false;
+}
+
 class Parser {
   constructor(source, options = {}) {
     this.pos = 0;
+    // How many loops enclose the line being parsed, within the current function.
+    this.loopDepth = 0;
     this.lines = source.replace(/^﻿/, "").split(/\r?\n/).flatMap((text, index) => {
       if (!text.trim()) return [];
       const prefix = /^\s*/.exec(text)[0];
@@ -571,11 +677,25 @@ class Parser {
   // Reads the indented lines after a line: an object literal's properties or a function's body.
   indentedValue(expr, value, line) {
     const functions = expr.blockFunctions;
-    if (functions.length > 1 || (functions.length && value?.type === "object")) {
+    if (functions.length > 1 || (functions.length && value?.type === "object" && !value.inline)) {
       fail(line.line, "Only one indented body can follow a line.");
     }
-    if (functions.length) functions[0].body = this.body(line, true);
-    else if (value?.type === "object") this.objectBody(value, line);
+    if (functions.length) functions[0].body = this.functionBody(line);
+    else if (value?.type === "object" && !value.inline) this.objectBody(value, line);
+  }
+  // A function's body starts outside any loop, so skip and stop can't reach a loop around the function.
+  functionBody(line) {
+    const loops = this.loopDepth;
+    this.loopDepth = 0;
+    const body = this.body(line, true);
+    this.loopDepth = loops;
+    return body;
+  }
+  loopBody(line, inFunction) {
+    this.loopDepth++;
+    const body = this.body(line, inFunction);
+    this.loopDepth--;
+    return body;
   }
   typeDeclaration(expr, line, exported, doc) {
     expr.take("type");
@@ -623,6 +743,12 @@ class Parser {
       this.pos++;
       if (line.tokens.length === 1 && line.tokens[0].type === "string") continue;
       const expr = this.expression(line);
+      if (expr.at("like") && !isWord(line.tokens[1], "is")) {
+        expr.take("like");
+        object.properties.push({ spread: true, value: expr.parse(), line: line.line });
+        expr.end();
+        continue;
+      }
       const name = expr.propertyName();
       if (!expr.at("is")) fail(line.line, "Object bodies contain only property definitions: name is value.");
       expr.take("is");
@@ -642,9 +768,17 @@ class Parser {
       if (!inFunction) fail(expr.line, "'return' is only allowed inside a function.");
       expr.take("return");
       node = { type: "return", value: expr.peek() ? expr.list() : null };
-    } else if (first?.type === "word" &&
-        expr.tokens.some((token, index) => index > expr.pos && token.type === "word" &&
-          token.value === "is" && expr.tokens[index - 1]?.value !== ":")) {
+    } else if (expr.at("skip") || expr.at("stop")) {
+      const word = expr.take(first.value).value;
+      if (expr.peek()) fail(expr.line, `'${word}' is a word for loops, so it can't be used as a name.`);
+      if (!this.loopDepth) fail(expr.line, `'${word}' only works inside a loop.`);
+      node = { type: word };
+    } else if (destructuresAt(expr.tokens, expr.pos)) {
+      const names = expr.names("variable");
+      expr.take("are");
+      if (!expr.peek()) fail(expr.line, "Expected a list after 'are'.");
+      node = { type: "destructure", names, value: expr.list() };
+    } else if (assignsAt(expr.tokens, expr.pos)) {
       const name = expr.variableName();
       let target = { type: "name", value: name, line: expr.line };
       const declaredType = expr.optionalType();
@@ -679,7 +813,7 @@ class Parser {
     expr.end();
     node.line = expr.line;
     const indented = expr.blockFunctions.length ||
-      (node.value?.type === "object" && ["assign", "assignTarget", "return"].includes(node.type));
+      (node.value?.type === "object" && !node.value.inline && ["assign", "assignTarget", "return"].includes(node.type));
     if (indented && !parent) {
       if (expr.blockFunctions.length) fail(expr.line, "A function with an indented body needs a line of its own, not an inline if.");
     } else if (indented) {
@@ -710,7 +844,7 @@ class Parser {
       if (expr.at("function")) {
         if (!topLevel) fail(line.line, "Functions must be declared at the top level.");
         const header = functionHeader(line.tokens, line.line);
-        result.push({ type: "function", ...header, exported, doc, line: line.line, body: this.body(line, true) });
+        result.push({ type: "function", ...header, exported, doc, line: line.line, body: this.functionBody(line) });
       } else if (declaresType) {
         if (!topLevel) fail(line.line, "Types must be declared at the top level.");
         result.push(this.typeDeclaration(expr, line, exported, doc));
@@ -746,7 +880,7 @@ class Parser {
         expr.take("while");
         const condition = this.condition(expr);
         expr.end();
-        result.push({ type: "while", condition, body: this.body(line, inFunction) });
+        result.push({ type: "while", condition, body: this.loopBody(line, inFunction) });
       } else if (expr.at("for")) {
         expr.take("for");
         if (expr.at("each")) {
@@ -755,7 +889,7 @@ class Parser {
           expr.take("in");
           const iterable = this.condition(expr, true);
           expr.end();
-          result.push({ type: "foreach", names, iterable, line: line.line, body: this.body(line, inFunction) });
+          result.push({ type: "foreach", names, iterable, line: line.line, body: this.loopBody(line, inFunction) });
         } else {
           const name = expr.variableName();
           expr.take("is");
@@ -763,7 +897,7 @@ class Parser {
           expr.take("to");
           const end = this.condition(expr);
           expr.end();
-          result.push({ type: "for", name, start, end, line: line.line, body: this.body(line, inFunction) });
+          result.push({ type: "for", name, start, end, line: line.line, body: this.loopBody(line, inFunction) });
         }
       } else {
         result.push(this.simple(expr, inFunction, line));
@@ -779,7 +913,8 @@ const pad = depth => "  ".repeat(depth);
 // The variables a body assigns, with the line of each one's first assignment. Nested functions have their own.
 function assignedNames(nodes, names = new Map()) {
   for (const node of nodes) {
-    const assigned = node.type === "assign" || node.type === "for" ? [node.name] : node.type === "foreach" ? node.names : [];
+    const assigned = node.type === "assign" || node.type === "for" ? [node.name]
+      : node.type === "foreach" || node.type === "destructure" ? node.names : [];
     for (const name of assigned) if (!names.has(name)) names.set(name, node.line);
     if (node.type === "if") {
       for (const branch of node.branches) assignedNames(branch.body, names);
@@ -923,13 +1058,19 @@ export function compile(source, options = {}) {
 
   function expression(node, scope, depth) {
     const emit = child => expression(child, scope, depth);
-    const list = nodes => `[${nodes.map(emit).join(", ")}]`;
+    // Lists and arguments may spread a collection into them with `each of`.
+    const element = child => child.type === "spread" ? spread(child, scope, depth) : emit(child);
+    const list = nodes => `[${nodes.map(element).join(", ")}]`;
     if (node.type === "literal") return JSON.stringify(node.value);
     if (node.type === "unset") return "undefined";
     if (node.type === "name") return resolve(node, scope);
+    if (node.type === "pattern") return node.literal;
+    if (node.type === "spread") fail(node.line, "'each of' can only spread into a list, a call's arguments, or print.");
     if (node.type === "array") return list(node.elements);
     if (node.type === "object") {
-      return `({${node.properties.map(property => `[${JSON.stringify(property.name)}]: ${emit(property.value)}`).join(", ")}})`;
+      return `({${node.properties.map(property => property.spread
+        ? `...${emit(property.value)}`
+        : `[${JSON.stringify(property.name)}]: ${emit(property.value)}`).join(", ")}})`;
     }
     if (node.type === "property") {
       if (node.maybe) return `__prose_maybe_property(${emit(node.object)}, ${JSON.stringify(node.name)})`;
@@ -968,6 +1109,10 @@ export function compile(source, options = {}) {
     return `(${emit(node.left)} ${op} ${emit(node.right)})`;
   }
 
+  function spread(node, scope, depth) {
+    return `...__prose_each(${expression(node.value, scope, depth)}, ${node.line})`;
+  }
+
   function reference(target, scope, depth) {
     if (target.type === "name") {
       const name = rebindable(target, scope);
@@ -990,9 +1135,16 @@ export function compile(source, options = {}) {
       if (node.type === "assign") return `${indent}${variable(node.name)} = ${emit(node.value)};`;
       // Rebuilding a string assigns its binding; mutating an object property does not.
       if (node.type === "assignTarget") return `${indent}${reference(node.target, scope, depth)}.set(${emit(node.value)});`;
-      if (node.type === "print") return `${indent}console.log(${emit(node.value)});`;
+      if (node.type === "print") {
+        return `${indent}console.log(${node.value.type === "spread" ? spread(node.value, scope, depth) : emit(node.value)});`;
+      }
       if (node.type === "return") return `${indent}return${node.value ? " " + emit(node.value) : ""};`;
       if (node.type === "expression") return `${indent}(${emit(node.value)});`;
+      if (node.type === "destructure") {
+        return `${indent}([${node.names.map(variable).join(", ")}] = __prose_each(${emit(node.value)}, ${node.line}));`;
+      }
+      if (node.type === "skip") return `${indent}continue;`;
+      if (node.type === "stop") return `${indent}break;`;
       if (node.type === "if") {
         const branches = node.branches.map((branch, index) =>
           `${indent}${index ? "else if" : "if"} (${emit(branch.condition)}) {\n${emitBlock(branch.body, scope, depth + 1)}\n${indent}}`

@@ -87,9 +87,14 @@ builds it to `site/dist/index.html`.
 - One-based Unicode string indexing and single-character indexed assignment.
 - Standard-library `length`, `char_to_number`, and `number_to_char`.
 - Standalone string expressions as comments, and unset variable declarations.
-- Indented object literals with property-only bodies, and `:` property access and assignment.
+- Object literals, indented or on one line (`object kind is "none", count`), copying
+  another object's properties with `like`, and `:` property access and assignment.
 - Comma-separated arrays with one-based indexing, shared by reference like objects.
+- `each of` to spread a collection into a list or a call, and `are` to assign
+  several names from a list: `first, second are pair`.
 - `for each item in items`, including several variables for pairs: `for each name, count in counts`.
+- `skip` and `stop` to continue or leave a loop.
+- Regular expressions written `pattern "^\d+$"`, with flag words such as `everywhere`.
 - Inline `if ... then ... else ...` values, the `unset` value, and the `otherwise` fallback operator.
 - Functions as values, with inline (`function takes x return x * 2`) or indented bodies.
 - JavaScript globals, methods, and `new`: a value followed by arguments is a
@@ -341,6 +346,31 @@ Start with `items is array` to append arbitrary array elements.
 
 Run `npm.cmd run example:arrays` to try array iteration and sharing.
 
+### Spreading and taking apart
+
+`each of` spreads a list, string, or other collection into a list, a call's
+arguments, or `print`:
+
+```text
+rest is 2, 3
+all_items is 1, each of rest, 4
+print Math:max each of all_items
+```
+
+These make `1, 2, 3, 4` and print `4`. Prose's own functions take a fixed
+number of arguments, so `each of` can't spread into them.
+
+`are` assigns several names at once, from a list's items in order:
+
+```text
+first, second are pair
+r, g, b are (255, 128, 0)
+a, b are b, a
+```
+
+The last line swaps `a` and `b`. Like `for each name, score in scores`, it
+works with any collection, including strings and `Map` entries.
+
 ## Loops over collections
 
 `for each` visits the elements of an array, the characters of a string (by
@@ -358,6 +388,35 @@ for each name, score in scores
 
 As with `for`, the loop variables belong to the surrounding function or
 script and keep their last values after the loop.
+
+`skip` moves on to the loop's next turn, and `stop` leaves the loop. Both apply
+to the innermost `for`, `for each`, or `while` loop in the same function:
+
+```text
+for each datum in datums
+    if datum:time < since skip
+    if length found = 10 stop
+    found:push datum
+```
+
+## Patterns
+
+`pattern "..."` is a regular expression. Its text is kept exactly as typed,
+so `\d` and `\s` need no extra backslashes; write `\"` for a quote. Flag words
+may follow it: `everywhere` finds every match, `ignoring case` matches either
+case, and `by line` makes `^` and `$` match at each line. Patterns always treat
+emoji and other characters beyond the basic set as single characters, matching
+how Prose counts positions.
+
+```text
+if text:match pattern "^\d{4}$" then print "a year"
+clean is name:replace (pattern "\s*\([^()]*\)$"), ""
+tags is note:match pattern "#(\p{L}+)" everywhere
+```
+
+A pattern that isn't a valid regular expression is a syntax error on its line.
+`pattern` means this only when a quoted string follows it, so it still works as
+part of other names, like `pattern_count`.
 
 ## Inline if, unset, and otherwise
 
@@ -652,8 +711,23 @@ existing Unicode indexing and append rules.
 
 Object literals can be assigned to a variable or property, or returned from
 a function with `return object` followed by indented property definitions.
-A property's value can be a function value. Computed property names and
-inline object bodies within function arguments are not implemented yet.
+A property's value can be a function value. Computed property names are not
+implemented yet.
+
+An object can also be written on one line, after `object`. Each entry is
+`name is value`, a bare name (a property with that variable's name and value),
+or `like other`, which copies another object's properties:
+
+```text
+return object text, labels
+runs:push object start is key, end is key, length is 1
+updated is object like tag, value is title
+```
+
+Later entries replace earlier ones, so `updated` is a copy of `tag` with a new
+`value`. An indented body can also contain `like` lines. Like a call, a
+one-line object takes every comma after it, so put it in parentheses when more
+arguments or list items follow: `Array:from (object length is 24), make_hour`.
 
 Run `npm.cmd run example:objects` to try the example.
 
@@ -682,9 +756,9 @@ The corrected `caesar_cipher.prose` is preserved; `caesar_cipher_demo.prose` add
 calls that exercise it. `reading_list.prose` demonstrates `for each`, function
 values, and JavaScript methods; `habits.prose` adds `maybe` and imports between
 Prose files; `tour.prose` covers everything. MusicTicker remains a design sketch. Computed
-object keys, multiple print arguments, nested named functions, default
-imports, `try`/`catch`, and async are not implemented yet. Unsupported syntax
-produces a line-numbered error.
+object keys, nested named functions, default imports, `typeof` and
+`instanceof`, `try`/`catch`, and async are not implemented yet. Unsupported
+syntax produces a line-numbered error.
 
 The library entry points are `compile` and `transpile` in `src/transpile.js`.
 The implementation parses expressions and indentation into an AST, resolves

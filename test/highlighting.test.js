@@ -195,6 +195,28 @@ test("type annotations, type declarations, and type imports have type scopes onl
   hasScope('type is "plain"', "type", "variable.other.binding.prose");
 });
 
+test("patterns, inline objects, spreads, destructuring, and loop control have scopes", () => {
+  const replace = 'clean is name:replace (pattern "\\s*\\([^()]*\\)$" everywhere ignoring case), ""';
+  hasScope(replace, "pattern", "keyword.other.prose");
+  hasScope(replace, "\\s*", "string.regexp.prose");
+  hasScope(replace, "\\s*", "constant.character.escape.prose");
+  hasScope(replace, "[^()]", "string.regexp.prose");
+  assert.ok(!scopesAt(replace, "[^()]").includes("string.quoted.double.prose"));
+  hasScope(replace, "everywhere", "keyword.other.prose");
+  hasScope(replace, "ignoring case", "keyword.other.prose");
+  hasScope('print text:match pattern "^\\d{4}$" by line', "by line", "keyword.other.prose");
+  hasScope('label is "a pattern of light"', "pattern", "string.quoted.double.prose");
+  hasScope("print pattern_count", "pattern_count", "variable.other.readwrite.prose");
+  hasScope("return object like datum, tags", "like", "keyword.other.prose");
+  hasScope("return object like datum, tags", "datum", "variable.other.readwrite.prose");
+  hasScope("print Math:max each of counts", "each", "keyword.control.prose");
+  hasScope("print Math:max each of counts", "of", "keyword.control.prose");
+  hasScope("r, g, b are colors", "are", "keyword.other.prose");
+  hasScope("    if blank skip", "skip", "keyword.control.prose");
+  hasScope("    if done stop", "stop", "keyword.control.prose");
+  hasScope("print offset", "of", "variable.other.readwrite.prose");
+});
+
 test("array keywords and comma lists have syntax scopes without turning literals into comments", () => {
   hasScope("items is array", "array", "storage.type.array.prose");
   hasScope('names is "Ada", "Grace"', "Ada", "string.quoted.double.prose");

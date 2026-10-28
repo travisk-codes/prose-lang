@@ -190,6 +190,32 @@ callback is unset
 maybe callback run
 print (maybe callback run) otherwise "no callback"
 
+"--- Objects on one line, spreading with each of, and taking lists apart with are."
+title is "Dr."
+greeting_card is object title, name is "Ada", lines is 2
+updated_card is object like greeting_card, lines is 3
+print JSON:stringify updated_card
+print greeting_card:lines
+low, high are 4, 9
+low, high are high, low
+print (each of numbers, low, high)
+print Math:min each of numbers
+
+"--- skip moves to the next turn of a loop, and stop leaves it."
+picked is array
+for each n in 1, 2, 3, 4, 5, 6
+    if n mod 2 = 0 skip
+    if n > 4 stop
+    picked:push n
+print picked
+
+"--- Patterns: regular expressions, with backslashes kept as typed."
+date is "2026-10-28"
+year, month are (date:match pattern "^(\d{4})-(\d{2})"):slice 1
+print year + "/" + month
+print "a  b   c":replace (pattern "\s+" everywhere), " "
+print "Prose":match pattern "^prose$" ignoring case != null
+
 "--- Types: optional annotations that describe exports to TypeScript. They don't change what runs."
 "A point on a grid."
 export type Point is object
@@ -211,6 +237,6 @@ print double 21
 
 "How many sections the tour has."
 export function stop_count giving number
-    return 15
+    return 18
 export version as text is "tour 1"
 print "Tour stops: " + (stop_count run) + ", " + version
