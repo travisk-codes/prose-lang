@@ -27,7 +27,7 @@ for i is 1 to length rows
 "Parentheses distinguish nested literal indexes from decimal numbers."
 print "Third entry of row six: " + ((rows.6).3)
 
-"Array arguments are copies, so creating a new row leaves its input alone."
+"next_row builds a new array and only reads its argument, so the seed is unchanged."
 seed is (1,)
 grown is next_row seed
 print "Seed length: " + (length seed)

@@ -1,0 +1,7 @@
+"A module for tour.prose: an exported variable and an exported function with an optional argument."
+
+export greeting is "Hello"
+
+export function greet takes name, punctuation
+    if punctuation = unset punctuation is "!"
+    return greeting + ", " + name + punctuation

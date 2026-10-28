@@ -99,36 +99,36 @@ test("CLI runs the array example", () => {
   const example = fileURLToPath(new URL("../examples/arrays.prose", import.meta.url));
   const result = spawnSync(process.execPath, [cli, example, "--run"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(result.stdout.trim().split(/\r?\n/), ["Ada", "Grace", "Linus", "Ada", "Changed"]);
+  assert.deepEqual(result.stdout.trim().split(/\r?\n/), ["Ada", "Grace", "Linus", "Changed", "Changed", "Copied"]);
 });
 
-test("array assignments copy recursively while object elements keep reference semantics", () => {
+test("arrays are shared references, like objects", () => {
   assert.deepEqual(run([
-    "row is 1, 2", "original is row, row", "copy is original",
-    "copy.(1).1 is 99", "print (original.1).1", "print (copy.1).1",
-    "print (copy.2).1", "print row.1",
+    "row is 1, 2", "original is row, row", "same is original",
+    "same.(1).1 is 99", "print (original.1).1", "print (same.1).1",
+    "print (same.2).1", "print row.1",
     "person is object", '    name is "Ada"',
     "people is (person,)", "other is people", 'other.1:name is "Grace"',
     "print people.1:name", "print person:name"
-  ].join("\n")), [1, 99, 1, 1, "Grace", "Grace"]);
+  ].join("\n")), [99, 99, 99, 99, "Grace", "Grace"]);
 });
 
-test("array-valued object fields and indexed assignments receive independent copies", () => {
+test("arrays stored in object fields and other arrays stay shared with the original", () => {
   assert.deepEqual(run([
     "row is 1, 2", "holder is object", "    values is row",
     "holder:values.1 is 8", "print row.1", "holder:other is row",
     "holder:other.1 is 9", "print row.1",
     "matrix is array", "matrix.1 is row", "matrix.(1).1 is 10", "print row.1"
-  ].join("\n")), [1, 1, 1]);
+  ].join("\n")), [8, 9, 10]);
 });
 
-test("function array arguments are isolated, including nested arrays and repeated arguments", () => {
+test("functions change the arrays they receive, including nested and repeated arguments", () => {
   assert.deepEqual(run([
     "function change takes rows, another",
     "    rows.(1).1 is 99", "    another.(1).1 is 88", "    return rows",
     "original is ((1, 2),)", "changed is change original, original",
     "print (original.1).1", "print (changed.1).1"
-  ].join("\n")), [1, 99]);
+  ].join("\n")), [88, 88]);
 });
 
 test("comma elements evaluate left to right exactly once", () => {
@@ -139,11 +139,18 @@ test("comma elements evaluate left to right exactly once", () => {
   ].join("\n")), [[1, 2, 3], 3]);
 });
 
-test("array elements copy their value before later element expressions run", () => {
+test("array elements hold references, so later changes show through them", () => {
   assert.deepEqual(run([
     "state is object", "    values is 1, 2",
     "function mutate", "    state:values.1 is 99", "    return 0",
     "snapshot is state:values, mutate run",
     "print (snapshot.1).1", "print state:values.1"
-  ].join("\n")), [1, 99]);
+  ].join("\n")), [99, 99]);
+});
+
+test("slice and Array:from make separate copies", () => {
+  assert.deepEqual(run([
+    "values is 1, 2, 3", "copy is values:slice run", "also is Array:from with values",
+    "copy.1 is 10", "also.2 is 20", "print values", "print copy", "print also"
+  ].join("\n")), [[1, 2, 3], [10, 2, 3], [1, 20, 3]]);
 });

@@ -63,7 +63,10 @@ test("loop upper bound is evaluated once", () => {
 });
 
 test("logical expressions short circuit", () => {
-  assert.deepEqual(run("print false and missing\nprint true or missing"), [false, true]);
+  assert.deepEqual(run([
+    "function noisy", '    print "evaluated"', "    return true",
+    "print false and noisy run", "print true or noisy run"
+  ].join("\n")), [false, true]);
 });
 
 test("invalid or unsupported syntax reports the original source line", () => {
@@ -191,7 +194,7 @@ test("while conditions support function calls and short circuiting", () => {
   assert.deepEqual(run([
     "function below takes n", "    return n < 3",
     "n is 0", "while below n", "    n is n + 1", "print n",
-    "while false and missing", '    print "unreachable"'
+    "missing", "while false and missing", '    print "unreachable"'
   ].join("\n")), [3]);
 });
 
@@ -289,7 +292,7 @@ test("bare and empty-is declarations start unset and become strings on indexed a
 test("missing reads return unset, while skipped and invalid writes fail with source lines", () => {
   assert.deepEqual(run([
     'word is "cat"', "print word.0", "print word.4", "print word.(-1)",
-    "print word.1.5", "unset", "print unset.1"
+    "print word.1.5", "print unset.1"
   ].join("\n")), [undefined, undefined, undefined, undefined, undefined]);
   for (const statement of [
     'word.0 is "s"', 'word.5 is "s"', 'word.(-1) is "s"', 'word.(1.5) is "s"'
@@ -446,7 +449,8 @@ test("object bodies reject ordinary statements and malformed property access rep
     ["person is object\nprint person:", /Line 2: Expected a property name/],
     ["person is object\nperson:1 is 2", /Line 2: Expected a property name/]
   ]) assert.throws(() => transpile(source), expected);
-  assert.throws(() => run("person is null\nprint person:name"), /Line 2:.*requires an object/);
+  assert.throws(() => run("person is null\nprint person:name"), /Line 2: Can't read property 'name' of null/);
+  assert.throws(() => run("person is unset\nprint person:name"), /Line 2: Can't read property 'name' of unset/);
   assert.throws(() => run("person is 1\nperson:name is 2"), /Line 2:.*requires an object/);
 });
 

@@ -1,15 +1,4 @@
 // These helpers are also embedded in emitted JavaScript so compiled scripts are standalone.
-export function __prose_copy_array(value, active = new Map()) {
-  if (!Array.isArray(value)) return value;
-  if (active.has(value)) return active.get(value);
-  const result = [];
-  active.set(value, result);
-  for (const element of value) result.push(__prose_copy_array(element, active));
-  // Duplicate repeated occurrences independently; the map only guards active cycles.
-  active.delete(value);
-  return result;
-}
-
 export function __prose_chars(value, line) {
   if (typeof value !== "string") throw new TypeError(`Line ${line}: Expected a string.`);
   return [...value];
@@ -32,7 +21,7 @@ export function __prose_set(value, index, replacement, line) {
     if (!Number.isInteger(index) || index < 1 || index > value.length + 1) {
       throw new RangeError(`Line ${line}: Array writes must replace a position or append at length + 1; gaps are not allowed.`);
     }
-    value[index - 1] = __prose_copy_array(replacement);
+    value[index - 1] = replacement;
     return value;
   }
   const chars = value === undefined ? [] : __prose_chars(value, line);
@@ -72,25 +61,28 @@ export function __prose_mod(left, right, line) {
 }
 
 export function __prose_property(value, name, line) {
-  if (typeof value !== "object" || value === null) {
-    throw new TypeError(`Line ${line}: Named property access requires an object.`);
+  if (value === undefined || value === null) {
+    throw new TypeError(`Line ${line}: Can't read property '${name}' of ${value === null ? "null" : "unset"}.`);
   }
   return value[name];
 }
 
 export function __prose_property_ref(value, name, line) {
-  if (typeof value !== "object" || value === null) {
+  if ((typeof value !== "object" && typeof value !== "function") || value === null) {
     throw new TypeError(`Line ${line}: Named property assignment requires an object.`);
   }
   return {
     get: () => __prose_property(value, name, line),
     set: replacement => {
-      // Names such as __proto__ are ordinary data properties.
-      const assigned = __prose_copy_array(replacement);
-      Object.defineProperty(value, name, {
-        value: assigned, writable: true, enumerable: true, configurable: true
-      });
-      return assigned;
+      // __proto__ is an ordinary data property; other names keep JavaScript setters such as document.title.
+      if (name === "__proto__") {
+        Object.defineProperty(value, name, {
+          value: replacement, writable: true, enumerable: true, configurable: true
+        });
+      } else {
+        value[name] = replacement;
+      }
+      return replacement;
     }
   };
 }
@@ -104,9 +96,56 @@ export function __prose_index_ref(parent, indexExpression, line) {
   };
 }
 
-export const runtimeSource = [
-  __prose_copy_array,
+export function __prose_call(value, args, line) {
+  if (typeof value !== "function") throw new TypeError(`Line ${line}: Only functions can be called.`);
+  return value(...args);
+}
+
+export function __prose_method(value, name, args, line) {
+  const method = __prose_property(value, name, line);
+  if (typeof method !== "function") throw new TypeError(`Line ${line}: '${name}' is not a function.`);
+  return method.apply(value, args);
+}
+
+export function __prose_new(value, args, line) {
+  if (typeof value !== "function") throw new TypeError(`Line ${line}: 'new' requires a class or constructor.`);
+  return new value(...args);
+}
+
+// The maybe helpers give unset instead of failing when there is nothing to read or call.
+export function __prose_maybe_property(value, name) {
+  return value === undefined || value === null ? undefined : value[name];
+}
+
+export function __prose_maybe_get(value, index, line) {
+  return value === undefined || value === null ? undefined : __prose_get(value, index(), line);
+}
+
+export function __prose_maybe_call(value, args, line) {
+  return value === undefined || value === null ? undefined : __prose_call(value, args(), line);
+}
+
+export function __prose_maybe_method(value, name, args, line) {
+  if (value === undefined || value === null || value[name] === undefined || value[name] === null) return undefined;
+  return __prose_method(value, name, args(), line);
+}
+
+export function __prose_each(value, line) {
+  if (value === undefined || value === null || typeof value[Symbol.iterator] !== "function") {
+    throw new TypeError(`Line ${line}: 'for each' requires an array, string, or other collection.`);
+  }
+  return value;
+}
+
+const helpers = [
   __prose_chars, __prose_length, __prose_get, __prose_set,
   __prose_char_to_number, __prose_number_to_char, __prose_mod,
-  __prose_property, __prose_property_ref, __prose_index_ref
-].map(helper => helper.toString()).join("\n\n");
+  __prose_property, __prose_property_ref, __prose_index_ref,
+  __prose_call, __prose_method, __prose_new, __prose_maybe_property, __prose_maybe_get,
+  __prose_maybe_call, __prose_maybe_method, __prose_each
+];
+
+export const runtimeHelpers = helpers.map(helper => helper.name);
+export const runtimeSource = helpers.map(helper => helper.toString()).join("\n\n");
+// The same helpers as one ES module, for bundlers that share them instead of embedding them per file.
+export const runtimeModule = `${runtimeSource}\n\nexport { ${runtimeHelpers.join(", ")} };\n`;

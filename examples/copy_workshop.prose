@@ -1,4 +1,4 @@
-"Arrays are copied; objects keep their identity. Compare the results."
+"Arrays and objects are shared, not copied. Use slice when you need a separate array."
 
 function markdown takes prices, reduction
     for i is 1 to length prices
@@ -9,21 +9,26 @@ function publish takes entry
     entry:status is "published"
 
 prices is 10, 20, 30
-sale is markdown prices, 2
+sale is markdown (prices:slice run), 2
 print "Original first price: " + prices.1
 print "Sale first price: " + sale.1
 print "Quarter of the second price: " + (prices.2 / 4)
 
-"Nested arrays and repeated occurrences receive independent copies."
+"Without a copy, the function changes the caller's array."
+clearance is markdown prices, 5
+print "Original after clearance: " + prices.1
+print "Same array: " + (clearance = prices)
+
+"Nested arrays are shared too: both rows of original are the same array."
 row is 1, 2
 original is row, row
 edited is original
 edited.(1).2 is 99
 print "Original nested value: " + ((original.1).2)
-print "Edited nested value: " + ((edited.1).2)
-print "Other nested row: " + ((edited.2).2)
+print "Other nested row: " + ((original.2).2)
+print "Row itself: " + row.2
 
-"Objects inside copied arrays still refer to the same object."
+"Objects inside arrays are shared in the same way."
 entry is object
     title is "Prose field notes"
     status is "draft"

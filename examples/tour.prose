@@ -1,0 +1,188 @@
+"A tour of everything Prose supports. Run it with: node bin/prose.js examples/tour.prose --run"
+
+use greet, greeting from "./tour_helpers.prose"
+use basename from "node:path"
+
+"--- Values. A quoted string on its own line, like this one, is a comment."
+answer is 42
+ratio is 2.5
+quote is "She said \"hi\"!"
+yes is true
+no is false
+nothing is null
+missing
+also_missing is
+print answer
+print quote
+print nothing = null and missing = unset and also_missing = unset
+
+"--- Arithmetic: precedence, grouping, unary minus, %, prefix remainder, and mod."
+print 2 + 3 * 4 - 10 / 5
+print (2 + 3) * -2
+print 17 % 5
+print remainder 17 5
+print -1 % 26
+print -1 mod 26
+
+"--- Comparison and logic. otherwise replaces only unset and null; or replaces any false value."
+print 3 >= 3 and 2 != 3 and not (1 > 2) and 1 < 2 and 2 <= 2
+print no or "or fallback"
+print nothing otherwise "otherwise fallback"
+print 0 otherwise 5
+
+"--- Branches: if, else if, else, inline statements, and inline if values."
+function size_of takes n
+    if n < 10
+        return "small"
+    else if n < 100
+        return "medium"
+    else
+        return "large"
+print size_of 5
+print size_of 50
+print size_of 500
+if answer = 42 print "inline if statement"
+if false print "not printed"
+else if yes print "inline else if"
+else print "not printed either"
+print if ratio > 2 then "big ratio" else "small ratio"
+
+"--- Loops: counting with for, while, and for each over lists, strings, and pairs."
+total is 0
+for i is 1 to 4
+    total is total + i
+print total
+countdown is 3
+while countdown > 0
+    print countdown
+    countdown is countdown - 1
+for each letter in "a😀"
+    print letter
+for each word, position in ("first", 1), ("second", 2)
+    print word + " " + position
+
+"--- Functions: recursion, calling ahead, no arguments, bare return, and the call-first rule."
+function factorial takes n
+    if n <= 1 return 1
+    return n * factorial (n - 1)
+print factorial 5
+print factorial 3 + 1
+print twice_plus 3, 1
+function twice_plus takes value, extra
+    return value * 2 + extra
+function announce
+    print "announcing"
+    return
+announce run
+
+"--- Modules: a Prose function called with or without with, an imported variable, and JavaScript."
+print greet with "Ada"
+print greet "Grace", "?"
+print greeting
+print basename with "/notes/today.txt"
+
+"--- Strings: one-based Unicode positions, the standard library, and writes."
+word is "h😀llo"
+print length word
+print word.2
+print char_to_number "A"
+print number_to_char 97
+word.1 is "H"
+word.(length word + 1) is "!"
+print word
+built
+built.1 is "o"
+built.2 is "k"
+print built
+
+"--- Objects: nested literals, colon access, changes, function values, and returning objects."
+person is object
+    name is "Ada"
+    address is object
+        city is "London"
+    describe is function takes who return who:name + " of " + who:address:city
+print person:address:city
+person:address:city is "Paris"
+person:name.1 is "E"
+print person:describe with person
+empty is object
+empty:added is "later"
+print empty:added
+print empty:nothing = unset
+function make_point takes x, y
+    return object
+        x is x
+        y is y
+point is make_point 3, 4
+print point:x + point:y
+
+"--- Arrays: commas, one item, empty, nesting, positions, appending, sharing, and copies."
+numbers is 3, 1, 2
+single is ("only",)
+empty_list is array
+grid is (1, 2), (3, 4)
+row is 2
+column is 1
+print numbers.1 + length single + length empty_list
+print (grid.2).1
+print grid.(1).2
+print grid.row.column
+numbers.(length numbers + 1) is 4
+shared is numbers
+shared.1 is 30
+copy is numbers:slice run
+copy.1 is 300
+print numbers
+print copy.1
+
+"--- Function values: inline and indented bodies, passed to methods and to Prose functions."
+sorted is numbers:toSorted with function takes a, b return a - b
+print sorted
+evens is sorted:filter with function takes n return n mod 2 = 0
+print evens
+labels is sorted:map with function takes n, index
+    prefix is "#" + (index + 1)
+    return prefix + "=" + n
+print labels:join with ", "
+square is function takes n return n * n
+print square with 9
+seven is function return 7
+print seven run
+function apply_twice takes action, value
+    return action with (action with value)
+print apply_twice square, 3
+function after takes action, delay
+    return action run + " after " + delay
+print after function, 5
+    return "ran"
+
+"--- JavaScript: globals, methods, new, and parentheses where with would be ambiguous."
+print Math:max with 4, 9, 2
+print (Math:round with (10 / 3)):toFixed with 1
+print "Prose":toUpperCase run
+print JSON:stringify with point
+seen is new Set with ("a", "b", "a")
+print seen:size
+lookup is new Map
+lookup:set with "key", ("val" + "ue")
+print (lookup:get with "key") + "!"
+print Math:max with (Math:min with 5, 8), 6
+
+"--- maybe: reading through values that might be missing."
+profile is object
+    name is "Grace"
+    nickname is
+print maybe profile:address:city
+print maybe profile:address:city otherwise "no city"
+print maybe profile:name:toUpperCase run
+print maybe profile:nickname:length otherwise 0
+print maybe profile:tags.1 otherwise "no tags"
+callback is unset
+maybe callback run
+print (maybe callback run) otherwise "no callback"
+
+"--- Exports: other modules could use these."
+export function stop_count
+    return 14
+export version is "tour 1"
+print "Tour stops: " + (stop_count run) + ", " + version

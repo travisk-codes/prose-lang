@@ -4,6 +4,10 @@
   "private": true,
   "description": "An experimental Prose to JavaScript transpiler",
   "type": "module",
+  "exports": {
+    ".": "./src/transpile.js",
+    "./vite": "./src/vite.js"
+  },
   "bin": {
     "prose": "bin/prose.js"
   },
@@ -14,10 +18,13 @@
     "example:factorial": "node bin/prose.js examples/factorial_demo.prose --run",
     "example:cipher": "node bin/prose.js examples/caesar_cipher_demo.prose --run",
     "example:objects": "node bin/prose.js examples/objects.prose --run",
-    "example:arrays": "node bin/prose.js examples/arrays.prose --run"
+    "example:arrays": "node bin/prose.js examples/arrays.prose --run",
+    "example:reading": "node bin/prose.js examples/reading_list.prose --run",
+    "example:habits": "node bin/prose.js examples/habits.prose --run",
+    "example:tour": "node bin/prose.js examples/tour.prose --run"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.6"
   },
   "devDependencies": {
     "vscode-oniguruma": "^2.0.1",

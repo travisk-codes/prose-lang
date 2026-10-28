@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { transpile } from "../src/transpile.js";
+import { register } from "node:module";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { moduleReader } from "../src/node-hooks.js";
+import { compile } from "../src/transpile.js";
 
 const args = process.argv.slice(2);
 if (!args.length || args.includes("--help")) {
@@ -13,13 +16,13 @@ if (args.length > 2 || (args.length === 2 && args[1] !== "--run") || args[0].sta
   process.exit(1);
 }
 try {
-  const output = transpile(readFileSync(args[0], "utf8"));
+  const file = resolve(args[0]);
   if (args[1] === "--run") {
-    const result = spawnSync(process.execPath, ["--input-type=commonjs", "-e", output], { stdio: "inherit" });
-    if (result.error) throw result.error;
-    process.exitCode = result.status ?? 1;
+    // The hook compiles this file and every .prose file it imports as Node loads them.
+    register("../src/node-hooks.js", import.meta.url);
+    await import(pathToFileURL(file).href);
   } else {
-    process.stdout.write(output);
+    process.stdout.write(compile(readFileSync(file, "utf8"), { readModule: moduleReader(file) }).code);
   }
 } catch (error) {
   console.error(error.message);
