@@ -52,6 +52,10 @@
       "include": "#punctuation"
     },
     {
+      "match": "\\b[A-Z][A-Za-z_0-9]*\\b",
+      "name": "support.class.prose"
+    },
+    {
       "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b",
       "name": "variable.other.readwrite.prose"
     }

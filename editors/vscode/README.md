@@ -1,6 +1,6 @@
 # Prose Language for Visual Studio Code
 
-Syntax highlighting for `.prose` files with a soft neon palette optimized for dark backgrounds.
+Syntax highlighting for `.prose` files with a rainbow palette for dark backgrounds.
 
 Highlights keywords, function declarations and parameters, standard-library
 calls, booleans, numbers, strings, escapes, operators, dot indexing, object literals, arrays, and colon property access.
@@ -22,10 +22,21 @@ The extension supplies Prose-only token colors through VS Code configuration
 defaults. It leaves the workbench theme and other languages alone. Existing
 user token-color settings take precedence.
 
-- Lavender control flow and pink language words.
-- Gold function names and cyan standard-library calls.
-- Mint strings, peach numbers, and teal object properties.
-- Blue bindings, warm parameters and loop variables, and muted italic comments.
+Each kind of word gets its own hue, in rainbow order:
+
+- Red control flow (`if`, `for each`, `return`).
+- Orange numbers and amber `true`, `false`, `null`, and `unset`.
+- Yellow `function` and function names (bold), and yellow string escapes.
+- Lime parameters (italic) and loop variables.
+- Green strings with emerald quotes.
+- Teal object properties and accessors, and cyan standard-library calls.
+- Blue bindings (names being assigned) and pale blue variables.
+- Indigo `object` and `array`, and purple language words (`is`, `with`, `takes`).
+- Pink operators, and rose types and capitalized names such as `Map` and `Math`.
+
+Comments stay a muted italic gray so code stands out. Parentheses take VS
+Code's own bracket pair colors when bracket pair colorization is on, which is
+the default.
 
 Change individual colors using `editor.tokenColorCustomizations` in VS Code
 settings. All palette selectors are scoped to `source.prose`.

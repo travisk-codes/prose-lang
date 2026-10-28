@@ -185,6 +185,11 @@ test("type annotations, type declarations, and type imports have type scopes onl
   hasScope("    start as text", "start", "variable.other.binding.prose");
   hasScope("    start as text", "text", "support.type.prose");
   hasScope('use type Datum from "../types"', "type", "keyword.other.prose");
+  hasScope('use type Datum from "../types"', "Datum", "support.class.prose");
+  hasScope("seen is new Set items", "Set", "support.class.prose");
+  hasScope("print Math:max 4, 9", "Math", "support.class.prose");
+  hasScope("print Math:max 4, 9", "max", "variable.other.property.prose");
+  hasScope("print total", "total", "variable.other.readwrite.prose");
   hasScope("for number is 1 to 10", "number", "variable.other.iterator.prose");
   hasScope("print text + number", "number", "variable.other.readwrite.prose");
   hasScope('type is "plain"', "type", "variable.other.binding.prose");
