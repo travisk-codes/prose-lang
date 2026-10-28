@@ -1,6 +1,6 @@
 # Prose Language for Visual Studio Code
 
-Syntax highlighting for `.prose` files. Colors come from your existing VS Code theme.
+Syntax highlighting for `.prose` files with a soft neon palette optimized for dark backgrounds.
 
 Highlights keywords, function declarations and parameters, standard-library
 calls, booleans, numbers, strings, escapes, operators, dot indexing, object literals, arrays, and colon property access.
@@ -16,16 +16,30 @@ This is a declarative extension with no executable extension code.
 Async and await are colored for the MusicTicker design sketch; the compiler
 does not implement those features yet.
 
+## Prose colors
+
+The extension supplies Prose-only token colors through VS Code configuration
+defaults. It leaves the workbench theme and other languages alone. Existing
+user token-color settings take precedence.
+
+- Lavender control flow and pink language words.
+- Gold function names and cyan standard-library calls.
+- Mint strings, peach numbers, and teal object properties.
+- Blue bindings, warm parameters and loop variables, and muted italic comments.
+
+Change individual colors using `editor.tokenColorCustomizations` in VS Code
+settings. All palette selectors are scoped to `source.prose`.
+
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.2.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.3.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.2.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.3.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -49,7 +63,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.2.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.3.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

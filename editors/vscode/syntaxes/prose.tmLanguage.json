@@ -22,6 +22,12 @@
       "include": "#parameters"
     },
     {
+      "include": "#loop-iterators"
+    },
+    {
+      "include": "#bindings"
+    },
+    {
       "include": "#keywords"
     },
     {
@@ -75,7 +81,7 @@
       ]
     },
     "function-declarations": {
-      "match": "\\b(function)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+      "match": "\\b(function)\\s+(?!(?:takes|return)\\b)([A-Za-z_][A-Za-z_0-9]*)",
       "captures": {
         "1": {
           "name": "storage.type.function.prose"
@@ -88,7 +94,7 @@
     "parameters": {
       "name": "meta.function.parameters.prose",
       "begin": "\\b(takes)\\b",
-      "end": "$",
+      "end": "(?=\\breturn\\b)|$",
       "beginCaptures": {
         "1": {
           "name": "keyword.other.prose"
@@ -116,11 +122,15 @@
           "name": "storage.type.object.prose"
         },
         {
-          "match": "\\b(?:if|else|for|while|return)\\b",
+          "match": "\\bfunction\\b",
+          "name": "storage.type.function.prose"
+        },
+        {
+          "match": "\\b(?:if|then|else|for|each|in|while|return)\\b",
           "name": "keyword.control.prose"
         },
         {
-          "match": "\\b(?:is|to|print|run)\\b",
+          "match": "\\b(?:is|to|print|run|with|new|use|export)\\b|\\bfrom(?=\\s*\")",
           "name": "keyword.other.prose"
         },
         {
@@ -134,7 +144,7 @@
       "name": "support.function.prose"
     },
     "constants": {
-      "match": "\\b(?:true|false|null)\\b",
+      "match": "\\b(?:true|false|null|unset)\\b",
       "name": "constant.language.prose"
     },
     "numbers": {
@@ -144,7 +154,7 @@
     "operators": {
       "patterns": [
         {
-          "match": "\\b(?:and|or|not|mod)\\b",
+          "match": "\\b(?:and|or|not|mod|otherwise|maybe)\\b",
           "name": "keyword.operator.word.prose"
         },
         {
@@ -181,6 +191,59 @@
         },
         "2": {
           "name": "variable.other.property.prose"
+        }
+      }
+    },
+    "loop-iterators": {
+      "patterns": [
+        {
+          "begin": "\\b(for)\\s+(each)\\b",
+          "end": "\\b(in)\\b|$",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.prose"
+            },
+            "2": {
+              "name": "keyword.control.prose"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "keyword.control.prose"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b",
+              "name": "variable.other.iterator.prose"
+            },
+            {
+              "match": ",",
+              "name": "punctuation.separator.parameters.prose"
+            }
+          ]
+        },
+        {
+          "match": "\\b(for)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.prose"
+            },
+            "2": {
+              "name": "variable.other.iterator.prose"
+            }
+          }
+        }
+      ]
+    },
+    "bindings": {
+      "match": "^\\s*(?:(export)\\s+)?([A-Za-z_][A-Za-z_0-9]*)(?=\\s+is\\b)",
+      "captures": {
+        "1": {
+          "name": "keyword.other.prose"
+        },
+        "2": {
+          "name": "variable.other.binding.prose"
         }
       }
     }

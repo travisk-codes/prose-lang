@@ -121,6 +121,46 @@ test("object construction and colon properties have distinct scopes, including k
   hasScope("word.i", ".", "punctuation.accessor.prose");
 });
 
+test("module, call, and function-value words have syntax scopes", () => {
+  const imports = 'use addDays, dateFromKey from "../dates"';
+  hasScope(imports, "use", "keyword.other.prose");
+  hasScope(imports, "from", "keyword.other.prose");
+  hasScope("print from + 1", "from", "variable.other.readwrite.prose");
+  hasScope("export function pluralize takes count", "export", "keyword.other.prose");
+  hasScope("export function pluralize takes count", "pluralize", "entity.name.function.prose");
+  hasScope("export limit is 3", "export", "keyword.other.prose");
+  hasScope("export limit is 3", "limit", "variable.other.binding.prose");
+  hasScope('print words:join with ", "', "with", "keyword.other.prose");
+  hasScope('print words:join with ", "', "join", "variable.other.property.prose");
+  hasScope("seen is new Set with items", "new", "keyword.other.prose");
+  const lambda = "doubled is values:map with function takes value return value * 2";
+  hasScope(lambda, "function", "storage.type.function.prose");
+  assert.ok(!scopesAt(lambda, "takes").includes("entity.name.function.prose"));
+  hasScope(lambda, "value return", "variable.parameter.prose");
+  hasScope(lambda, "return", "keyword.control.prose");
+  hasScope(lambda, "value * 2", "variable.other.readwrite.prose");
+  hasScope("labels is shelf:map with function takes book", "book", "variable.parameter.prose");
+  hasScope("seven is function return 7", "return", "keyword.control.prose");
+});
+
+test("for each loops, inline if, unset, and otherwise have syntax scopes", () => {
+  const loop = "for each name, score in scores";
+  hasScope(loop, "each", "keyword.control.prose");
+  hasScope(loop, "name", "variable.other.iterator.prose");
+  hasScope(loop, "score in", "variable.other.iterator.prose");
+  hasScope(loop, "in scores", "keyword.control.prose");
+  hasScope(loop, "scores", "variable.other.readwrite.prose");
+  hasScope("for index is 1 to 3", "index", "variable.other.iterator.prose");
+  const choice = 'label is if count = 1 then "one" else "many"';
+  hasScope(choice, "then", "keyword.control.prose");
+  hasScope("value is unset otherwise 0", "unset", "constant.language.prose");
+  hasScope("value is unset otherwise 0", "otherwise", "keyword.operator.word.prose");
+  hasScope("city is maybe person:address:city", "maybe", "keyword.operator.word.prose");
+  for (const word of ["thenceforth", "eachother", "inside", "newest", "withdraw", "user", "exported", "unsettled", "maybelline"]) {
+    assert.ok(scopesAt(`print ${word}`, word).includes("variable.other.readwrite.prose"), word);
+  }
+});
+
 test("array keywords and comma lists have syntax scopes without turning literals into comments", () => {
   hasScope("items is array", "array", "storage.type.array.prose");
   hasScope('names is "Ada", "Grace"', "Ada", "string.quoted.double.prose");

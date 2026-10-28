@@ -2,7 +2,7 @@
   "name": "prose-language",
   "displayName": "Prose Language",
   "description": "Syntax highlighting for the Prose concept programming language.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "travisk-codes",
   "license": "MIT",
   "engines": {
@@ -42,7 +42,231 @@
         "scopeName": "source.prose",
         "path": "./syntaxes/prose.tmLanguage.json"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "name": "Prose: Variables",
+            "scope": [
+              "source.prose variable.other.readwrite.prose"
+            ],
+            "settings": {
+              "foreground": "#BCD0F1",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Bindings",
+            "scope": [
+              "source.prose variable.other.binding.prose"
+            ],
+            "settings": {
+              "foreground": "#9BC5FF",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Loop iterators",
+            "scope": [
+              "source.prose variable.other.iterator.prose"
+            ],
+            "settings": {
+              "foreground": "#F6C177",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Properties",
+            "scope": [
+              "source.prose variable.other.property.prose"
+            ],
+            "settings": {
+              "foreground": "#5EEAD4",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Parameters",
+            "scope": [
+              "source.prose variable.parameter.prose"
+            ],
+            "settings": {
+              "foreground": "#F6C177",
+              "fontStyle": "italic"
+            }
+          },
+          {
+            "name": "Prose: Control flow",
+            "scope": [
+              "source.prose keyword.control.prose",
+              "source.prose keyword.control.experimental.prose"
+            ],
+            "settings": {
+              "foreground": "#C6A0F6",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Language words",
+            "scope": [
+              "source.prose keyword.other.prose"
+            ],
+            "settings": {
+              "foreground": "#F5A9D0",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Function declarations",
+            "scope": [
+              "source.prose storage.type.function.prose"
+            ],
+            "settings": {
+              "foreground": "#C6A0F6",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Function names",
+            "scope": [
+              "source.prose entity.name.function.prose"
+            ],
+            "settings": {
+              "foreground": "#F9E2AF",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "name": "Prose: Standard library",
+            "scope": [
+              "source.prose support.function.prose"
+            ],
+            "settings": {
+              "foreground": "#76D7EA",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Objects and arrays",
+            "scope": [
+              "source.prose storage.type.object.prose",
+              "source.prose storage.type.array.prose"
+            ],
+            "settings": {
+              "foreground": "#89B4FA",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Strings",
+            "scope": [
+              "source.prose string.quoted.double.prose"
+            ],
+            "settings": {
+              "foreground": "#A6E3A1",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: String escapes",
+            "scope": [
+              "source.prose constant.character.escape.prose"
+            ],
+            "settings": {
+              "foreground": "#F9E2AF",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Comments",
+            "scope": [
+              "source.prose comment.line.string.prose"
+            ],
+            "settings": {
+              "foreground": "#8B96B5",
+              "fontStyle": "italic"
+            }
+          },
+          {
+            "name": "Prose: Numbers",
+            "scope": [
+              "source.prose constant.numeric.prose"
+            ],
+            "settings": {
+              "foreground": "#FAB387",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Booleans and null",
+            "scope": [
+              "source.prose constant.language.prose"
+            ],
+            "settings": {
+              "foreground": "#F5A97F",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Operators",
+            "scope": [
+              "source.prose keyword.operator.prose",
+              "source.prose keyword.operator.word.prose"
+            ],
+            "settings": {
+              "foreground": "#F38BA8",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Accessors",
+            "scope": [
+              "source.prose punctuation.accessor.prose",
+              "source.prose punctuation.accessor.object.prose"
+            ],
+            "settings": {
+              "foreground": "#64D8CB",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Commas and parentheses",
+            "scope": [
+              "source.prose punctuation.separator.arguments.prose",
+              "source.prose punctuation.separator.parameters.prose",
+              "source.prose punctuation.section.group.begin.prose",
+              "source.prose punctuation.section.group.end.prose"
+            ],
+            "settings": {
+              "foreground": "#A2ACC8",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: String quotes",
+            "scope": [
+              "source.prose punctuation.definition.string.begin.prose",
+              "source.prose punctuation.definition.string.end.prose"
+            ],
+            "settings": {
+              "foreground": "#82CBA0",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Invalid escapes",
+            "scope": [
+              "source.prose invalid.illegal.escape.prose"
+            ],
+            "settings": {
+              "foreground": "#FF7794",
+              "fontStyle": "underline"
+            }
+          }
+        ]
+      }
+    }
   },
   "files": [
     "package.json",
