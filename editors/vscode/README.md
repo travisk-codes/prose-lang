@@ -24,6 +24,15 @@ The editor's tab size and spaces/tabs preference control indentation.
 Set `prose.format.width` to change the preferred width (default 80, minimum 20).
 You can enable format-on-save through VS Code's usual editor settings.
 
+Existing line breaks and continuation indentation stay as written when all physical
+lines of a statement or header fit the width. Only logical lines with an overlong
+physical line are reflowed. Long function headers put each parameter on its own
+indented line, with a trailing comma before an aligned `giving` line. Without
+`giving`, the final parameter has no trailing comma. Short headers stay on one line.
+Other long lines prefer breaks after `or` / `otherwise`, `and`, a lambda's `return`,
+and outer argument or object-entry commas, ahead of breaks inside nested calls.
+New continuation lines all use one extra indentation level from the statement.
+
 The formatter preserves parentheses, strings, patterns, accessors, documentation,
 and program structure. It wraps only where Prose allows a continuation and
 checks the parsed result before returning an edit. A long string or expression

@@ -64,8 +64,10 @@ See [the extension README](editors/vscode/README.md) for development and packagi
 
 ## Formatting
 
-The formatter standardizes indentation and spacing and wraps long expressions
-at safe continuation points. Its default width is 80 columns:
+The formatter standardizes indentation and spacing while keeping your line breaks
+and continuation indentation whenever every physical line of a statement or header
+fits the width. It reflows a logical line only when one of its physical lines is too
+long. Its default width is 80 columns:
 
 ```powershell
 node bin/prose.js format examples/reading_list.prose --width 80
@@ -78,6 +80,24 @@ hidden entries and `node_modules`. Formatting updates files in place. `--check`
 reports files that would change and exits with status 1 without writing them.
 Already formatted files are left alone. A syntax error stops the batch before
 any files are written; unfinished design sketches need valid syntax first.
+
+When a function header needs reflowing, each parameter gets its own indented line,
+with a trailing comma, and `giving` returns to the header's indentation:
+
+```text
+export function create_note_tags takes
+    body as text,
+    title as maybe text,
+    labels as maybe list of text,
+giving list of DatumTag
+```
+
+A header that fits on one line stays there. Without `giving`, the last parameter
+has no trailing comma, so the function body starts separately. Other long lines
+prefer breaks after `or` / `otherwise`, then `and`, then a lambda's `return`, then
+commas between outer call arguments or object entries. Nested calls and opening
+parentheses stay together when a looser break works. Every new continuation line
+uses one extra indentation level from the statement's first line.
 
 The formatter keeps strings, patterns, parentheses, and the choice of `.` or `:`.
 It reparses the result and checks that the program's structure and documentation

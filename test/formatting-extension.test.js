@@ -102,8 +102,15 @@ test("bounded edits preserve Unicode characters and CRLF pairs", () => {
 
 test("packaged formatter uses the same parser and behavior as the CLI", async () => {
   const bundled = await import("../editors/vscode/dist/formatter/format.js");
-  const source = 'shout is function takes word return word.to_upper_case run\nprint  shout "hello"';
-  assert.equal(bundled.format(source, { width: 40 }), format(source, { width: 40 }));
+  for (const source of [
+    'shout is function takes word return word.to_upper_case run\nprint  shout "hello"',
+    'export function greet takes name as text, title as maybe text, giving text\n    return name',
+    'result is first_choice or\n      second_choice or\n          last_choice\n'
+  ]) {
+    const formatted = format(source, { width: 40 });
+    assert.equal(bundled.format(source, { width: 40 }), formatted);
+    assert.equal(bundled.format(formatted, { width: 40 }), formatted);
+  }
   const manifest = JSON.parse(readFileSync(new URL("../editors/vscode/package.json", import.meta.url), "utf8"));
   assert.equal(manifest.main, "./extension.cjs");
   assert.equal(manifest.contributes.configuration.properties["prose.format.width"].default, 80);

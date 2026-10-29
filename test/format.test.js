@@ -12,6 +12,106 @@ import { compile, parse, sourceLines } from "../src/transpile.js";
 const cli = fileURLToPath(new URL("../bin/prose.js", import.meta.url));
 const meaning = source => JSON.stringify(parse(source), (key, value) => key === "line" ? undefined : value);
 
+function layout(source, expected, options = {}) {
+  const formatted = format(source, options);
+  assert.equal(formatted, expected);
+  assert.equal(meaning(formatted), meaning(source));
+  assert.equal(format(formatted, options), formatted);
+  assert.ok(formatted.split("\n").every(line => line.length <= (options.width ?? 80)), formatted);
+}
+
+test("long function headers put each parameter on its own line and align giving", () => {
+  layout(
+    'export function create_note_tags takes body as text, title as maybe text, labels as maybe list of text, giving list of DatumTag\n    return array',
+    'export function create_note_tags takes\n    body as text,\n    title as maybe text,\n    labels as maybe list of text,\ngiving list of DatumTag\n    return array\n'
+  );
+  layout(
+    'export function is_numeric_selection takes entries as list of Entry, giving boolean\n    return true',
+    'export function is_numeric_selection takes\n    entries as list of Entry,\ngiving boolean\n    return true\n'
+  );
+});
+
+test("short function headers stay on one line, including after spacing normalization", () => {
+  const source = 'export function is_note takes datum as Datum, giving boolean\n    return true\n';
+  layout(source, source);
+  layout('function   greet   takes   name   as   text,   giving   text\n    return name',
+    'function greet takes name as text, giving text\n    return name\n', { width: 48 });
+});
+
+test("fitting wrapped headers and expressions retain their breaks and continuation indentation", () => {
+  const source = [
+    'function greet takes',
+    '      name as text,',
+    'giving text',
+    '    return name',
+    'result is first_choice or',
+    '',
+    '      second_choice or',
+    '          last_choice',
+    'listed is labels:some function takes label return',
+    '      label = name',
+    'lines is (items:map function takes line return',
+    '      (line:replace pattern "[ ]+" everywhere, " "):trim_end run)',
+    ''
+  ].join('\n');
+  layout(source, source);
+  const crlf = source.replace(/\n/g, '\r\n');
+  layout(crlf, crlf);
+});
+
+test("spacing and indentation normalization never make a fitting line overflow", () => {
+  const source = 'value is 1+2+3+4+5+6\n';
+  layout(source, source, { width: 25 });
+  const indented = 'callback is function takes word\n  if word = "" return unset\n  return word.to_upper_case run\n';
+  layout(indented, indented, { width: 32 });
+  const continuation = 'function greet\n  message is\n    "hello"\n';
+  layout(continuation, continuation);
+  layout(continuation, continuation, { tabWidth: 2, insertSpaces: false });
+  const tabs = 'result is first_choice or\n\tsecond_choice or\n\t\tlast_choice\n';
+  layout(tabs, tabs, { insertSpaces: false });
+});
+
+test("long logical chains prefer or and otherwise to and, with level continuation indentation", () => {
+  layout(
+    'function accepts takes entry\n    return entry:active and entry:visible or entry:archived and entry:owned or entry:shared and entry:enabled',
+    'function accepts takes entry\n    return entry:active and entry:visible or\n        entry:archived and entry:owned or\n        entry:shared and entry:enabled\n',
+    { width: 60 }
+  );
+  layout('result is first_choice otherwise second_choice otherwise third_choice',
+    'result is first_choice otherwise\n    second_choice otherwise third_choice\n', { width: 48 });
+});
+
+test("long and chains break after and without stepping right on later lines", () => {
+  layout('result is first_condition and second_condition and third_condition and fourth_condition',
+    'result is first_condition and\n    second_condition and third_condition and\n    fourth_condition\n', { width: 48 });
+});
+
+test("long lambdas break after return before splitting their body's call arguments", () => {
+  const prefix = 'function same_tag_name takes label, name\n    return label = name\nfunction check takes labels, name\n';
+  layout(prefix + '    listed is labels:some function takes label return same_tag_name label, name',
+    prefix + '    listed is labels:some function takes label return\n        same_tag_name label, name\n', { width: 72 });
+  layout('result is (items:map function takes line return (line:replace pattern "[ ]+" everywhere, " "):trim_end run)',
+    'result is (items:map function takes line return\n    (line:replace pattern "[ ]+" everywhere, " "):trim_end run)\n');
+});
+
+test("reflow prefers outer call arguments and object entries to nested call arguments", () => {
+  layout('result is combine (normalize first_argument, second_argument), third_argument, fourth_argument',
+    'result is combine (normalize first_argument, second_argument),\n    third_argument, fourth_argument\n', { width: 76 });
+  layout('result is object first is (normalize first_argument, second_argument), second is third_argument',
+    'result is object first is (normalize first_argument, second_argument),\n    second is third_argument\n', { width: 76 });
+  layout('result is items:map function takes item\n    average is window_average series, (date_from_key key), window, missing_as_zero\n    return average',
+    'result is items:map function takes item\n    average is window_average series, (date_from_key key), window,\n        missing_as_zero\n    return average\n', { width: 72 });
+});
+
+test("header reflow preserves function and tuple parameter types and optional giving", () => {
+  layout('function transform takes callback as function taking text giving number, pair as (text, number), giving number\n    return 1',
+    'function transform takes\n    callback as function taking text giving number,\n    pair as (text, number),\ngiving number\n    return 1\n');
+  layout('function combine_words takes first_word as text, second_word as text\n    return first_word + second_word',
+    'function combine_words takes\n    first_word as text,\n    second_word as text\n    return first_word + second_word\n', { width: 40 });
+  layout('function greeting giving text\n    return "hello"',
+    'function greeting giving\n    text\n    return "hello"\n', { width: 24 });
+});
+
 test("format normalizes spacing, indentation, blank lines, and the final newline", () => {
   const before = '\nfunction  shout takes text\n\treturn   text . to_upper_case  run   \n\n\nprint  shout   "done"';
   assert.equal(format(before), 'function shout takes text\n    return text.to_upper_case run\n\nprint shout "done"\n');
