@@ -1,0 +1,37 @@
+shelf is 
+    ("Middlemarch", 880, true), 
+    ("Piranesi", 272, false),
+    ("Beloved", 324, true)
+
+books is array
+for each title, pages, done in shelf
+    books.push object title, pages, done
+
+function status takes book
+    return "read" if book.done else "to read"
+
+finished is books.filter function takes book return book.done
+titles is finished.map function takes book return book.title
+print "Finished: " + titles.join ", "
+
+labels is books.map function takes book
+    return book.title + " (long)" if book.pages > 500
+        else book.title
+print labels.join ", "
+
+counts is new Map
+for each book in books
+    count is counts.get status book otherwise 0
+    counts.set status book, (count + 1)
+for each label, count in counts
+    print label + ": " + count
+
+total is 0
+for each book in books
+    total is total + book.pages
+print "Average pages: " + Math.round (total / length books)
+
+shout is function takes text return text.to_upper_case run
+print shout "done"
+abandoned is counts.get "abandoned"
+print "Abandoned: " + (abandoned otherwise 0)

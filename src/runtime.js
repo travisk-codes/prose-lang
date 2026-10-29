@@ -67,6 +67,62 @@ export function __prose_property(value, name, line) {
   return value[name];
 }
 
+// Bare names become variable indexes only on text and lists. Ordinary objects
+// keep literal property names; explicit computed keys have no literal name.
+export function __prose_dot_key(value, key, name) {
+  if (name === undefined) return key;
+  if (typeof key === "function" && (value === undefined || typeof value === "string" || Array.isArray(value))) {
+    const index = key();
+    if (typeof index === "number") return index;
+  }
+  return name;
+}
+
+export function __prose_dot(value, key, line, name) {
+  key = __prose_dot_key(value, key, name);
+  if (typeof key === "number" && (value === undefined || typeof value === "string" || Array.isArray(value))) {
+    return __prose_get(value, key, line);
+  }
+  return __prose_property(value, key, line);
+}
+
+export function __prose_dot_ref(parent, keyExpression, line, name) {
+  const original = parent.get();
+  const key = __prose_dot_key(original, keyExpression(), name);
+  if (typeof key !== "number" || (original !== undefined && typeof original !== "string" && !Array.isArray(original))) {
+    return __prose_property_ref(original, key, line);
+  }
+  return {
+    get: () => __prose_get(original, key, line),
+    set: replacement => {
+      const updated = __prose_set(original, key, replacement, line);
+      // Lists mutate in place; text must be written back through its parent.
+      if (!Array.isArray(original)) parent.set(updated);
+      return replacement;
+    }
+  };
+}
+
+export function __prose_dot_method(value, key, args, line, name) {
+  key = __prose_dot_key(value, key, name);
+  const method = __prose_dot(value, key, line);
+  if (typeof method !== "function") throw new TypeError(`Line ${line}: '${key}' is not a function.`);
+  return method.apply(value, args);
+}
+
+export function __prose_maybe_dot(value, key, line, name) {
+  return value === undefined || value === null ? undefined : __prose_dot(value, key(), line, name);
+}
+
+export function __prose_maybe_dot_method(value, key, args, line, literal) {
+  if (value === undefined || value === null) return undefined;
+  const name = __prose_dot_key(value, key(), literal);
+  const method = __prose_dot(value, name, line);
+  if (method === undefined || method === null) return undefined;
+  if (typeof method !== "function") throw new TypeError(`Line ${line}: '${name}' is not a function.`);
+  return method.apply(value, args());
+}
+
 export function __prose_property_ref(value, name, line) {
   if ((typeof value !== "object" && typeof value !== "function") || value === null) {
     throw new TypeError(`Line ${line}: Named property assignment requires an object.`);
@@ -151,6 +207,7 @@ const helpers = [
   __prose_chars, __prose_length, __prose_get, __prose_set,
   __prose_char_to_number, __prose_number_to_char, __prose_mod,
   __prose_property, __prose_property_ref, __prose_index_ref,
+  __prose_dot_key, __prose_dot, __prose_dot_ref, __prose_dot_method, __prose_maybe_dot, __prose_maybe_dot_method,
   __prose_call, __prose_method, __prose_new, __prose_maybe_property, __prose_maybe_get,
   __prose_maybe_call, __prose_maybe_method, __prose_each, __prose_is_object, __prose_error
 ];

@@ -155,6 +155,7 @@ class Expression {
     if (this.adjacentValues || !(left.grouped || ["name", "property", "index"].includes(left.type))) return false;
     if (this.shiftAt()) return false;
     const next = this.peek();
+    if (isWord(next, "if") && this.trailingIf()) return false;
     if (next.type === "symbol" && next.value === "-" && next.spaced && this.tokens[this.pos + 1] && !this.tokens[this.pos + 1].spaced) {
       fail(this.line, "'-' here could start a negative argument or subtract. Write with before a negative argument (items:at with -1), or put spaces around a minus that subtracts.");
     }
@@ -162,7 +163,7 @@ class Expression {
     if (next.type === "symbol") return next.value === "(";
     if (next.type === "pattern") return true;
     return !reserved.has(next.value) ||
-      ["function", "new", "not", "maybe", "array", "object", "unset", "true", "false", "null", "each"].includes(next.value);
+      ["function", "if", "new", "not", "maybe", "array", "object", "unset", "true", "false", "null", "each"].includes(next.value);
   }
   // An inline object's entries: `name is value`, a bare name, or `like other`. Like a call, it takes every comma.
   objectEntries() {
@@ -205,6 +206,25 @@ class Expression {
     const token = this.peek();
     return token?.value === value && (token.type === "word" || token.type === "symbol");
   }
+  // `f if ready then a else b` passes a prefix conditional to f. Without a
+  // top-level `then`, `f value if ready else b` selects the whole call's result.
+  trailingIf() {
+    if (!this.at("if")) return false;
+    let depth = 0;
+    for (let pos = this.pos + 1; pos < this.tokens.length; pos++) {
+      const token = this.tokens[pos];
+      if (token.type === "symbol" && token.value === "(") { depth++; continue; }
+      if (token.type === "symbol" && token.value === ")") {
+        if (!depth) break;
+        depth--;
+        continue;
+      }
+      if (depth || token.type !== "word" || [".", ":"].includes(this.tokens[pos - 1]?.value)) continue;
+      if (token.value === "then") return false;
+      if (token.value === "else") break;
+    }
+    return true;
+  }
   take(value) {
     if (!this.at(value)) fail(this.line, `Expected '${value}'.`);
     return this.tokens[this.pos++];
@@ -229,8 +249,22 @@ class Expression {
   }
   propertyName() {
     const token = this.tokens[this.pos++];
-    if (token?.type !== "word") fail(this.line, "Expected a property name after ':', or before 'is' in an object body.");
+    if (token?.type !== "word") fail(this.line, "Expected a property name after an accessor, or before 'is' in an object body.");
     return token.value;
+  }
+  // Bare words after a dot can index a list or text using a numeric variable.
+  // Their spelling stays literal on other receivers.
+  dotStep(object) {
+    if (this.at("(")) {
+      this.take("(");
+      const key = this.inParentheses(() => this.parse());
+      this.take(")");
+      return { type: "property", object, key, contextual: true, line: this.line };
+    }
+    if (this.peek()?.type === "word") {
+      return { type: "property", object, name: this.propertyName(), contextual: true, line: this.line };
+    }
+    return { type: "index", object, index: this.index(), line: this.line };
   }
   end() {
     if (this.peek()) fail(this.line, `Unexpected token ${JSON.stringify(this.peek().value)}.`);
@@ -386,10 +420,10 @@ class Expression {
     if (word === "object") return { kind: "object" };
     if (Object.hasOwn(builtinTypes, word)) return { kind: "builtin", name: builtinTypes[word] };
     if (/^[A-Z]/.test(word)) {
-      // A type inside a namespace, such as Intl:DateTimeFormatOptions.
+      // A type inside a namespace, such as Intl.DateTimeFormatOptions.
       let name = word;
-      while (this.at(":")) {
-        this.take(":");
+      while (this.at(":") || this.at(".")) {
+        this.pos++;
         name += "." + this.propertyName();
       }
       const args = [];
@@ -467,8 +501,8 @@ class Expression {
       fail(this.line, `Expected a kind of value after '${article}': text, number, boolean, function, list, object, or a class such as Error.`);
     }
     let kind = { type: "name", value: token.value, line: this.line };
-    while (this.at(":")) {
-      this.take(":");
+    while (this.at(":") || this.at(".")) {
+      this.pos++;
       kind = { type: "property", object: kind, name: this.propertyName(), line: this.line };
     }
     return { type: "typeTest", value, kind, negated, line: this.line };
@@ -511,9 +545,11 @@ class Expression {
       left = { type: "conditional", condition, then, otherwise: this.parse() };
     } else if (token.value === "new") {
       let callee = { type: "name", value: this.name(), line: this.line };
-      while (this.at(":")) {
-        this.take(":");
-        callee = { type: "property", object: callee, name: this.propertyName(), line: this.line };
+      while (this.at(":") || this.at(".")) {
+        const dot = this.at(".");
+        this.pos++;
+        callee = dot ? this.dotStep(callee)
+          : { type: "property", object: callee, name: this.propertyName(), line: this.line };
       }
       const args = [];
       if (this.at("with")) {
@@ -543,6 +579,19 @@ class Expression {
       fail(this.line, `Unexpected token ${JSON.stringify(token.value)} in expression.`);
     }
     while (this.peek()) {
+      // A trailing conditional binds below calls, arithmetic, and logic. An
+      // argument reader leaves it for the surrounding call to consume.
+      if (this.trailingIf()) {
+        if (min > 5) break;
+        if (left.type === "conditional" && left.postfix && !left.grouped) {
+          fail(this.line, "Nested trailing if expressions need parentheses.");
+        }
+        this.take("if");
+        const condition = this.parse(6);
+        this.take("else");
+        left = { type: "conditional", condition, then: left, otherwise: this.parse(6), postfix: true };
+        continue;
+      }
       if (this.at(":") && min <= 70) {
         this.take(":");
         if (this.at("(")) {
@@ -558,7 +607,7 @@ class Expression {
       }
       if (this.at(".") && min <= 70) {
         this.take(".");
-        left = { type: "index", object: left, index: this.index(), line: this.line };
+        left = this.dotStep(left);
         continue;
       }
       if (this.at("with") && min <= 70) {
@@ -649,8 +698,10 @@ function continues(tokens) {
     else if (token.type === "symbol" && token.value === ")") depth--;
   }
   const last = tokens.at(-1);
+  const conditionalEnd = last.type === "word" && ["if", "else"].includes(last.value) && tokens.length > 1 &&
+    ![".", ":"].includes(tokens.at(-2)?.value);
   return depth > 0 || (last.type === "symbol" && continuingSymbols.has(last.value)) ||
-    (last.type === "word" && continuingWords.has(last.value));
+    (last.type === "word" && continuingWords.has(last.value)) || conditionalEnd;
 }
 
 // The source's lines with their indentation. A line with a parenthesis still open, or that ends in
@@ -937,7 +988,7 @@ class Parser {
           }
         } else {
           expr.take(".");
-          target = { type: "index", object: target, index: expr.index(), line: expr.line };
+          target = expr.dotStep(target);
         }
       }
       expr.take("is");
@@ -1124,6 +1175,19 @@ function resolve(node, scope) {
   fail(node.line, `Unknown name '${node.value}'. Assign it before using it, or check the spelling.`);
 }
 
+function dotKey(node, scope, emit) {
+  if (node.key) return emit(node.key);
+  for (let current = scope; current; current = current.parent) {
+    if (current.names.has(node.name)) {
+      // Defer reading the variable until the receiver requires an index.
+      return `() => ${variable(node.name)}`;
+    }
+  }
+  return "undefined";
+}
+
+const dotName = node => node.key ? "undefined" : JSON.stringify(camel(node.name));
+
 // Indexed writes rebuild strings, so the variable holding one must be assignable.
 function rebindable(node, scope) {
   for (let current = scope; current; current = current.parent) {
@@ -1268,6 +1332,11 @@ export function compile(source, options = {}) {
         : `[${JSON.stringify(camel(property.name))}]: ${emit(property.value)}`).join(", ")}})`;
     }
     if (node.type === "property") {
+      if (node.contextual) {
+        const key = dotKey(node, scope, emit);
+        if (node.maybe) return `__prose_maybe_dot(${emit(node.object)}, () => ${key}, ${node.line}, ${dotName(node)})`;
+        return `__prose_dot(${emit(node.object)}, ${key}, ${node.line}, ${dotName(node)})`;
+      }
       const name = node.key ? emit(node.key) : JSON.stringify(camel(node.name));
       if (node.maybe) return `__prose_maybe_property(${emit(node.object)}, ${name})`;
       return `__prose_property(${emit(node.object)}, ${name}, ${node.line})`;
@@ -1291,6 +1360,10 @@ export function compile(source, options = {}) {
       const args = node.maybe ? `() => ${list(node.args)}` : list(node.args);
       const helper = node.maybe ? "__prose_maybe_" : "__prose_";
       if (node.callee.type === "property") {
+        if (node.callee.contextual) {
+          const key = dotKey(node.callee, scope, emit);
+          return `${helper}dot_method(${emit(node.callee.object)}, ${node.maybe ? `() => ${key}` : key}, ${args}, ${node.line}, ${dotName(node.callee)})`;
+        }
         return `${helper}method(${emit(node.callee.object)}, ${node.callee.key ? emit(node.callee.key) : JSON.stringify(camel(node.callee.name))}, ${args}, ${node.line})`;
       }
       return `${helper}call(${emit(node.callee)}, ${args}, ${node.line})`;
@@ -1316,12 +1389,26 @@ export function compile(source, options = {}) {
     return `...__prose_each(${expression(node.value, scope, depth)}, ${node.line})`;
   }
 
-  function reference(target, scope, depth) {
+  function reference(target, scope, depth, readOnlyParent = false) {
     if (target.type === "name") {
+      if (readOnlyParent) {
+        const name = resolve(target, scope);
+        let binding = scope;
+        while (binding && !binding.names.has(target.value)) binding = binding.parent;
+        if (!binding || binding.imports.has(target.value)) {
+          const reason = binding ? "is imported" : "belongs to JavaScript";
+          const message = JSON.stringify(`Line ${target.line}: '${target.value}' ${reason}, so its positions can't be assigned.`);
+          return `({ get: () => ${name}, set: () => { throw new TypeError(${message}); } })`;
+        }
+        return `({ get: () => ${name}, set: __value => ${name} = __value })`;
+      }
       const name = rebindable(target, scope);
       return `({get: () => ${name}, set: __value => { ${name} = __value; }})`;
     }
     if (target.type === "property") {
+      if (target.contextual) {
+        return `__prose_dot_ref(${reference(target.object, scope, depth, true)}, () => ${dotKey(target, scope, child => expression(child, scope, depth))}, ${target.line}, ${dotName(target)})`;
+      }
       const name = target.key ? expression(target.key, scope, depth) : JSON.stringify(camel(target.name));
       return `__prose_property_ref(${expression(target.object, scope, depth)}, ${name}, ${target.line})`;
     }

@@ -1,15 +1,14 @@
 "A reading list built from JavaScript arrays, maps, methods, and functions as"
 "values."
 
-shelf is ("Middlemarch", 880, true), ("Piranesi", 272, false), ("Beloved", 324, true)
+shelf is 
+    ("Middlemarch", 880, true ), 
+    ("Piranesi",    272, false), 
+    ("Beloved",     324, true )
 
 books is array
 for each title, pages, done in shelf
-    book is object
-        title is title
-        pages is pages
-        done is done
-    books:push book
+    books.push object title, pages, done
 
 "An inline if chooses between two values."
 function status takes book

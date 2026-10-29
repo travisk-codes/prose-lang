@@ -1,0 +1,8 @@
+function cipher takes string, rotate
+    ciphered_string is ""
+    base_number is char_to_number "a"
+    for i is 1 to length string
+        char_number is (char_to_number string.i - base_number + rotate) mod 26 +
+            base_number
+        ciphered_string.i is number_to_char char_number
+    return ciphered_string

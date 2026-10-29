@@ -1,0 +1,33 @@
+"Rules for a small habit log. habits_simplified.prose imports these and calls"
+"them like its own functions."
+
+"The longest run of consecutive days, such as 3 for days 4, 5, and 6."
+export function longest_streak takes days
+    unique is Array.from new Set days
+    unique.sort function takes a, b return a - b
+    best is 0
+    current is 0
+    previous is unset
+    for each day in unique
+        current is if day = (previous otherwise -2) + 1 then current + 1 else 1
+        best is Math.max best, current
+        previous is day
+    return best
+
+"A word for a streak length, using early returns."
+export function streak_label takes length_in_days
+    if length_in_days >= 5 return "on fire"
+    if length_in_days >= 3 return "steady"
+    return "starting"
+
+"Some check-ins have notes. maybe reads a note's length without failing when"
+"it's missing."
+export function note_length takes check_in
+    return maybe check_in.note.length otherwise 0
+
+"Leave out the marker to get the default one."
+export function summary takes name, streak, marker
+    if marker = unset marker is "-"
+    days is if streak = 1 then " day" else " days"
+    return marker + " " + name + ": " + streak + days + " in a row (" +
+        streak_label streak + ")"

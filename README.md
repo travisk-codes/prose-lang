@@ -428,7 +428,29 @@ part of other names, like `pattern_count`.
 ## Inline if, unset, and otherwise
 
 `if condition then value else other` chooses a value inside an expression.
-Its `else` part extends as far right as it can, so wrap the whole inline `if`
+The value can also come first: `value if condition else other`.
+
+```text
+function status takes book
+    return "read" if book.done else "to read"
+
+label is "one" if count = 1 else "many"
+```
+
+The trailing form requires `else`. Calls, arithmetic, and logic bind before
+it: `describe book if book.done else "to read"` chooses between the result of
+`describe book` and `"to read"`. The condition runs first, followed by only the
+selected branch. Use parentheses to pass a trailing conditional as an argument
+or to nest trailing conditionals:
+
+```text
+print format ("read" if book.done else "to read")
+label is "first" if first else ("second" if second else "neither")
+```
+
+Continuation lines can break after `if` or `else`, with greater indentation.
+
+The prefix form's `else` part extends as far right as it can, so wrap that inline `if`
 in parentheses when more of the expression follows:
 
 ```text
@@ -808,6 +830,14 @@ print length person:name
 print person:name.1
 person:name.1 is "a"
 ```
+
+Dot notation uses the receiver to choose between properties and positions.
+On arrays and strings, a visible numeric variable supplies the index:
+`people.i` selects position `i`. Other names remain literal. On ordinary objects,
+bare names always select literal properties: `book.pages` reads the `pages`
+field even when a numeric loop variable named `pages` is still in scope.
+Explicit computed keys keep using their values, so `record.(key)` selects the
+property named by `key`. An unset string can still begin with an indexed write.
 
 A missing property reads as unset. Reading named properties of `null` or
 unset, or writing named properties on anything that is not an object, reports
