@@ -10,7 +10,7 @@ import { formatCommand } from "../src/format-cli.js";
 import { checkCommand } from "../src/check-cli.js";
 
 const usage = `Usage: node bin/prose.js <file.prose> [--run]
-       node bin/prose.js check [files or folders...] [--project tsconfig.json] [--json]
+       node bin/prose.js check [files or folders...] [--project tsconfig.json] [--strict] [--json]
        node bin/prose.js types <files or folders...> [--check]
        node bin/prose.js format <files or folders...> [--width 80] [--check]
        node bin/prose.js format - [--width 80] [--stdin-filepath file.prose]
@@ -19,6 +19,7 @@ Outputs JavaScript, or executes it with --run. The types command writes a
 TypeScript declaration file (name.d.prose.ts) for each .prose file that
 exports something; --check only reports the ones that are out of date.
 Check uses the project's TypeScript and tsconfig without writing or running code.
+Check --strict also reports unchecked function parameters and export contracts.
 Exit status: 0 for clean checks, 1 for source errors, 2 for check setup errors.
 Format updates Prose files in place; --check reports changes without writing.
 Use '-' to format standard input and print the result.`;

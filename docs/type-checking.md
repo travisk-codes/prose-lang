@@ -14,6 +14,7 @@ node bin/prose.js check
 node bin/prose.js check examples/arrays.prose
 node bin/prose.js check src --project tsconfig.json
 node bin/prose.js check --project ../my-app --json
+node bin/prose.js check src --strict
 npm.cmd run check -- examples/arrays.prose
 ```
 
@@ -97,6 +98,69 @@ scope. Hoisted bindings point to their first Prose assignment, and imported Pros
 exports point to the original source rather than the virtual declaration. Hosts
 can request hovers and definitions together to share analysis and token mapping.
 All symbol and compiler objects stay internal; results are serializable.
+
+## Optional stricter boundary checks
+
+Run `prose check --strict` (or `node bin/prose.js check --strict`) to require
+checked function parameters and public value contracts. Ordinary checking keeps
+its existing behavior. TypeScript's strict settings are already enabled in both
+modes; this flag adds Prose boundary checks.
+
+| Code | What strict mode reports |
+| --- | --- |
+| `PROSE_UNCHECKED_PARAMETER` | Any in a named function or callback parameter's type, including inside containers and aliases |
+| `PROSE_UNCHECKED_RETURN` | Any in an exported named function's return contract |
+| `PROSE_UNCHECKED_EXPORT` | Any in an exported value's contract, including function values and public nested fields |
+
+These are errors: the CLI exits with status 1, and VS Code shows the same codes
+in Problems. JSON results include `strict: true` when enabled. Diagnostics point
+to the parameter or export name in the original Prose source. Imported Prose
+dependencies are checked under the same policy, with fresh declarations held in
+memory. TypeScript/JavaScript dependencies are not newly linted for untyped
+parameters; an unchecked part of a contract exposed by Prose is still reported.
+
+For example, this function has an unchecked parameter and exported return:
+
+```text
+export function double takes value
+    return value * 2
+```
+
+Its body infers a numeric result, but its public declaration has no `giving`
+contract. Both boundaries become checked with:
+
+```text
+export function double takes value as number giving number
+    return value * 2
+```
+
+Contextual inference also counts: a `map` callback on a list of numbers can have
+a checked numeric parameter without an annotation. `unknown` and generic type
+parameters are allowed. Explicit `any`, including `list of any`, remains
+unchecked and is reported at these boundaries.
+
+Exported literal values can already have concrete contracts. Other exported
+values may need `as`: an unannotated function-valued export currently has an
+`any` declaration even when its body is typed. Exported contracts are expanded
+through named types and recursive public fields. Native generic arguments are
+checked, while native implementation members and private/protected fields do
+not make a concrete `Date` or typed map fail.
+
+Enable the same policy in a workspace or folder's VS Code settings:
+
+```json
+{ "prose.check.strict": true }
+```
+
+It defaults to `false`, takes effect on saved-file checking, and shares
+`prose.check.enabled` and Workspace Trust requirements. Roots with different
+folder policies use separate jobs. For CI, add `--strict` to the project's check
+script. API callers can pass `checkProject({ ..., strict: true })`.
+
+This mode checks these boundaries; local dynamic values and operations keep the
+existing checking rules and suppression policy. It does not prove index bounds
+or validate external JSON at runtime. Unresolved annotations retain their normal
+TypeScript diagnostics rather than gaining a second unchecked-boundary error.
 
 ## Understanding unchecked hover types
 
@@ -228,7 +292,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.18 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.19 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.

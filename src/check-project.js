@@ -7,6 +7,7 @@ import { declarationPath } from "./declarations.js";
 import { sourceMapLookup } from "./source-map.js";
 import { collectSourceInfo } from "./check-hover.js";
 import { createAnyExplainer } from "./check-any.js";
+import { strictDiagnostics } from "./check-strict.js";
 import { definitionResolver } from "./check-definition.js";
 
 export class CheckSetupError extends Error {
@@ -37,7 +38,7 @@ function filesUnder(directory) {
 /** Check Prose and its imported Prose dependencies without writing or executing
  * anything. Resolve TypeScript from the selected project, never from this tool.
  */
-export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], overlays = [] } = {}) {
+export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], overlays = [], strict = false } = {}) {
   cwd = resolve(cwd);
   const bufferKey = file => process.platform === "win32" ? resolve(file).toLowerCase() : resolve(file);
   const buffers = new Map(overlays.map(([file, source]) => [bufferKey(file), source]));
@@ -194,28 +195,30 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
   // selected roots. Add its checking body too, including through TypeScript imports.
   while (count !== records.size && !sourceErrors.length) {
     count = records.size;
-    const roots = [...records.values()].map(record => record.name).concat(ambient);
+    const roots = [...records.values()].flatMap(record => strict ? [record.name, record.declaration] : [record.name]).concat(ambient);
     program = ts.createProgram({ rootNames: roots, options, host, oldProgram: program, projectReferences: parsed?.projectReferences });
     diagnostics = ts.getPreEmitDiagnostics(program);
   }
   const result = {
     project: configFile ?? null, projectRoot, typescriptVersion: ts.version,
-    files: [...records.values()].map(record => record.file).sort(), diagnostics: [...sourceErrors], ignored: 0, exitCode: sourceErrors.length ? 1 : 0
+    files: [...records.values()].map(record => record.file).sort(), diagnostics: [...sourceErrors], ignored: 0, exitCode: sourceErrors.length ? 1 : 0,
+    ...(strict ? { strict: true } : {})
   };
   if (hoverTargets.length) result.hovers = [];
   if (definitionTargets.length) result.definitions = [];
   if (sourceErrors.length) return result;
-  if (hoverTargets.length || definitionTargets.length) {
+  if (strict || hoverTargets.length || definitionTargets.length) {
     const hoverFiles = new Set(hoverTargets.map(file => canonical(resolve(cwd, file))));
     const definitionFiles = new Set(definitionTargets.map(file => canonical(resolve(cwd, file))));
     const checker = program.getTypeChecker();
     const explainAny = hoverTargets.length ? createAnyExplainer(ts, checker, program, records.values()) : undefined;
     const information = new Map();
-    for (const record of records.values()) if (hoverFiles.has(canonical(record.file)) || definitionTargets.length) {
+    for (const record of records.values()) if (strict || hoverFiles.has(canonical(record.file)) || definitionTargets.length) {
       const items = collectSourceInfo(ts, checker, program.getSourceFile(record.name), record, { hover: hoverFiles.has(canonical(record.file)), explainAny });
       information.set(record, items);
       if (hoverFiles.has(canonical(record.file))) result.hovers.push(...items.map(({ node, symbol, priority, ...item }) => item));
     }
+    if (strict) result.diagnostics.push(...strictDiagnostics(ts, checker, program, records.values(), information));
     if (definitionTargets.length) {
       const resolveDefinition = definitionResolver(ts, checker, records.values(), information, canonical);
       for (const [record, items] of information) if (definitionFiles.has(canonical(record.file))) {

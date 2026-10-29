@@ -2,7 +2,7 @@
   "name": "prose-language",
   "displayName": "Prose Language",
   "description": "Syntax highlighting, formatting, type checking, hover types, and Go to Definition for Prose.",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -48,6 +48,12 @@
           "default": true,
           "scope": "resource",
           "description": "Check saved Prose files on open and save using the project's TypeScript. Diagnostics appear in the editor and Problems panel."
+        },
+        "prose.check.strict": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Also report any in function parameters and exported return/value contracts. Applies to checked Prose files and their Prose dependencies in this project; off by default."
         },
         "prose.hover.enabled": {
           "type": "boolean",

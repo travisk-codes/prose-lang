@@ -6,6 +6,7 @@ export function checkCommand(args) {
   const targets = [];
   let project;
   const json = args.includes("--json");
+  const strict = args.includes("--strict");
   const report = diagnostics => {
     for (const diagnostic of diagnostics) {
       const file = diagnostic.file ? relative(process.cwd(), diagnostic.file) || diagnostic.file : "Project";
@@ -17,14 +18,14 @@ export function checkCommand(args) {
   try {
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
-      if (arg === "--json") continue;
+      if (arg === "--json" || arg === "--strict") continue;
       else if (arg === "--project" || arg === "-p") {
         if (project || !args[i + 1] || args[i + 1].startsWith("-")) throw new CheckSetupError("Expected one project path after --project.");
         project = args[++i];
       } else if (arg.startsWith("-")) throw new CheckSetupError(`Unknown check option: ${arg}`);
       else targets.push(arg);
     }
-    const result = checkProject({ project, targets });
+    const result = checkProject({ project, targets, strict });
     if (json) console.log(JSON.stringify(result, null, 2));
     else {
       report(result.diagnostics);

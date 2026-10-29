@@ -132,8 +132,11 @@ function createDiagnostics(vscode, { runCheck = startCheck, delay = 250 } = {}) 
       const project = findConfig(document.uri.fsPath);
       const folder = workspace.getWorkspaceFolder(document.uri)?.uri;
       const cwd = project ? dirname(project) : folder?.scheme === "file" ? folder.fsPath : dirname(document.uri.fsPath);
-      const key = canonical(project ?? cwd);
-      if (!groups.has(key)) groups.set(key, { cwd, project, targets: [] });
+      const strict = workspace.getConfiguration("prose", document.uri).get("check.strict", false);
+      const key = canonical(project ?? cwd) + (strict ? "|strict" : "");
+      if (!groups.has(key)) {
+        groups.set(key, { cwd, project, targets: [], ...(strict ? { strict: true } : {}) });
+      }
       groups.get(key).targets.push(document.uri.fsPath);
     }
     for (const [key, state] of states) if (!groups.has(key)) {

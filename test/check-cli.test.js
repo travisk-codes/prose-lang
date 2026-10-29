@@ -72,6 +72,28 @@ test("check reports mapped Prose type errors as text and JSON, using the project
   } finally { f.close(); }
 });
 
+test("--strict reports unchecked boundaries in text and JSON without changing default checks", () => {
+  const f = fixture();
+  try {
+    f.write('src/main.prose', 'export function identity takes value\n    return value\nexport data is JSON.parse "{}"\nfail "Must not run"');
+    const before = snapshot(f.root);
+    assert.equal(f.run('src/main.prose').status, 0);
+    const checked = f.run('--strict', '--json', 'src/main.prose');
+    assert.equal(checked.status, 1, checked.stderr);
+    const report = JSON.parse(checked.stdout);
+    assert.equal(report.strict, true);
+    assert.deepEqual(report.diagnostics.map(item => item.code), ['PROSE_UNCHECKED_RETURN', 'PROSE_UNCHECKED_PARAMETER', 'PROSE_UNCHECKED_EXPORT']);
+    const text = f.run('--strict', 'src/main.prose');
+    assert.match(text.stderr, /main\.prose:1:32 - PROSE_UNCHECKED_PARAMETER/);
+    assert.match(text.stdout, /3 errors/);
+    f.write('src/main.prose', 'export function identity takes value as number giving number\n    return value');
+    assert.equal(f.run('--strict', 'src/main.prose').status, 0);
+    delete before[join('src', 'main.prose')];
+    const after = snapshot(f.root); delete after[join('src', 'main.prose')];
+    assert.deepEqual(after, before);
+  } finally { f.close(); }
+});
+
 test("check never executes application imports or writes emitted files, declarations, or build info", () => {
   const f = fixture({ compilerOptions: { incremental: true, tsBuildInfoFile: "cache/build.tsbuildinfo" } });
   try {

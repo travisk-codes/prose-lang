@@ -24,7 +24,7 @@ function fixture() {
   return { root, write, close: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-function editor(f, { trusted = true, enabled = true } = {}) {
+function editor(f, { trusted = true, enabled = true, strict = false } = {}) {
   const documents = [], jobs = [], entries = new Map(), logs = [], events = {}, commands = new Map();
   const uri = file => ({ scheme: "file", fsPath: file, toString: () => pathToFileURL(file).href });
   const listen = name => callback => {
@@ -48,7 +48,7 @@ function editor(f, { trusted = true, enabled = true } = {}) {
     commands: { registerCommand: (name, callback) => { commands.set(name, callback); return { dispose: () => commands.delete(name) }; } },
     workspace: {
       textDocuments: documents, isTrusted: trusted,
-      getConfiguration: () => ({ get: (key, fallback) => key === "check.enabled" ? enabled : fallback }),
+      getConfiguration: () => ({ get: (key, fallback) => key === "check.enabled" ? enabled : key === "check.strict" ? strict : fallback }),
       getWorkspaceFolder: () => ({ uri: uri(f.root) }),
       onDidOpenTextDocument: listen("open"), onDidCloseTextDocument: listen("close"),
       onDidSaveTextDocument: listen("save"), onDidChangeTextDocument: listen("change"),
@@ -73,7 +73,8 @@ function editor(f, { trusted = true, enabled = true } = {}) {
   return {
     vscode, documents, jobs, entries, collection, output, logs, events, commands, add, fire,
     start: () => createDiagnostics(vscode, { runCheck, delay: 0 }),
-    setEnabled: value => { enabled = value; fire("settings", { affectsConfiguration: key => key === "prose.check" }); }
+    setEnabled: value => { enabled = value; fire("settings", { affectsConfiguration: key => key === "prose.check" }); },
+    setStrict: value => { strict = value; fire("settings", { affectsConfiguration: key => key === "prose.check" }); }
   };
 }
 
@@ -100,6 +101,30 @@ test("editor publishes mapped diagnostics for a saved file and its closed Prose 
     assert.equal(diagnostic.source, "Prose");
     assert.equal(diagnostic.code, "TS2322");
     assert.equal(diagnostic.message, "Type of 'count' is wrong.");
+  } finally { service.dispose(); f.close(); }
+});
+
+test("strict editor checks opt in, refresh settings and preserve boundary diagnostic codes", async () => {
+  const f = fixture(), e = editor(f);
+  const document = e.add('src/main.prose', 'function echo takes value\n    return value');
+  const service = e.start();
+  try {
+    await pause();
+    assert.equal(e.jobs[0].options.strict, undefined);
+    e.jobs[0].resolve(result([document.uri.fsPath]));
+    await pause();
+    e.setStrict(true);
+    await pause();
+    assert.equal(e.jobs[1].options.strict, true);
+    e.jobs[1].resolve(result([document.uri.fsPath], [{ file: document.uri.fsPath, source: 'prose', code: 'PROSE_UNCHECKED_PARAMETER', severity: 'error', line: 1, column: 20, message: "Parameter 'value' has any in its type." }]));
+    await pause();
+    assert.equal(e.entries.get(document.uri.fsPath)[0].code, 'PROSE_UNCHECKED_PARAMETER');
+    e.setStrict(false);
+    await pause();
+    assert.equal(e.jobs[2].options.strict, undefined);
+    e.jobs[2].resolve(result([document.uri.fsPath]));
+    await pause();
+    assert.equal(e.entries.size, 0);
   } finally { service.dispose(); f.close(); }
 });
 
@@ -321,6 +346,38 @@ test("packaged worker matches the CLI checker, uses project TypeScript, and neve
     assert.equal(manifest.contributes.configuration.properties["prose.check.enabled"].default, true);
     assert.equal(manifest.capabilities.untrustedWorkspaces.supported, "limited");
   } finally { f.close(); }
+});
+
+test("packaged strict worker matches CLI boundary diagnostics and never writes application files", async () => {
+  const f = fixture();
+  try {
+    const startCheck = packagedChecker(f);
+    f.write('node_modules/typescript/package.json', '{"main":"index.cjs"}');
+    f.write('node_modules/typescript/index.cjs', `module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+    const main = f.write('src/main.prose', 'use answer from "./child.prose"\nfunction echo takes value\n    return value\nfail "Must not run"\nprint answer run');
+    f.write('src/child.prose', 'export function answer\n    return 42');
+    const before = snapshot(f.root), options = { cwd: f.root, targets: [main], strict: true };
+    const result = await startCheck(options).promise;
+    assert.deepEqual(result, checkProject(options));
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.diagnostics.length, 2);
+    assert.deepEqual(snapshot(f.root), before);
+    const manifest = JSON.parse(readFileSync(new URL('../editors/vscode/package.json', import.meta.url), 'utf8'));
+    assert.equal(manifest.contributes.configuration.properties['prose.check.strict'].default, false);
+  } finally { f.close(); }
+});
+
+test("roots with different strict folder settings use separate checking jobs", async () => {
+  const f = fixture(), e = editor(f);
+  const plain = e.add('src/plain.prose'), strict = e.add('src/strict.prose');
+  e.vscode.workspace.getConfiguration = (_, uri) => ({ get: (key, fallback) => key === 'check.strict' ? uri?.fsPath === strict.uri.fsPath : fallback });
+  const service = e.start();
+  try {
+    await pause();
+    assert.equal(e.jobs.length, 2);
+    assert.deepEqual(e.jobs.find(job => job.options.strict).options.targets, [strict.uri.fsPath]);
+    assert.deepEqual(e.jobs.find(job => !job.options.strict).options.targets, [plain.uri.fsPath]);
+  } finally { service.dispose(); f.close(); }
 });
 
 test("worker returns setup diagnostics for missing TypeScript and supports cancellation", async () => {

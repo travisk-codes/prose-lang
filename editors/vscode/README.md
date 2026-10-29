@@ -63,6 +63,13 @@ codes and locations as `prose check`. Use **Prose: Check Saved Files** from the
 Command Palette to recheck immediately. Set `prose.check.enabled` to `false` to
 disable checking for a workspace or folder.
 
+Enable `prose.check.strict` to also report `any` in function parameters and
+exported return/value contracts. This opt-in policy matches CLI `prose check
+--strict`; it defaults to `false`. The errors use `PROSE_UNCHECKED_PARAMETER`,
+`PROSE_UNCHECKED_RETURN`, and `PROSE_UNCHECKED_EXPORT` codes in Problems.
+Typed callback inference counts, and imported Prose dependencies follow the
+same policy. See [stricter boundary checks](../../docs/type-checking.md#optional-stricter-boundary-checks).
+
 The open, saved Prose files are the roots; imported Prose dependencies are also
 checked, including closed files. The nearest `tsconfig.json` selects each project,
 so nested projects get separate checks. Saving Prose, TypeScript, JavaScript, or
@@ -166,13 +173,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.18.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.19.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.18.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.19.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -197,7 +204,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.18.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.19.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.
