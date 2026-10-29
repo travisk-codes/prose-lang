@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { register } from "node:module";
 import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -74,6 +74,7 @@ try {
       process.exit(1);
     }
     const file = resolve(args[0]);
+    if (!existsSync(file)) throw new Error(`Input does not exist: ${file}`);
     if (args[1] === "--run") {
       running = true;
       process.setSourceMapsEnabled(true);

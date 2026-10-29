@@ -1,16 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { transpile } from "../src/transpile.js";
-
-function run(source) {
-  const output = [];
-  runInNewContext(transpile(source), { console: { log: value => output.push(value) } }, { timeout: 1000 });
-  return output;
-}
+import { run } from "./run.js";
 
 test("the original FizzBuzz example prints all 100 expected lines", () => {
   const source = readFileSync(new URL("../examples/fizzbuzz.prose", import.meta.url), "utf8");

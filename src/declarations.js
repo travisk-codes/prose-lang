@@ -17,12 +17,18 @@ export function writeDeclarations(file, declarations) {
   return true;
 }
 
-/** The `.prose` files in some files and folders, searching folders recursively and skipping node_modules. */
+// Folders a search skips: dependencies and build output, as `prose check` skips them too.
+const skippedFolders = new Set(["node_modules", "dist", "build", "coverage"]);
+
+/** The `.prose` files in some files and folders, searching folders recursively. Hidden
+ * entries, symlinks, and dependency or build folders are skipped.
+ */
 export function proseFiles(paths) {
   return paths.flatMap(path => {
+    if (!existsSync(path)) throw new Error(`Input does not exist: ${path}`);
     if (!statSync(path).isDirectory()) return [path];
     return readdirSync(path, { withFileTypes: true }).flatMap(entry => {
-      if (entry.name === "node_modules" || entry.name.startsWith(".")) return [];
+      if (entry.name.startsWith(".") || skippedFolders.has(entry.name) || entry.isSymbolicLink()) return [];
       const child = join(path, entry.name);
       return entry.isDirectory() ? proseFiles([child]) : entry.name.endsWith(".prose") ? [child] : [];
     });

@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { compile } from "../src/transpile.js";
 import { untypedError } from "../src/check.js";
 import { sourceMapLookup } from "../src/source-map.js";
-import { measureProject } from "../scripts/measure-check.mjs";
+import { checkProject } from "../src/check-project.js";
 
 // The checking output is TypeScript written to be type-checked, never run.
 const checked = (source, options = {}) => compile(source, { check: true, ...options }).code;
@@ -568,7 +568,7 @@ test("filter inference does not invent guards for truthiness, compound tests, or
   ].join('\n')).map(({ line, code }) => [line, code]), [[6, 2339]]);
 });
 
-test("measurement uses fresh declarations, strict checks, and leaves project files alone", withTypeScript, () => {
+test("project checks use fresh declarations and strict checks, and leave project files alone", withTypeScript, () => {
   const folder = mkdtempSync(join(tmpdir(), 'prose-check-project-'));
   try {
     mkdirSync(join(folder, 'src'));
@@ -586,9 +586,10 @@ test("measurement uses fresh declarations, strict checks, and leaves project fil
       'export function invalid takes text as maybe text, giving text', '    return text',
       'fail "This program must not run during checking"'
     ].join('\n'));
-    const result = measureProject(folder, { typescript: ts });
-    assert.equal(result.modules, 2);
-    assert.deepEqual(result.diagnostics.map(({ file, line, code }) => [file, line, code]), [['src/main.prose', 5, 2322]]);
+    const result = checkProject({ cwd: folder, project: folder, targets: [join(folder, 'src')], typescript: ts });
+    assert.equal(result.files.length, 2);
+    assert.deepEqual(result.diagnostics.map(({ file, line, code }) => [relative(folder, file).replaceAll('\\', '/'), line, code]),
+      [['src/main.prose', 5, 2322]]);
     assert.equal(readFileSync(join(folder, 'src', 'value.d.prose.ts'), 'utf8'), stale);
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });

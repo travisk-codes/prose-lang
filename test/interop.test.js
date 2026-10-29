@@ -3,16 +3,10 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runInNewContext } from "node:vm";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { compile, transpile } from "../src/transpile.js";
-
-function run(source) {
-  const output = [];
-  runInNewContext(transpile(source), { console: { log: value => output.push(value) } }, { timeout: 1000 });
-  return structuredClone(output);
-}
+import { run } from "./run.js";
 
 test("unset is a value, and otherwise replaces only unset and null", () => {
   assert.deepEqual(run([
@@ -37,7 +31,7 @@ test("for each visits arrays, Unicode strings, and map entries, and its variable
     "scores is new Map", 'scores:set with "Ada", 3', 'scores:set with "Grace", 4',
     "for each name, score in scores", '    print name + ": " + score'
   ].join("\n")), [10, 5, ["a", "😀"], "Ada: 3", "Grace: 4"]);
-  assert.throws(() => run("for each value in 5\n    print value"), /Line 1: 'for each' requires an array/);
+  assert.throws(() => run("for each value in 5\n    print value"), /Line 1: Expected a list, text, or other collection/);
   assert.throws(() => transpile("for each a, a in pairs\n    print a"), /Line 1: Duplicate loop variable name/);
 });
 
