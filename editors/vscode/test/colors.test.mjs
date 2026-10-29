@@ -45,30 +45,30 @@ function colorAt(line, fragment, language = grammar) {
 
 test("the palette resolves distinct function, parameter, property, string and number colors", () => {
   const declaration = "function double takes value";
-  assert.equal(colorAt(declaration, "function"), "#FDE047");
-  assert.equal(colorAt(declaration, "double"), "#FDE047");
-  assert.equal(colorAt(declaration, "value"), "#A3E635");
-  assert.equal(colorAt('print person:name + 12', "name"), "#2DD4BF");
-  assert.equal(colorAt('print person:name + 12', "12"), "#FB923C");
-  assert.equal(colorAt('result is "hello"', "hello"), "#4ADE80");
-  assert.equal(colorAt('"A quoted comment"', "quoted"), "#8B96B5");
+  assert.equal(colorAt(declaration, "function"), "#F5E07B");
+  assert.equal(colorAt(declaration, "double"), "#F5E07B");
+  assert.equal(colorAt(declaration, "value"), "#B7E16E");
+  assert.equal(colorAt('print person:name + 12', "name"), "#64D6C7");
+  assert.equal(colorAt('print person:name + 12', "12"), "#F5AA6C");
+  assert.equal(colorAt('result is "hello"', "hello"), "#7CDA9E");
+  assert.equal(colorAt('"A quoted comment"', "quoted"), "#979FB8");
 });
 
 test("bindings and loop iterators receive their own colors without changing expression variables", () => {
-  assert.equal(colorAt('result is "hello"', "result"), "#60A5FA");
-  assert.equal(colorAt("for index is 1 to 3", "index"), "#A3E635");
-  assert.equal(colorAt("print result", "result"), "#BFDBFE");
+  assert.equal(colorAt('result is "hello"', "result"), "#85B7F4");
+  assert.equal(colorAt("for index is 1 to 3", "index"), "#B7E16E");
+  assert.equal(colorAt("print result", "result"), "#C5D9F5");
 });
 
 test("for each colors its keywords as control flow and only its variables as loop iterators", () => {
   const loop = "for each name, score in scores";
-  assert.equal(colorAt(loop, "each"), "#F87171");
-  assert.equal(colorAt(loop, "name"), "#A3E635");
-  assert.equal(colorAt(loop, "score in"), "#A3E635");
-  assert.equal(colorAt(loop, "in scores"), "#F87171");
-  assert.equal(colorAt(loop, "scores"), "#BFDBFE");
-  assert.equal(colorAt("values:map with function takes value", "function"), "#FDE047");
-  assert.equal(colorAt("values:map with function takes value", "with"), "#C084FC");
+  assert.equal(colorAt(loop, "each"), "#F58C8F");
+  assert.equal(colorAt(loop, "name"), "#B7E16E");
+  assert.equal(colorAt(loop, "score in"), "#B7E16E");
+  assert.equal(colorAt(loop, "in scores"), "#F58C8F");
+  assert.equal(colorAt(loop, "scores"), "#C5D9F5");
+  assert.equal(colorAt("values:map with function takes value", "function"), "#F5E07B");
+  assert.equal(colorAt("values:map with function takes value", "with"), "#C79EF4");
 });
 
 test("the palette spans the spectrum: each kind of code word has its own hue", () => {
@@ -76,8 +76,8 @@ test("the palette spans the spectrum: each kind of code word has its own hue", (
   const colors = ["export", "count", "number", "length", "names", "filter", "function", "takes n", "!=", '""', "true", "1"]
     .map(fragment => colorAt(line, fragment));
   assert.deepEqual(colors, [
-    "#C084FC", "#60A5FA", "#FB7185", "#22D3EE", "#BFDBFE", "#2DD4BF", "#FDE047", "#C084FC",
-    "#F472B6", "#34D399", "#FBBF24", "#FB923C"
+    "#C79EF4", "#85B7F4", "#F392A2", "#66D6E9", "#C5D9F5", "#64D6C7", "#F5E07B", "#C79EF4",
+    "#EC93C4", "#6AD5AB", "#F3C962", "#F5AA6C"
   ]);
   const hues = new Set(rules.map(rule => rule.settings.foreground));
   assert.ok(hues.size >= 16, `expected at least 16 distinct colors, got ${hues.size}`);

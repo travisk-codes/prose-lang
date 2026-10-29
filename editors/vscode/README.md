@@ -1,6 +1,6 @@
 # Prose Language for Visual Studio Code
 
-Syntax highlighting for `.prose` files with a rainbow palette for dark backgrounds.
+Syntax highlighting for `.prose` files with a softened rainbow palette for dark backgrounds, matching the Prose website.
 
 Highlights keywords, function declarations and parameters, standard-library
 calls, booleans, numbers, strings, escapes, operators, dot indexing, object literals, arrays, and colon property access.
@@ -22,13 +22,14 @@ The extension supplies Prose-only token colors through VS Code configuration
 defaults. It leaves the workbench theme and other languages alone. Existing
 user token-color settings take precedence.
 
-Each kind of word gets its own hue, in rainbow order:
+Each kind of word gets its own softened hue, in rainbow order:
 
 - Red control flow (`if`, `for each`, `return`).
 - Orange numbers and amber `true`, `false`, `null`, and `unset`.
 - Yellow `function` and function names (bold), and yellow string escapes.
 - Lime parameters (italic) and loop variables.
 - Green strings with emerald quotes.
+- Mauve regular expression patterns.
 - Teal object properties and accessors, and cyan standard-library calls.
 - Blue bindings (names being assigned) and pale blue variables.
 - Indigo `object` and `array`, and purple language words (`is`, `with`, `takes`).
@@ -44,13 +45,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.3.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.5.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.3.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.5.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -74,7 +75,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.3.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.5.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

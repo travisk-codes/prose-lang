@@ -1,10 +1,12 @@
-// Builds the landing page (site/dist/index.html) from template.html. Every code sample is highlighted
-// with the VS Code extension's grammar and palette, and every output and error comes from the real compiler.
-import { execFileSync } from "node:child_process";
+// Builds the landing page (site/dist/index.html) from template.html. Prose uses the VS Code grammar;
+// JavaScript and TypeScript use Prism with the same palette. Outputs and errors come from the real compiler.
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { inlineScript } from "./scripts.mjs";
+import { syntaxSource, highlightCode } from "./syntax.mjs";
 
 const repo = fileURLToPath(new URL("../", import.meta.url));
 const here = new URL("./", import.meta.url);
@@ -31,10 +33,10 @@ const colorMap = registry.getColorMap();
 
 // Palette colors become class names, so the page's CSS tokens own the actual values.
 const names = {
-  "#F87171": "red", "#FB923C": "orange", "#FBBF24": "amber", "#FDE047": "yellow", "#A3E635": "lime",
-  "#4ADE80": "green", "#34D399": "emerald", "#2DD4BF": "teal", "#5EEAD4": "teal2", "#22D3EE": "cyan",
-  "#60A5FA": "blue", "#BFDBFE": "pale", "#818CF8": "indigo", "#C084FC": "purple", "#F472B6": "pink",
-  "#FB7185": "rose", "#8B96B5": "comment", "#A2ACC8": "punct", "#F43F5E": "invalid", "#D4D4D4": "plain"
+  "#F58C8F": "red", "#F5AA6C": "orange", "#F3C962": "amber", "#F5E07B": "yellow", "#B7E16E": "lime",
+  "#7CDA9E": "green", "#6AD5AB": "emerald", "#64D6C7": "teal", "#89E5D7": "teal2", "#66D6E9": "cyan",
+  "#85B7F4": "blue", "#C5D9F5": "pale", "#9CA3F0": "indigo", "#C79EF4": "purple", "#EC93C4": "pink",
+  "#F392A2": "rose", "#E799F3": "magenta", "#979FB8": "comment", "#ADB5CC": "punct", "#F37086": "invalid", "#D4D4D4": "plain"
 };
 const escape = text => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -154,16 +156,29 @@ for (const example of examples) {
   compile(example.source);
 }
 
-// The page states how many tests pass, so the build runs them; a failing suite stops the build.
-const testReport = execFileSync(process.execPath, ["--test"], { cwd: repo, encoding: "utf8" });
-const testCount = Number(/^ℹ pass (\d+)$/m.exec(testReport)[1]);
+// Production builds still require a green suite. An explicit local preview can
+// render the site while compiler work is in progress, with an honest visible notice.
+const preview = process.argv.includes("--preview");
+if (process.argv.slice(2).some(arg => arg !== "--preview")) throw new Error("Usage: node site/build.mjs [--preview]");
+const testRun = spawnSync(process.execPath, ["--test", "--test-reporter=spec"], { cwd: repo, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
+if (testRun.error) throw testRun.error;
+const testReport = testRun.stdout;
+const pass = /^ℹ pass (\d+)$/m.exec(testReport);
+const fail = /^ℹ fail (\d+)$/m.exec(testReport);
+if (!pass || !fail) throw new Error("Could not read the test results.\n" + testReport + testRun.stderr);
+const testCount = Number(pass[1]);
+const failures = Number(fail[1]);
+if (testRun.status !== 0 && !preview) {
+  process.stderr.write(testReport + testRun.stderr);
+  throw new Error("The test suite must pass before publishing. For local site work, run node site/build.mjs --preview.");
+}
 const play = examples[0].source;
 const values = {
   play_source: escape(play),
   play_output: escape(outputOf(play)),
-  play_js: escape(body(compile(play, { runtime: "prose-runtime" }).code)),
+  play_js: highlightCode(body(compile(play, { runtime: "prose-runtime" }).code)),
   hero_prose: highlight(hero),
-  hero_js: escape(heroJs),
+  hero_js: highlightCode(heroJs),
   hero_output: escape(outputOf(hero)),
   f_words: highlight(features.words),
   f_loops: highlight(features.loops),
@@ -173,8 +188,10 @@ const values = {
   f_positions_output: escape(positionsOutput.replace(/\n/g, ", ")),
   f_values: highlight(features.values),
   interop_prose: highlight(interop),
+  vite_config: highlightCode("import prose from 'prose-lang/vite'\n\nexport default defineConfig({\n  plugins: [prose({ declarations: true })],\n})", "typescript"),
+  import_js: highlightCode("import { nextDay } from './next-day.prose'"),
   types_prose: highlight(typed),
-  types_dts: escape(declarations),
+  types_dts: highlightCode(declarations, "typescript"),
   errata: errata.map(({ source, token, message, note }) => {
     const [, line, text] = /^Line (\d+): (.*)$/.exec(message);
     return `<li class="erratum-entry">
@@ -183,7 +200,11 @@ const values = {
         </li>`;
   }).join("\n        "),
   test_count: String(testCount),
-  compiler: compiler.replace(/<\//g, "<\\/"),
+  test_summary: failures ? `${testCount} passing tests; ${failures} checks in progress` : `${testCount} tests that keep all of it honest`,
+  preview_notice: preview ? `<aside class="preview-notice">Local development preview · ${testCount} tests passing${failures ? ` · ${failures} checks still in progress` : ""}</aside>` : "",
+  playground: inlineScript(readFileSync(new URL("playground.js", here), "utf8")),
+  syntax: inlineScript(syntaxSource),
+  compiler: inlineScript(compiler),
   examples: JSON.stringify(examples).replace(/<\//g, "<\\/")
 };
 
@@ -194,4 +215,4 @@ page = page.replace(/\{\{(\w+)\}\}/g, (all, key) => {
 });
 mkdirSync(new URL("dist/", here), { recursive: true });
 writeFileSync(new URL("dist/index.html", here), page);
-console.log(`Wrote site/dist/index.html (${Math.round(page.length / 1024)} KB, ${testCount} tests passing)`);
+console.log(`Wrote site/dist/index.html (${Math.round(page.length / 1024)} KB, ${testCount} tests passing${preview ? ", local preview" : ""})`);

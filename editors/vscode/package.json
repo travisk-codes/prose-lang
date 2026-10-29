@@ -2,7 +2,7 @@
   "name": "prose-language",
   "displayName": "Prose Language",
   "description": "Syntax highlighting for the Prose concept programming language.",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "publisher": "travisk-codes",
   "license": "MIT",
   "engines": {
@@ -52,7 +52,7 @@
               "source.prose variable.other.readwrite.prose"
             ],
             "settings": {
-              "foreground": "#BFDBFE",
+              "foreground": "#C5D9F5",
               "fontStyle": ""
             }
           },
@@ -62,7 +62,7 @@
               "source.prose variable.other.binding.prose"
             ],
             "settings": {
-              "foreground": "#60A5FA",
+              "foreground": "#85B7F4",
               "fontStyle": ""
             }
           },
@@ -72,7 +72,7 @@
               "source.prose variable.other.iterator.prose"
             ],
             "settings": {
-              "foreground": "#A3E635",
+              "foreground": "#B7E16E",
               "fontStyle": ""
             }
           },
@@ -82,7 +82,7 @@
               "source.prose variable.other.property.prose"
             ],
             "settings": {
-              "foreground": "#2DD4BF",
+              "foreground": "#64D6C7",
               "fontStyle": ""
             }
           },
@@ -92,7 +92,7 @@
               "source.prose variable.parameter.prose"
             ],
             "settings": {
-              "foreground": "#A3E635",
+              "foreground": "#B7E16E",
               "fontStyle": "italic"
             }
           },
@@ -103,7 +103,7 @@
               "source.prose keyword.control.experimental.prose"
             ],
             "settings": {
-              "foreground": "#F87171",
+              "foreground": "#F58C8F",
               "fontStyle": ""
             }
           },
@@ -113,7 +113,7 @@
               "source.prose keyword.other.prose"
             ],
             "settings": {
-              "foreground": "#C084FC",
+              "foreground": "#C79EF4",
               "fontStyle": ""
             }
           },
@@ -123,7 +123,7 @@
               "source.prose storage.type.function.prose"
             ],
             "settings": {
-              "foreground": "#FDE047",
+              "foreground": "#F5E07B",
               "fontStyle": ""
             }
           },
@@ -133,7 +133,7 @@
               "source.prose entity.name.function.prose"
             ],
             "settings": {
-              "foreground": "#FDE047",
+              "foreground": "#F5E07B",
               "fontStyle": "bold"
             }
           },
@@ -145,7 +145,7 @@
               "source.prose support.class.prose"
             ],
             "settings": {
-              "foreground": "#FB7185",
+              "foreground": "#F392A2",
               "fontStyle": ""
             }
           },
@@ -155,7 +155,7 @@
               "source.prose entity.name.type.parameter.prose"
             ],
             "settings": {
-              "foreground": "#FB7185",
+              "foreground": "#F392A2",
               "fontStyle": "italic"
             }
           },
@@ -165,7 +165,7 @@
               "source.prose support.function.prose"
             ],
             "settings": {
-              "foreground": "#22D3EE",
+              "foreground": "#66D6E9",
               "fontStyle": ""
             }
           },
@@ -176,7 +176,7 @@
               "source.prose storage.type.array.prose"
             ],
             "settings": {
-              "foreground": "#818CF8",
+              "foreground": "#9CA3F0",
               "fontStyle": ""
             }
           },
@@ -186,7 +186,7 @@
               "source.prose string.quoted.double.prose"
             ],
             "settings": {
-              "foreground": "#4ADE80",
+              "foreground": "#7CDA9E",
               "fontStyle": ""
             }
           },
@@ -196,7 +196,7 @@
               "source.prose string.regexp.prose"
             ],
             "settings": {
-              "foreground": "#E879F9",
+              "foreground": "#E799F3",
               "fontStyle": ""
             }
           },
@@ -206,7 +206,7 @@
               "source.prose constant.character.escape.prose"
             ],
             "settings": {
-              "foreground": "#FDE047",
+              "foreground": "#F5E07B",
               "fontStyle": ""
             }
           },
@@ -216,7 +216,7 @@
               "source.prose comment.line.string.prose"
             ],
             "settings": {
-              "foreground": "#8B96B5",
+              "foreground": "#979FB8",
               "fontStyle": "italic"
             }
           },
@@ -226,7 +226,7 @@
               "source.prose constant.numeric.prose"
             ],
             "settings": {
-              "foreground": "#FB923C",
+              "foreground": "#F5AA6C",
               "fontStyle": ""
             }
           },
@@ -236,7 +236,7 @@
               "source.prose constant.language.prose"
             ],
             "settings": {
-              "foreground": "#FBBF24",
+              "foreground": "#F3C962",
               "fontStyle": ""
             }
           },
@@ -247,7 +247,7 @@
               "source.prose keyword.operator.word.prose"
             ],
             "settings": {
-              "foreground": "#F472B6",
+              "foreground": "#EC93C4",
               "fontStyle": ""
             }
           },
@@ -258,7 +258,7 @@
               "source.prose punctuation.accessor.object.prose"
             ],
             "settings": {
-              "foreground": "#5EEAD4",
+              "foreground": "#89E5D7",
               "fontStyle": ""
             }
           },
@@ -271,7 +271,7 @@
               "source.prose punctuation.section.group.end.prose"
             ],
             "settings": {
-              "foreground": "#A2ACC8",
+              "foreground": "#ADB5CC",
               "fontStyle": ""
             }
           },
@@ -282,7 +282,7 @@
               "source.prose punctuation.definition.string.end.prose"
             ],
             "settings": {
-              "foreground": "#34D399",
+              "foreground": "#6AD5AB",
               "fontStyle": ""
             }
           },
@@ -292,7 +292,7 @@
               "source.prose invalid.illegal.escape.prose"
             ],
             "settings": {
-              "foreground": "#F43F5E",
+              "foreground": "#F37086",
               "fontStyle": "underline"
             }
           }

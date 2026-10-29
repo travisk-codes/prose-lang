@@ -1,5 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Prose Programming Language</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Prose is a small programming language made of plain English words that compiles to JavaScript.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,16 +20,16 @@
     --ink-soft: #6B5B49;
     --accent: #3B3A8E;
     --proof: #A3281E;
-    /* The dark pages that hold code, and the VS Code palette that colors it. */
+    /* Dark code pages with a 50/50 blend of the original neon and pastel Prose palettes. */
     --slab: #1E1D27;
     --slab-edge: #353343;
     --slab-ink: #D4D4D4;
     --slab-soft: #A9A6B4;
-    --c-red: #F87171; --c-orange: #FB923C; --c-amber: #FBBF24; --c-yellow: #FDE047;
-    --c-lime: #A3E635; --c-green: #4ADE80; --c-emerald: #34D399; --c-teal: #2DD4BF;
-    --c-teal2: #5EEAD4; --c-cyan: #22D3EE; --c-blue: #60A5FA; --c-pale: #BFDBFE;
-    --c-indigo: #818CF8; --c-purple: #C084FC; --c-pink: #F472B6; --c-rose: #FB7185;
-    --c-comment: #8B96B5; --c-punct: #A2ACC8; --c-invalid: #F43F5E; --c-plain: #D4D4D4;
+    --c-red: #F58C8F; --c-orange: #F5AA6C; --c-amber: #F3C962; --c-yellow: #F5E07B;
+    --c-lime: #B7E16E; --c-green: #7CDA9E; --c-emerald: #6AD5AB; --c-teal: #64D6C7;
+    --c-teal2: #89E5D7; --c-cyan: #66D6E9; --c-blue: #85B7F4; --c-pale: #C5D9F5;
+    --c-indigo: #9CA3F0; --c-purple: #C79EF4; --c-pink: #EC93C4; --c-rose: #F392A2; --c-magenta: #E799F3;
+    --c-comment: #979FB8; --c-punct: #ADB5CC; --c-invalid: #F37086; --c-plain: #D9D8DC;
     --display: "Alegreya", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
     --label: "Alegreya Sans SC", "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
     --mono: "Victor Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
@@ -34,9 +38,10 @@
   }
 
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; scroll-padding-top: 6rem; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
   body {
+    margin: 0;
     background-color: var(--paper);
     background-image: var(--grain);
     color: var(--ink);
@@ -80,15 +85,30 @@
   /* The compiler's side of a spread wraps instead of scrolling; it is read, not edited. */
   .spread .translation { white-space: pre-wrap; overflow-wrap: anywhere; }
 
-  /* Code colors from the Prose palette for VS Code. */
+  /* Softened code colors, shared by static samples and the live playground. */
   .c-red { color: var(--c-red); } .c-orange { color: var(--c-orange); } .c-amber { color: var(--c-amber); }
   .c-yellow { color: var(--c-yellow); } .c-lime { color: var(--c-lime); } .c-green { color: var(--c-green); }
   .c-emerald { color: var(--c-emerald); } .c-teal { color: var(--c-teal); } .c-teal2 { color: var(--c-teal2); }
   .c-cyan { color: var(--c-cyan); } .c-blue { color: var(--c-blue); } .c-pale { color: var(--c-pale); }
   .c-indigo { color: var(--c-indigo); } .c-purple { color: var(--c-purple); } .c-pink { color: var(--c-pink); }
   .c-rose { color: var(--c-rose); } .c-comment { color: var(--c-comment); } .c-punct { color: var(--c-punct); }
+  .c-magenta { color: var(--c-magenta); }
   .c-invalid { color: var(--c-invalid); text-decoration: underline; } .c-plain { color: var(--c-plain); }
   .it { font-style: italic; } .bd { font-weight: 600; }
+  /* JavaScript and TypeScript use the same palette as the Prose examples. */
+  .token.comment, .token.prolog, .token.doctype { color: var(--c-comment); font-style: italic; }
+  .token.keyword { color: var(--c-purple); }
+  .token.string, .token.template-string, .token.char { color: var(--c-green); }
+  .token.number, .token.regex { color: var(--c-orange); }
+  .token.boolean, .token.constant { color: var(--c-amber); }
+  .token.function { color: var(--c-yellow); }
+  .token.class-name { color: var(--c-rose); }
+  .token.builtin { color: var(--c-cyan); }
+  .token.property, .token.literal-property { color: var(--c-teal); }
+  .token.parameter { color: var(--c-lime); }
+  .token.operator, .token.template-punctuation { color: var(--c-pink); }
+  .token.punctuation { color: var(--c-punct); }
+  .token.interpolation { color: var(--c-pale); }
   mark.erratum {
     background: none;
     color: inherit;
@@ -110,19 +130,22 @@
     color: var(--ink);
     text-decoration: none;
   }
-  .button.primary { background: var(--ink); color: var(--paper); }
+  .button.primary { background: var(--ink); color: var(--paper); gap: 0.8rem; }
+  .hero h1 em { color: var(--accent); }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; font: 700 0.85rem var(--label); letter-spacing: 0.04em; color: var(--ink-soft); }
+  .hero-meta span + span::before { content: "·"; margin-right: 1.4rem; color: var(--proof); }
   @media (prefers-reduced-motion: no-preference) {
     .button { transition: transform 120ms ease, box-shadow 120ms ease; }
     .button:hover { transform: translateY(-1px); box-shadow: 0 3px 0 var(--rule); }
   }
 
   /* Masthead */
-  .masthead { border-bottom: 1px solid var(--rule); }
+  .masthead { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--rule); background: rgba(241, 231, 211, 0.94); backdrop-filter: blur(16px); }
   .masthead-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 2rem; padding-block: 1.1rem; }
   .wordmark { font-family: var(--display); font-weight: 800; font-style: italic; font-size: 1.75rem; color: var(--ink); text-decoration: none; letter-spacing: -0.01em; }
   .masthead nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1.4rem; }
   .masthead nav a { font-family: var(--label); font-weight: 700; letter-spacing: 0.06em; color: var(--ink-soft); text-decoration: none; }
-  .masthead nav a:hover { color: var(--ink); }
+  .masthead nav a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 6px; }
 
   /* Hero */
   .hero { padding-block: clamp(3rem, 8vw, 6rem) clamp(3.5rem, 8vw, 6rem); }
@@ -137,7 +160,8 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     background: var(--slab);
-    border-radius: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--slab-edge);
     color: var(--slab-ink);
     box-shadow: 0 30px 50px -30px rgba(43, 36, 29, 0.55), 0 2px 0 var(--rule);
   }
@@ -178,8 +202,9 @@
   .section-head { display: grid; gap: 0.9rem; max-width: 40rem; margin-bottom: clamp(2rem, 5vw, 3rem); }
   .section-head p:not(.eyebrow) { color: var(--ink-soft); }
 
-  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 2.75rem 2.25rem; }
-  .feature { display: flex; flex-direction: column; gap: 0.65rem; min-width: 0; }
+  .features { counter-reset: feature; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 2.75rem 2.25rem; }
+  .feature { counter-increment: feature; display: flex; flex-direction: column; gap: 0.65rem; min-width: 0; border-top: 1px solid var(--rule); padding-top: 1.2rem; }
+  .feature::before { content: "0" counter(feature); font: 700 0.85rem var(--label); letter-spacing: 0.1em; color: var(--proof); }
   .feature p { color: var(--ink-soft); }
   .feature .slab { margin-top: 0.35rem; }
   .feature code.inline, .section-head code.inline, .step code.inline {
@@ -190,60 +215,82 @@
     color: var(--ink);
   }
 
-  /* Playground */
-  .playground { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1rem; }
-  .pg-pane { background: var(--slab); border-radius: 4px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-  .pg-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.55rem 0.75rem 0.55rem 1.15rem; border-bottom: 1px solid var(--slab-edge); }
-  .pg-bar .running-head { color: var(--slab-soft); font-size: 0.95rem; }
-  .pg-bar select {
-    font: 700 0.95rem var(--label);
-    letter-spacing: 0.04em;
-    color: var(--slab-ink);
-    background: var(--slab-edge);
-    border: 0;
-    border-radius: 3px;
-    padding: 0.3rem 0.5rem;
+  /* Playground: a single text scroller, with a painted layer following its offsets. */
+  .playground-shell { border: 1px solid var(--slab-edge); border-radius: 12px; overflow: hidden; background: var(--slab); box-shadow: 0 24px 48px -28px rgba(43, 36, 29, 0.6); color-scheme: dark; }
+  .pg-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; padding: 0.8rem 1.1rem; background: #272531; border-bottom: 1px solid var(--slab-edge); }
+  .playground-title { display: flex; align-items: center; gap: 0.65rem; font: 700 1rem var(--label); letter-spacing: 0.05em; color: #EDE5D6; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c-emerald); box-shadow: 0 0 0 4px rgba(106, 213, 171, 0.11); }
+  .pg-actions { display: flex; align-items: center; gap: 0.55rem; }
+  .auto-run { display: flex; align-items: center; gap: 0.4rem; margin-right: 0.4rem; color: #C5C2D1; font: 500 0.9rem var(--label); cursor: pointer; }
+  .auto-run input { accent-color: var(--c-emerald); width: 14px; height: 14px; margin: 0; }
+  .pg-button { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.75rem; border: 1px solid #514D61; border-radius: 5px; color: #E9E6F0; background: transparent; font: 700 0.9rem var(--label); letter-spacing: 0.03em; cursor: pointer; }
+  .pg-button:hover { background: #3A364A; }
+  .pg-button.run-button { color: #211C30; background: #D2C0F3; border-color: #D2C0F3; }
+  .pg-button.run-button:hover { background: #E1D2FB; }
+  .playground { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1px; background: var(--slab-edge); }
+  .pg-pane { background: var(--slab); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .pg-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; min-height: 3.25rem; padding: 0.55rem 1.1rem; border-bottom: 1px solid var(--slab-edge); }
+  .pg-bar .running-head { color: #C3BECE; font-size: 0.9rem; white-space: nowrap; }
+  .file-extension { margin-left: 0.4rem; color: #817B92; font: 400 0.75rem var(--mono); letter-spacing: 0; }
+  .pg-bar > label { min-width: 0; max-width: 55%; flex: 0 1 12rem; }
+  .pg-bar select { width: 100%; min-width: 0; font: 500 0.9rem var(--label); letter-spacing: 0.02em; color: #E3DDEB; background: #2D2A38; border: 1px solid #484355; border-radius: 4px; padding: 0.3rem 0.45rem; cursor: pointer; }
+  .editor { position: relative; isolation: isolate; height: clamp(22rem, 50vh, 30rem); overflow: hidden; --editor-pad: 1.125rem 1.25rem; --editor-font-size: 14px; --editor-line-height: 24px; }
+  .editor-layer { position: absolute; inset: 0; z-index: 0; margin: 0; padding: 0; border: 0; pointer-events: none; overflow: hidden; }
+  .editor-content, .editor-input {
+    margin: 0; padding: var(--editor-pad); border: 0;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: var(--editor-font-size); line-height: var(--editor-line-height);
+    font-weight: 400; font-style: normal; font-variant: normal;
+    font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0;
+    font-kerning: none; font-synthesis: none; tab-size: 4;
+    white-space: pre; overflow-wrap: normal; word-break: normal;
+    letter-spacing: 0; word-spacing: 0; text-indent: 0; text-transform: none;
+    text-align: left; direction: ltr; box-sizing: border-box;
   }
-  .editor { position: relative; height: clamp(17rem, 46vh, 25rem); }
-  .editor-layer, .editor-input {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    padding: 1rem 1.15rem;
-    border: 0;
-    font: 400 0.82rem/1.65 var(--mono);
-    tab-size: 4;
-    white-space: pre;
-    overflow: auto;
-    letter-spacing: normal;
+  .editor-content { display: block; width: max-content; color: var(--slab-ink); transform-origin: top left; }
+  /* Textareas cannot paint individual italic/bold tokens. Keep identical glyph
+     metrics in both layers; the rainbow supplies emphasis in the live editor. */
+  .editor-content span { font: inherit; font-style: normal; font-weight: 400; }
+  .editor-input { position: absolute; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; resize: none; overflow: auto; background: transparent; color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--c-yellow); outline: none; border-radius: 0; }
+  .editor-input::selection { background: rgba(199, 158, 244, 0.28); color: transparent; }
+  .editor:focus-within { box-shadow: inset 0 0 0 1px #9A83C2; }
+  .editor-foot { display: flex; justify-content: space-between; gap: 1rem; padding: 0.65rem 1.1rem; border-top: 1px solid var(--slab-edge); color: #A9A3B9; font: 400 0.7rem/1.4 ui-monospace, Consolas, monospace; }
+  #cursor-position { white-space: nowrap; }
+  .tabs { display: flex; gap: 0.6rem; }
+  .tabs button { font: 700 0.95rem var(--label); letter-spacing: 0.04em; color: #A9A3B9; background: none; border: 0; border-bottom: 2px solid transparent; padding: 0.3rem 0.2rem; cursor: pointer; }
+  .tabs button[aria-selected="true"] { color: #EDE5D6; border-bottom-color: #D2C0F3; }
+  .tabs button:focus-visible, .pg-bar select:focus-visible, .pg-button:focus-visible, .copy:focus-visible { outline-color: #D2C0F3; }
+  .result-label { font: 400 0.8rem var(--label); color: #938BA7; }
+  .result { margin: 0; padding: 1.125rem 1.25rem; overflow: auto; flex: 1 1 0; min-height: 14rem; max-height: 32rem; color: #E2DEE9; font-size: 13px; line-height: 24px; }
+  .result[hidden] { display: none; }
+  .result.translation { color: #B6B0C5; }
+  .result:empty::before { content: "Your output will appear here."; color: #938BA7; font-style: italic; }
+  #compiled:empty::before { content: "The compiled JavaScript will appear here."; }
+  .pg-status { display: flex; align-items: flex-start; gap: 0.6rem; min-height: 3rem; padding: 0.65rem 1.1rem; border-top: 1px solid var(--slab-edge); font: 400 0.85rem/1.5 var(--label); letter-spacing: 0.015em; color: #BDB6CB; overflow-wrap: anywhere; }
+  .pg-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; margin-top: 0.45rem; background: var(--c-emerald); }
+  .pg-status[data-state="error"] { color: #F5A3AA; }
+  .pg-status[data-state="error"]::before { background: var(--c-rose); }
+  .pg-status[data-state="running"]::before { background: var(--c-amber); }
+  .pg-status[data-state="idle"]::before { background: #A9A3B9; }
+  .playground-note { margin-top: 1rem; color: var(--ink-soft); font-style: italic; font-size: 1rem; }
+  .preview-notice { padding: 0.65rem 1.5rem; text-align: center; font: 600 0.9rem var(--label); background: #F9E7AC; border-bottom: 1px solid var(--rule); color: #624213; }
+  @media (max-width: 38rem) {
+    .masthead-row { align-items: center; padding-block: 0.85rem; }
+    .masthead nav { font-size: 0.85rem; gap: 0.35rem 0.9rem; }
+    .hero { padding-top: 2.5rem; }
+    .hero-meta { gap: 0.5rem 0.8rem; font-size: 0.75rem; }
+    .hero-meta span + span::before { margin-right: 0.8rem; }
+    .pg-toolbar { padding: 0.8rem; gap: 0.85rem; }
+    .pg-actions { margin-left: auto; }
+    .pg-bar { padding-inline: 0.85rem; }
+    .file-extension, .result-label { display: none; }
+    .editor { --editor-pad: 1rem; --editor-font-size: 13px; --editor-line-height: 22px; height: 22rem; }
+    #editor-hint { max-width: 12rem; font-size: 0.65rem; }
+    .editor-foot { padding-inline: 0.85rem; }
+    .toc .when { font-size: 0.85rem; }
+    .toc li { font-size: 1rem; }
+    .actions .button { width: 100%; justify-content: center; }
   }
-  .editor-layer { pointer-events: none; overflow: hidden; color: var(--slab-ink); }
-  .editor-input {
-    resize: none;
-    background: transparent;
-    color: transparent;
-    caret-color: var(--c-yellow);
-    outline: none;
-  }
-  .editor-input::selection { background: rgba(253, 224, 71, 0.22); color: transparent; }
-  .editor:focus-within { box-shadow: inset 0 0 0 2px var(--c-yellow); }
-  .tabs { display: flex; gap: 0.25rem; }
-  .tabs button {
-    font: 700 0.95rem var(--label);
-    letter-spacing: 0.06em;
-    color: var(--slab-soft);
-    background: none;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    padding: 0.3rem 0.45rem;
-    cursor: pointer;
-  }
-  .tabs button[aria-selected="true"] { color: var(--slab-ink); border-bottom-color: var(--c-yellow); }
-  .tabs button:focus-visible, .pg-bar select:focus-visible, .copy:focus-visible { outline-color: var(--c-yellow); }
-  .result { padding: 1rem 1.15rem; overflow: auto; flex: 1; min-height: 12rem; max-height: clamp(17rem, 46vh, 25rem); color: var(--slab-ink); }
-  .result.translation { color: var(--slab-soft); }
-  .pg-status { min-height: 1.6em; padding: 0.55rem 1.15rem 0.8rem; border-top: 1px solid var(--slab-edge); font-style: italic; font-size: 1rem; color: var(--slab-soft); }
-  .pg-status.error { color: var(--c-red); }
 
   /* JavaScript interop */
   .split { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: clamp(2rem, 5vw, 4rem); align-items: start; }
@@ -316,6 +363,9 @@
     .spread figcaption { padding-inline: 1.15rem; }
   }
 </style>
+</head>
+<body>
+{{preview_notice}}
 
 <header class="masthead">
   <div class="wrap masthead-row">
@@ -338,9 +388,10 @@
         <h1>Code you can <em>read aloud.</em></h1>
         <p class="lede">Prose is a small programming language made of plain English words. It compiles to ordinary JavaScript, so it runs anywhere JavaScript runs and works alongside the code you already have.</p>
         <div class="actions">
-          <a class="button primary" href="#try">Try it in your browser</a>
+          <a class="button primary" href="#try">Try it in your browser <span aria-hidden="true">↗</span></a>
           <a class="button" href="https://github.com/travisk-codes/prose-lang">Get Prose on GitHub</a>
         </div>
+        <p class="hero-meta"><span>Open source · MIT</span><span>Made for JavaScript</span><span>Still being written</span></p>
       </div>
 
       <figure class="spread">
@@ -413,29 +464,42 @@
         <h2>Write some Prose.</h2>
         <p>This is the real compiler, running in your browser. Change the program and the output follows as you type. The Compiled tab shows the JavaScript the compiler writes, with the checks that report line numbers.</p>
       </div>
-      <div class="playground">
-        <div class="pg-pane">
-          <div class="pg-bar">
-            <span class="running-head">Your program</span>
-            <label><span class="visually-hidden">Example program</span><select id="example"></select></label>
-          </div>
-          <div class="editor">
-            <pre class="editor-layer" id="highlight" aria-hidden="true"></pre>
-            <textarea class="editor-input" id="source" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Prose program">{{play_source}}</textarea>
+      <div class="playground-shell">
+        <div class="pg-toolbar">
+          <span class="playground-title"><span class="live-dot" aria-hidden="true"></span>A little room to write</span>
+          <div class="pg-actions">
+            <label class="auto-run"><input type="checkbox" id="auto-run" checked>Auto-run</label>
+            <button type="button" class="pg-button" id="reset-program" title="Restore the selected example">Reset</button>
+            <button type="button" class="pg-button run-button" id="run-program" title="Run your program (Ctrl or Command + Enter)"><span aria-hidden="true">▶</span> Run</button>
           </div>
         </div>
-        <div class="pg-pane">
-          <div class="pg-bar">
-            <div class="tabs" role="tablist" aria-label="Result">
-              <button type="button" role="tab" id="tab-output" aria-selected="true" aria-controls="output">Output</button>
-              <button type="button" role="tab" id="tab-compiled" aria-selected="false" aria-controls="compiled">Compiled</button>
+        <div class="playground">
+          <div class="pg-pane">
+            <div class="pg-bar">
+              <span class="running-head">Your program <span class="file-extension">.prose</span></span>
+              <label><span class="visually-hidden">Example program</span><select id="example"></select></label>
             </div>
+            <div class="editor">
+              <pre class="editor-layer" id="highlight-viewport" aria-hidden="true"><code class="editor-content" id="highlight"></code></pre>
+              <textarea class="editor-input" id="source" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" aria-label="Prose program" aria-describedby="editor-hint">{{play_source}}</textarea>
+            </div>
+            <div class="editor-foot"><span id="editor-hint">Tab to indent · Ctrl/⌘ Enter to run</span><span id="cursor-position">Ln 1, Col 1</span></div>
           </div>
-          <pre class="code result" id="output" role="tabpanel" aria-labelledby="tab-output">{{play_output}}</pre>
-          <pre class="code result translation" id="compiled" role="tabpanel" aria-labelledby="tab-compiled" hidden>{{play_js}}</pre>
-          <p class="pg-status" id="status" role="status" aria-live="polite">Compiled and ran.</p>
+          <div class="pg-pane" id="results-pane" aria-busy="false">
+            <div class="pg-bar">
+              <div class="tabs" role="tablist" aria-label="Result">
+                <button type="button" role="tab" id="tab-output" aria-selected="true" aria-controls="output">Output</button>
+                <button type="button" role="tab" id="tab-compiled" aria-selected="false" aria-controls="compiled" tabindex="-1">Compiled</button>
+              </div>
+              <span class="result-label" aria-hidden="true">Read what happens</span>
+            </div>
+            <pre class="code result" id="output" role="tabpanel" aria-labelledby="tab-output" tabindex="0">{{play_output}}</pre>
+            <pre class="code result translation" id="compiled" role="tabpanel" aria-labelledby="tab-compiled" tabindex="0" hidden>{{play_js}}</pre>
+            <p class="pg-status" id="status" role="status" aria-live="polite" data-state="success">Compiled and ran.</p>
+          </div>
         </div>
       </div>
+      <p class="playground-note">Start with an example, then make it your own. Everything runs here in your browser.</p>
     </div>
   </section>
 
@@ -451,11 +515,7 @@
         <span class="label">next-day.prose</span>
         <pre class="code slab"><code>{{interop_prose}}</code></pre>
         <span class="label">vite.config.ts</span>
-        <pre class="code slab translation"><code>import prose from 'prose-lang/vite'
-
-export default defineConfig({
-  plugins: [prose({ declarations: true })],
-})</code></pre>
+        <pre class="code slab translation"><code>{{vite_config}}</code></pre>
       </div>
     </div>
   </section>
@@ -512,7 +572,7 @@ export default defineConfig({
           <li>TypeScript declarations written from your annotations</li>
           <li>A VS Code extension with the rainbow palette on this page</li>
           <li>Example programs, including a tour of every feature</li>
-          <li>{{test_count}} tests that keep all of it honest</li>
+          <li>{{test_summary}}</li>
         </ul>
         <a class="button primary" href="https://github.com/travisk-codes/prose-lang">Get Prose on GitHub</a>
       </div>
@@ -548,7 +608,7 @@ node bin/prose.js examples/tour.prose --run</pre>
           <h3>Write your own</h3>
           <p>Save a <code class="inline">.prose</code> file and run it the same way, or import it from a Vite project.</p>
           <div class="command">
-            <pre class="code slab" id="cmd-import">import { nextDay } from './next-day.prose'</pre>
+            <pre class="code slab" id="cmd-import">{{import_js}}</pre>
             <button type="button" class="copy" data-copy="cmd-import">Copy</button>
           </div>
         </li>
@@ -577,230 +637,20 @@ node bin/prose.js examples/tour.prose --run</pre>
 <footer class="colophon">
   <div class="wrap">
     <p class="eyebrow">Colophon</p>
-    <p>Set in Alegreya and Victor Mono. Code is colored with the Prose palette for VS Code. Prose is released under the MIT license.</p>
+    <p>Set in Alegreya and Victor Mono. Code uses a softened version of the Prose palette. Prose is released under the MIT license.</p>
     <p><a href="https://github.com/travisk-codes/prose-lang">github.com/travisk-codes/prose-lang</a></p>
   </div>
 </footer>
 
 <script>
+{{syntax}}
+</script>
+<script>
 {{compiler}}
 </script>
 <script type="application/json" id="examples">{{examples}}</script>
 <script>
-(() => {
-  // Highlighting for the editor, matching the VS Code grammar's main rules.
-  const control = new Set(["if", "then", "else", "for", "each", "in", "while", "return"]);
-  const languageWords = new Set(["is", "to", "print", "run", "with", "new", "use", "export", "takes", "type"]);
-  const operatorWords = new Set(["and", "or", "not", "mod", "otherwise", "maybe"]);
-  const constants = new Set(["true", "false", "null", "unset"]);
-  const builtins = new Set(["length", "char_to_number", "number_to_char", "remainder"]);
-  const typeWords = new Set(["list", "set", "map", "of", "from", "to", "taking", "giving", "or", "and", "maybe", "function"]);
-  const escapeHtml = text => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const wrap = (classes, text) => `<span class="${classes}">${escapeHtml(text)}</span>`;
-
-  function highlightLine(line) {
-    if (/^\s*"(?:[^"\\]|\\.)*"\s*$/.test(line)) return wrap("c-comment it", line);
-    const binding = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s+(?:is|as)\b/d.exec(line);
-    const bindingAt = binding ? binding.indices[1][0] : -1;
-    const pattern = /("(?:[^"\\]|\\.)*"?)|(\d+(?:\.\d+)?)|([A-Za-z_][A-Za-z_0-9]*)|(<=|>=|!=|[=<>+*\/%-])|([:.])|([(),])|(\s+)|([\s\S])/g;
-    let html = "", match, previous = "", inParams = false, inType = false, inLoop = false, loopNext = false, afterFunction = false;
-    while ((match = pattern.exec(line))) {
-      const [text, string, number, word, operator, accessor, punct, space] = match;
-      if (space) { html += text; continue; }
-      let classes = "c-plain";
-      if (string) classes = "c-green";
-      else if (number) classes = "c-orange";
-      else if (operator) classes = "c-pink";
-      else if (accessor) classes = "c-teal2";
-      else if (punct) {
-        classes = "c-punct";
-        if (text === ",") inType = false;
-      } else if (word) {
-        if (inType && (word === "is" || word === "return")) inType = false;
-        if (match.index === bindingAt) classes = "c-blue";
-        else if (inType) classes = typeWords.has(word) ? "c-purple" : /^[A-Z]/.test(word) || ["text", "number", "boolean", "any", "nothing", "object"].includes(word) || constants.has(word) ? "c-rose" : "c-rose it";
-        else if (previous === ":") classes = "c-teal";
-        else if (afterFunction && !["takes", "return", "giving"].includes(word)) classes = "c-yellow bd";
-        else if (control.has(word)) classes = "c-red";
-        else if (word === "function") classes = "c-yellow";
-        else if (word === "as" || word === "giving") { classes = "c-purple"; inType = true; }
-        else if (languageWords.has(word)) classes = "c-purple";
-        else if (operatorWords.has(word)) classes = "c-pink";
-        else if (constants.has(word)) classes = "c-amber";
-        else if (builtins.has(word)) classes = "c-cyan";
-        else if (word === "object" || word === "array") classes = "c-indigo";
-        else if (inParams) classes = "c-lime it";
-        else if (inLoop || loopNext) classes = "c-lime";
-        else if (/^[A-Z]/.test(word)) classes = "c-rose";
-        else classes = "c-pale";
-        afterFunction = word === "function";
-        if (word === "takes") inParams = true;
-        if (word === "return") inParams = false;
-        if (word === "each" && previous === "for") inLoop = true;
-        if (word === "in") inLoop = false;
-        loopNext = word === "for";
-      }
-      if (!word) afterFunction = loopNext = false;
-      html += wrap(classes, text);
-      previous = text;
-    }
-    return html;
-  }
-
-  const source = document.getElementById("source");
-  const highlight = document.getElementById("highlight");
-  const output = document.getElementById("output");
-  const compiled = document.getElementById("compiled");
-  const status = document.getElementById("status");
-  const picker = document.getElementById("example");
-  const examples = JSON.parse(document.getElementById("examples").textContent);
-
-  for (const [index, example] of examples.entries()) picker.add(new Option(example.name, String(index)));
-
-  function render() {
-    highlight.innerHTML = source.value.split("\n").map(highlightLine).join("\n") + "\n";
-    highlight.scrollTop = source.scrollTop;
-    highlight.scrollLeft = source.scrollLeft;
-  }
-  source.addEventListener("scroll", () => {
-    highlight.scrollTop = source.scrollTop;
-    highlight.scrollLeft = source.scrollLeft;
-  });
-  source.addEventListener("keydown", event => {
-    if (event.key !== "Tab" || event.shiftKey) return;
-    event.preventDefault();
-    const { selectionStart, selectionEnd, value } = source;
-    source.value = value.slice(0, selectionStart) + "    " + value.slice(selectionEnd);
-    source.selectionStart = source.selectionEnd = selectionStart + 4;
-    render();
-    schedule();
-  });
-
-  function setStatus(text, isError) {
-    status.textContent = text;
-    status.classList.toggle("error", Boolean(isError));
-  }
-
-  // Programs run in a worker, so an endless loop can be stopped without freezing the page.
-  const workerSource = `
-    const show = (value, nested, depth) => {
-      if (typeof value === "string") return nested ? "'" + value + "'" : value;
-      if (value === undefined) return "undefined";
-      if (typeof value === "function") return "[Function]";
-      if (depth > 3) return "…";
-      if (Array.isArray(value)) return value.length ? "[ " + value.map(item => show(item, true, depth + 1)).join(", ") + " ]" : "[]";
-      if (value instanceof Map) return "Map(" + value.size + ") { " + [...value].map(([key, item]) => show(key, true, depth + 1) + " => " + show(item, true, depth + 1)).join(", ") + " }";
-      if (value instanceof Set) return "Set(" + value.size + ") { " + [...value].map(item => show(item, true, depth + 1)).join(", ") + " }";
-      if (value && typeof value === "object") {
-        const entries = Object.entries(value);
-        return entries.length ? "{ " + entries.map(([key, item]) => key + ": " + show(item, true, depth + 1)).join(", ") + " }" : "{}";
-      }
-      return String(value);
-    };
-    self.onmessage = event => {
-      const lines = [];
-      const log = (...values) => { if (lines.length < 2000) lines.push(values.map(value => show(value, false, 0)).join(" ")); };
-      try {
-        new Function("console", event.data)({ log });
-        self.postMessage({ lines });
-      } catch (error) {
-        self.postMessage({ lines, error: String((error && error.message) || error), name: error && error.name });
-      }
-    };`;
-  let workerUrl = null;
-  try { workerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" })); } catch {}
-  let worker = null;
-
-  function run(code) {
-    if (worker) worker.terminate();
-    let current;
-    try {
-      current = worker = new Worker(workerUrl);
-    } catch {
-      worker = null;
-      setStatus("Programs can't run in this browser frame, but the Compiled tab shows the JavaScript yours becomes.");
-      return;
-    }
-    const stop = setTimeout(() => {
-      current.terminate();
-      if (worker !== current) return;
-      worker = null;
-      setStatus("Stopped after 2 seconds. Is there a loop that never ends?", true);
-    }, 2000);
-    current.onmessage = ({ data }) => {
-      clearTimeout(stop);
-      current.terminate();
-      if (worker !== current) return;
-      worker = null;
-      output.textContent = data.lines.join("\n");
-      if (!data.error) setStatus(data.lines.length ? "Compiled and ran." : "Compiled and ran. Nothing was printed.");
-      else if (data.name === "EvalError" || /unsafe-eval|Content Security Policy/i.test(data.error)) {
-        setStatus("Programs can't run in this browser frame, but the Compiled tab shows the JavaScript yours becomes.");
-      } else setStatus(data.error, true);
-    };
-    current.postMessage(code);
-  }
-
-  function update() {
-    const program = source.value;
-    let shown, runnable;
-    try {
-      shown = Prose.compile(program, { runtime: "prose-runtime" });
-      runnable = Prose.compile(program);
-    } catch (error) {
-      setStatus(error.message, true);
-      return;
-    }
-    compiled.textContent = shown.code.split("\n").filter(line => !line.startsWith("import {")).join("\n").trim();
-    if (runnable.module) {
-      setStatus("Programs with use or export need a bundler to run. The Compiled tab shows the JavaScript this one becomes.");
-      return;
-    }
-    run(runnable.code);
-  }
-
-  let timer = null;
-  function schedule() {
-    clearTimeout(timer);
-    timer = setTimeout(update, 250);
-  }
-  source.addEventListener("input", () => { render(); schedule(); });
-  picker.addEventListener("change", () => {
-    source.value = examples[Number(picker.value)].source;
-    source.scrollTop = 0;
-    render();
-    update();
-  });
-
-  for (const tab of document.querySelectorAll('[role="tab"]')) {
-    tab.addEventListener("click", () => {
-      for (const other of document.querySelectorAll('[role="tab"]')) {
-        const selected = other === tab;
-        other.setAttribute("aria-selected", String(selected));
-        document.getElementById(other.getAttribute("aria-controls")).hidden = !selected;
-      }
-    });
-  }
-
-  for (const button of document.querySelectorAll("[data-copy]")) {
-    button.addEventListener("click", async () => {
-      const target = document.getElementById(button.dataset.copy);
-      try {
-        await navigator.clipboard.writeText(target.textContent);
-        button.textContent = "Copied";
-      } catch {
-        const range = document.createRange();
-        range.selectNodeContents(target);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        button.textContent = "Selected";
-      }
-      setTimeout(() => { button.textContent = "Copy"; }, 1600);
-    });
-  }
-
-  render();
-  update();
-})();
+{{playground}}
 </script>
+</body>
+</html>
