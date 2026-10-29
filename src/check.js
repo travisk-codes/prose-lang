@@ -59,6 +59,10 @@ declare function __prose_length(value: string | readonly unknown[], line: number
 declare function __prose_char_to_number(value: string, line: number): number;
 declare function __prose_number_to_char(value: number, line: number): string;
 declare function __prose_mod(left: number, right: number, line: number): number;
+// Inferred list literals keep known position types for row destructuring. Their
+// length and methods remain those of a mutable array, including appended items.
+type __ProseList<T extends unknown[]> = T[number][] & Pick<T, Exclude<keyof T, keyof any[]>>;
+declare function __prose_list<T extends unknown[]>(...items: T): __ProseList<T>;
 type __ProseItem<T> = __ProseIsAny<T> extends true ? any : T extends Iterable<infer E> ? E : never;
 declare function __prose_each<T extends Iterable<unknown>>(value: T, line: number): Iterable<__ProseItem<T>>;
 declare function __prose_is_object(value: unknown): value is { [key: string]: any };

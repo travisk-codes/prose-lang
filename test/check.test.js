@@ -275,6 +275,48 @@ test("working Prose type-checks without complaint", withTypeScript, () => {
   assert.deepEqual(diagnostics, []);
 });
 
+test("inferred table rows retain each position's type through destructuring and callbacks", withTypeScript, () => {
+  assert.deepEqual(typeCheck([
+    'shelf is ("Middlemarch", 880, true), ("Piranesi", 272, false), ("Beloved", 324, true)',
+    'books is array', 'for each title, pages, done in shelf',
+    '    books.push object title, pages, done',
+    'labels is books.map function takes book',
+    '    return book.title + " (long)"', '        if book.pages > 500', '        else book.title',
+    'finished is books.filter function takes book return book.done',
+    'titles is finished.map function takes book return book.title.to_upper_case run',
+    'total is 0', 'for each book in books', '    total is total + book.pages',
+    'row is shelf.1', 'title, pages, done are row',
+    'print title.to_upper_case run', 'print pages > 500',
+    'function boolean_value takes value as boolean', '    return value', 'print boolean_value done'
+  ].join('\n')), []);
+});
+
+test("inferred lists stay mutable and retain contextual typing for annotated tuples", withTypeScript, () => {
+  assert.deepEqual(typeCheck([
+    'numbers is 1, 2', 'numbers.push 3', 'numbers.4 is 4', 'print numbers.3 + numbers.4',
+    'if numbers.length = 3 then print "three"',
+    'row is "first", 1, true', 'row.push false', 'print row.4',
+    'rows is (row,)', 'rows.push ("second", 2, false)',
+    'pair as (text, number) is "first", 1',
+    'pairs as list of (text, number) is ("first", 1), ("second", 2)',
+    'function accept_pair takes pair as (text, number)', '    return pair.2',
+    'print accept_pair ("third", 3)',
+    'function make_pair giving (text, number)', '    return "fourth", 4',
+    'copy is array', 'copy.push ("fifth", 5)'
+  ].join('\n')), []);
+});
+
+test("row inference still reports mismatched fields and wrong list mutations", withTypeScript, () => {
+  const diagnostics = typeCheck([
+    'shelf is ("Good", 880, true), ("Bad", "many", false)',
+    'books is array', 'for each title, pages, done in shelf', '    books.push object title, pages, done',
+    'labels is books.map function takes book', '    return book.pages > 500',
+    'numbers is 1, 2', 'numbers.push "wrong"',
+    'function frozen takes values as list of number', '    values.1 is 3'
+  ].join('\n'));
+  assert.deepEqual(diagnostics.map(({ line, code }) => [line, code]), [[6, 2365], [8, 2345], [10, 2769]]);
+});
+
 test("mistakes are reported at the Prose lines that made them", withTypeScript, () => {
   const diagnostics = typeCheck([
     'use type Datum, DatumTag from "./types"',

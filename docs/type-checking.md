@@ -113,6 +113,7 @@ own installed TypeScript only when checking is requested.
 | A pure callback comparing a field with `null` or `unset` | An inferred field predicate, preserving that proof through `filter` and later operations |
 | An untyped empty variable | An unchecked placeholder that can later become text or a callback |
 | An empty list | An evolving array; nested empty lists stay untyped |
+| A nonempty list literal assigned without an annotation | A mutable array retaining known position types, including nested rows |
 | Objects, `like`, and later fields | Object literals and spreads; later fields belong to the actual lexical binding |
 | A returned unannotated object that gains fields | A declared type helper adds the new fields while preserving existing field types |
 | Named properties and ordinary method calls | Native TypeScript property access and calls |
@@ -139,6 +140,15 @@ Generic function values introduce free type variables and capture outer ones.
 Branch assignments preserve literal choices, so a value assigned `"a"` or `"b"`
 can satisfy that union without an extra annotation. Subsequent assignments still
 update its inferred flow type; ordinary object fields keep their mutable types.
+
+Unannotated list assignments retain each literal position's type. For example,
+rows such as `("Middlemarch", 880, true)` keep text, number, and boolean positions
+when destructured in `for each title, pages, done in shelf`. Objects built from
+those values keep the corresponding field types through later callbacks.
+These inferred lists remain mutable arrays: their length is a number, they can
+grow, and positions beyond the literal's initial entries use its element union.
+Explicit annotations, call arguments, and returned literals retain TypeScript's
+usual contextual typing, including declared tuples.
 
 A callback consisting of `point.value != null` tells the checker that retained
 points have a non-null value. `point.value != unset` excludes only unset; either
@@ -170,7 +180,7 @@ groups and the annotation issue found during the handoff.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.12 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.13 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.

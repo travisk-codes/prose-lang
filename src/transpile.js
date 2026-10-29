@@ -1571,12 +1571,17 @@ export function compile(source, options = {}) {
     return `${parameter} is ${helper}<typeof ${parameter}, ${JSON.stringify(camel(property.name))}, ${type}>`;
   }
 
-  // Bare hoisted bindings evolve as they are assigned. Preserve scalar literals
-  // in each assignment's flow type without freezing objects or restricting later writes.
-  function checkedAssignment(node, scope, depth) {
-    if (node.type === "literal" && node.value !== null) return mapped(node, `(${expressionValue(node, scope, depth)} as const)`);
+  // Inferred lists retain their position types without fixing their length.
+  // Hoisted bindings also preserve scalar literals in each assignment's flow type.
+  function checkedAssignment(node, scope, depth, preserveLiterals = true) {
+    if (node.type === "array" && node.elements.length) {
+      const item = child => child.type === "spread" ? spread(child, scope, depth)
+        : child.type === "array" ? checkedAssignment(child, scope, depth, false) : expression(child, scope, depth);
+      return mapped(node, `__prose_list(${node.elements.map(item).join(", ")})`);
+    }
+    if (preserveLiterals && node.type === "literal" && node.value !== null) return mapped(node, `(${expressionValue(node, scope, depth)} as const)`);
     if (node.type === "conditional") return mapped(node,
-      `(${expression(node.condition, scope, depth)} ? ${checkedAssignment(node.then, scope, depth)} : ${checkedAssignment(node.otherwise, scope, depth)})`);
+      `(${expression(node.condition, scope, depth)} ? ${checkedAssignment(node.then, scope, depth, preserveLiterals)} : ${checkedAssignment(node.otherwise, scope, depth, preserveLiterals)})`);
     return expression(node, scope, depth);
   }
 
@@ -1769,7 +1774,7 @@ export function compile(source, options = {}) {
         let value = node.value.type === "unset" && !scope.types.has(node.name) ? "(undefined as any)"
           : node.value.type === "array" && !node.value.elements.length ? "[]"
           : node.value.type === "object" ? mapped(node.value, checkObject(node.value, scope, depth, extra || undefined))
-          : !scope.types.has(node.name) && !scope.constants.has(node.name) ? checkedAssignment(node.value, scope, depth) : emit(node.value);
+          : !scope.types.has(node.name) ? checkedAssignment(node.value, scope, depth, !scope.constants.has(node.name)) : emit(node.value);
         if (extra?.size && node.value.type !== "object") {
           value = `__prose_open(${value}, ${[...extra].map(name => JSON.stringify(camel(name))).join(", ")})`;
         }
