@@ -90,6 +90,14 @@ Columns count UTF-16 code units. The project checker supplies these from the sam
 TypeScript program and source maps as diagnostics. Invalid Prose syntax returns
 an empty array. Without `hoverTargets`, the result shape is unchanged.
 
+`definitionTargets: [path, ...]` adds a `definitions` array. Each item has the same
+original word range as a hover and a `targets` array of `file`, `line`, `column`,
+exclusive `endColumn`, and optional `endLine` positions. Symbols respect lexical
+scope. Hoisted bindings point to their first Prose assignment, and imported Prose
+exports point to the original source rather than the virtual declaration. Hosts
+can request hovers and definitions together to share analysis and token mapping.
+All symbol and compiler objects stay internal; results are serializable.
+
 ## Checking output
 
 `compile(source, { check: true })` produces the TypeScript used for checking.
@@ -174,7 +182,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.14 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.15 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
@@ -208,5 +216,7 @@ fresh declarations, mapped diagnostics, exit codes, and read-only behavior.
 diagnostics, cancellation, project isolation, trust, and disposal.
 `test/hover.test.js` and `test/hovering-extension.test.js` cover inferred hover
 types, original token ranges, live buffers, caching, cancellation, and trust.
+`test/definition.test.js` covers lexical bindings, imports and re-exports, original
+definition ranges, and avoiding synthetic compiler declarations.
 The browser bundle and packaged formatter also carry the checking-output
 dependency without loading TypeScript.

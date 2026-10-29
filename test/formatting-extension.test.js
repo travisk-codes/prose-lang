@@ -133,7 +133,7 @@ test("extension activation registers the document formatter and disposes it with
     : name === "./formatting.cjs" ? { createProvider } : name === "./checking.cjs" ? { createDiagnostics: api => {
       assert.equal(api, vscode);
       return diagnostics;
-    } } : { createHovers: api => {
+    } } : { createLanguageFeatures: api => {
       assert.equal(name, "./hovering.cjs");
       assert.equal(api, vscode);
       return hovers;

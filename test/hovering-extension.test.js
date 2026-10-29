@@ -6,10 +6,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 const { createHovers } = createRequire(import.meta.url)("../editors/vscode/hovering.cjs");
 
-function editor({ trusted = true, enabled = true } = {}) {
+function editor({ trusted = true, enabled = true, definitions = true } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prose hover editor "));
   const events = {}, documents = [], jobs = [], logs = [];
-  let provider, registrationDisposed = false;
+  let provider, definitionProvider, registrationDisposed = false, definitionDisposed = false;
   const uri = file => ({ scheme: "file", fsPath: file });
   const listen = name => callback => {
     (events[name] ??= new Set()).add(callback);
@@ -28,14 +28,19 @@ function editor({ trusted = true, enabled = true } = {}) {
       appendText(text) { this.parts.push({ text }); }
     },
     window: { createOutputChannel: () => output },
+    Uri: { file: uri },
     languages: { registerHoverProvider: (selector, value) => {
       assert.deepEqual(selector, { language: "prose", scheme: "file" });
       provider = value;
       return { dispose: () => { registrationDisposed = true; } };
+    }, registerDefinitionProvider: (selector, value) => {
+      assert.deepEqual(selector, { language: "prose", scheme: "file" });
+      definitionProvider = value;
+      return { dispose: () => { definitionDisposed = true; } };
     } },
     workspace: {
       isTrusted: trusted, textDocuments: documents,
-      getConfiguration: () => ({ get: (key, fallback) => key === "hover.enabled" ? enabled : fallback }),
+      getConfiguration: () => ({ get: (key, fallback) => key === "hover.enabled" ? enabled : key === "definition.enabled" ? definitions : fallback }),
       getWorkspaceFolder: () => ({ uri: uri(root) }),
       createFileSystemWatcher: () => watcher,
       onDidOpenTextDocument: listen("open"), onDidCloseTextDocument: listen("close"), onDidSaveTextDocument: listen("save"),
@@ -62,8 +67,10 @@ function editor({ trusted = true, enabled = true } = {}) {
   const service = createHovers(vscode, { runCheck });
   return { root, jobs, logs, documents, output, watcher, events, service, vscode, add, write, fire,
     request: (document, token = cancellation(), position = { line: 0, character: 2 }) => provider.provideHover(document, position, token),
+    definition: (document, token = cancellation(), position = { line: 0, character: 2 }) => definitionProvider.provideDefinition(document, position, token),
     setEnabled: value => { enabled = value; fire('settings', { affectsConfiguration: () => true }); },
-    close() { service.dispose(); assert.ok(registrationDisposed); rmSync(root, { recursive: true, force: true }); } };
+    setDefinitions: value => { definitions = value; fire('settings', { affectsConfiguration: key => key === 'prose.definition' }); },
+    close() { service.dispose(); assert.ok(registrationDisposed && definitionDisposed); rmSync(root, { recursive: true, force: true }); } };
 }
 function cancellation() {
   const listeners = new Set();
@@ -212,5 +219,43 @@ test("setup failures stay out of hover content and disposal releases workers and
     assert.equal(await next, undefined);
     assert.ok(Object.values(e.events).every(listeners => listeners.size === 0));
     assert.ok(e.output.disposed && e.watcher.disposed);
+  } finally { e.close(); }
+});
+
+test("definitions share the hover snapshot and return original source selection ranges", async () => {
+  const e = editor(), document = e.add('main.prose'), child = e.write('child.prose', 'count is 1');
+  try {
+    const hover = e.request(document), definition = e.definition(document);
+    assert.equal(e.jobs.length, 1);
+    assert.deepEqual(e.jobs[0].options.definitionTargets, [document.uri.fsPath]);
+    const data = result(document);
+    data.definitions = [{ file: document.uri.fsPath, line: 1, column: 1, endColumn: 6,
+      targets: [{ file: child, line: 1, column: 1, endColumn: 6 }] }];
+    e.jobs[0].resolve(data);
+    assert.ok(await hover);
+    const [link] = await definition;
+    assert.equal(link.targetUri.fsPath, child);
+    assert.deepEqual(link.originSelectionRange.start, { line: 0, character: 0 });
+    assert.deepEqual(link.targetSelectionRange.end, { line: 0, character: 5 });
+    assert.equal((await e.definition(document)).length, 1);
+    assert.equal(e.jobs.length, 1);
+  } finally { e.close(); }
+});
+
+test("definition navigation has an independent setting and respects cancellation and newer edits", async () => {
+  const e = editor({ enabled: false }), document = e.add('main.prose');
+  try {
+    assert.equal(await e.request(document), undefined);
+    const token = cancellation(), canceled = e.definition(document, token);
+    assert.deepEqual(e.jobs[0].options.hoverTargets, []);
+    token.cancel();
+    assert.equal(await canceled, undefined);
+    const pending = e.definition(document);
+    document.version++; e.fire('change', { document, contentChanges: [{ text: '2' }] });
+    e.jobs[0].resolve(result(document));
+    assert.equal(await pending, undefined);
+    e.setDefinitions(false);
+    assert.equal(await e.definition(document), undefined);
+    assert.equal(e.jobs.length, 1);
   } finally { e.close(); }
 });

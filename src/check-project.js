@@ -5,7 +5,8 @@ import { compile } from "./transpile.js";
 import { untypedError } from "./check.js";
 import { declarationPath } from "./declarations.js";
 import { sourceMapLookup } from "./source-map.js";
-import { collectHovers } from "./check-hover.js";
+import { collectSourceInfo } from "./check-hover.js";
+import { definitionResolver } from "./check-definition.js";
 
 export class CheckSetupError extends Error {
   constructor(message, diagnostics = []) {
@@ -35,7 +36,7 @@ function filesUnder(directory) {
 /** Check Prose and its imported Prose dependencies without writing or executing
  * anything. Resolve TypeScript from the selected project, never from this tool.
  */
-export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], overlays = [] } = {}) {
+export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], overlays = [] } = {}) {
   cwd = resolve(cwd);
   const bufferKey = file => process.platform === "win32" ? resolve(file).toLowerCase() : resolve(file);
   const buffers = new Map(overlays.map(([file, source]) => [bufferKey(file), source]));
@@ -201,12 +202,26 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
     files: [...records.values()].map(record => record.file).sort(), diagnostics: [...sourceErrors], ignored: 0, exitCode: sourceErrors.length ? 1 : 0
   };
   if (hoverTargets.length) result.hovers = [];
+  if (definitionTargets.length) result.definitions = [];
   if (sourceErrors.length) return result;
-  if (hoverTargets.length) {
-    const wanted = new Set(hoverTargets.map(file => canonical(resolve(cwd, file))));
+  if (hoverTargets.length || definitionTargets.length) {
+    const hoverFiles = new Set(hoverTargets.map(file => canonical(resolve(cwd, file))));
+    const definitionFiles = new Set(definitionTargets.map(file => canonical(resolve(cwd, file))));
     const checker = program.getTypeChecker();
-    for (const record of records.values()) if (wanted.has(canonical(record.file))) {
-      result.hovers.push(...collectHovers(ts, checker, program.getSourceFile(record.name), record));
+    const information = new Map();
+    for (const record of records.values()) if (hoverFiles.has(canonical(record.file)) || definitionTargets.length) {
+      const items = collectSourceInfo(ts, checker, program.getSourceFile(record.name), record, { hover: hoverFiles.has(canonical(record.file)) });
+      information.set(record, items);
+      if (hoverFiles.has(canonical(record.file))) result.hovers.push(...items.map(({ node, symbol, priority, ...item }) => item));
+    }
+    if (definitionTargets.length) {
+      const resolveDefinition = definitionResolver(ts, checker, records.values(), information, canonical);
+      for (const [record, items] of information) if (definitionFiles.has(canonical(record.file))) {
+        result.definitions.push(...items.flatMap(item => {
+          const targets = resolveDefinition(item.symbol);
+          return targets.length ? [{ file: item.file, line: item.line, column: item.column, endColumn: item.endColumn, targets }] : [];
+        }));
+      }
     }
   }
   const optionErrors = new Set(program?.getOptionsDiagnostics() ?? []);

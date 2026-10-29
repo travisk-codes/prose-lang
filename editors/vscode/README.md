@@ -92,9 +92,24 @@ instead of displaying an older type. Configuration is read from saved files.
 Like checking, this needs Workspace Trust, a local project, and that project's
 TypeScript 5 or 6. It does not run application code or write files. Hovers have an
 independent `prose.hover.enabled` setting (default `true`), so disabling diagnostic
-checks does not disable hover types. Setup details appear in the **Prose Hovers**
+checks does not disable hover types. Setup details appear in the **Prose Language**
 output channel. Imported Prose uses its declared export contracts; unannotated
 exports can still show `any`.
+
+## Go to Definition
+
+Use **Go to Definition** (`F12` or `Ctrl+click`) on a variable, parameter, or
+function name. Reassigned and loop variables jump to their first assignment;
+parameters jump to their header. Imported Prose functions open their original
+`.prose` source, including through TypeScript re-exports. TypeScript imports open
+their real source or declaration files. A contextual numeric sequence index can
+jump to its index variable; object properties do not jump to a same-named variable.
+
+Definitions share the hover service's project snapshot and reflect unsaved edits,
+including moved declarations in imported Prose files. They require Workspace
+Trust and the project's TypeScript. Use `prose.definition.enabled` (default `true`)
+to control navigation independently of hovers and diagnostic checking. Invalid
+Prose syntax produces no target, and generated checking files are never targets.
 
 Version 0.1.9 preserves scalar literal choices assigned in branches and infers
 non-null or defined fields after a simple inline `filter` callback. Later `map`
@@ -137,13 +152,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.14.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.15.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.14.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.15.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -168,7 +183,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.14.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.15.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

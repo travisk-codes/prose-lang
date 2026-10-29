@@ -66,11 +66,12 @@ function hoverSignature(ts, checker, signature, location, seen, internalLine = f
   return `function${parameters.length ? ` takes ${parameters.join(", ")}` : ""} giving ${hoverType(ts, checker, signature.getReturnType(), location, seen, true)}`;
 }
 
-/** Build serializable hovers for original words, never for generated scaffolding.
+/** Collect source words and their checker symbols for hovers and navigation.
  * Source-map anchors select the logical line; original tokens locate names whose
  * generated spelling changed (snake_case members, parameters, and dot helpers).
+ * Compiler objects stay internal and are stripped before returning editor data.
  */
-export function collectHovers(ts, checker, generated, record) {
+export function collectSourceInfo(ts, checker, generated, record, { hover = true } = {}) {
   const lines = sourceLines(record.source, { locations: true });
   const owners = new Map();
   for (const line of lines) for (const token of line.tokens) owners.set(token.source.line, line);
@@ -139,14 +140,17 @@ export function collectHovers(ts, checker, generated, record) {
     if (!token) return;
     const key = `${token.source.line}:${token.source.start}`;
     if (found.has(key) && found.get(key).priority >= priority) return;
-    const rendered = builtin ? hoverSignature(ts, checker, type.getCallSignatures()[0], node, new Set(), true) : hoverType(ts, checker, type, node);
-    let code = rendered.startsWith("function")
-      ? rendered.replace(/^function/, `function ${token.value}`) : `${token.value} as ${rendered}`;
-    if (code.length > 2400) code = code.slice(0, 2399) + "…";
-    if (symbol?.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
-    const documentation = symbol ? ts.displayPartsToString(symbol.getDocumentationComment(checker)) : "";
+    let code, documentation;
+    if (hover) {
+      const rendered = builtin ? hoverSignature(ts, checker, type.getCallSignatures()[0], node, new Set(), true) : hoverType(ts, checker, type, node);
+      code = rendered.startsWith("function")
+        ? rendered.replace(/^function/, `function ${token.value}`) : `${token.value} as ${rendered}`;
+      if (code.length > 2400) code = code.slice(0, 2399) + "…";
+      const documented = symbol?.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+      documentation = documented ? ts.displayPartsToString(documented.getDocumentationComment(checker)) : "";
+    }
     found.set(key, { file: record.file, line: token.source.line, column: token.source.start + 1,
-      endColumn: token.source.start + token.source.raw.length + 1, code, documentation, priority });
+      endColumn: token.source.start + token.source.raw.length + 1, code, documentation, priority, node, symbol });
   }
   function visit(node) {
     // The console call belongs to `print`, not to any word named console or log
@@ -157,13 +161,24 @@ export function collectHovers(ts, checker, generated, record) {
       const source = original && owners.get(original.line)?.tokens.find(token => token.source.line === original.line && token.source.start === original.column - 1);
       if (source?.value === "print") { node.arguments.forEach(visit); return; }
     }
-    if (ts.isIdentifier(node) && !node.text.startsWith("__prose_") && !node.text.startsWith("__Prose")) {
+    if (ts.isIdentifier(node) && !node.text.startsWith("__prose_") && !node.text.startsWith("__Prose") &&
+        !/^_limit\d+$/.test(node.text) && node.text !== "__error") {
+      // Prose function types list parameter types without names. TypeScript's
+      // generated arg1/arg2 names must not consume a real source word.
+      if (ts.isParameter(node.parent) && node.parent.name === node &&
+          (ts.isFunctionTypeNode(node.parent.parent) || ts.isConstructorTypeNode(node.parent.parent))) return;
       const property = ts.isPropertyAccessExpression(node.parent) && node.parent.name === node;
       add(node, clean(node.text), identifierType(node), 0, checker.getSymbolAtLocation(node), property ? propertyPath(node.parent) : undefined);
     }
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) &&
         ["__prose_dot", "__prose_maybe_dot"].includes(node.expression.text) && ts.isStringLiteral(node.arguments[2])) {
-      add(node, node.arguments[2].text, checker.getTypeAtLocation(node), 1, undefined, propertyPath(node));
+      const receiver = checker.getTypeAtLocation(node.arguments[0]);
+      const index = node.arguments[1];
+      const sequence = receiver.flags & ts.TypeFlags.StringLike || checker.isArrayType(receiver) ||
+        receiver.isIntersection() && receiver.types.some(type => checker.isArrayType(type));
+      const symbol = sequence && ts.isIdentifier(index) && checker.getTypeAtLocation(index).flags & ts.TypeFlags.NumberLike
+        ? checker.getSymbolAtLocation(index) : undefined;
+      add(node, node.arguments[2].text, checker.getTypeAtLocation(node), 1, symbol, propertyPath(node));
     }
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) &&
         ["__prose_length", "__prose_char_to_number", "__prose_number_to_char"].includes(node.expression.text)) {
@@ -172,5 +187,5 @@ export function collectHovers(ts, checker, generated, record) {
     ts.forEachChild(node, visit);
   }
   visit(generated);
-  return [...found.values()].map(({ priority, ...item }) => item).sort((a, b) => a.line - b.line || a.column - b.column);
+  return [...found.values()].sort((a, b) => a.line - b.line || a.column - b.column);
 }

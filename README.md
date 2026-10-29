@@ -71,6 +71,12 @@ types and signatures. For example, `book.pages` shows `pages as number`, and
 including unsaved changes, and need the project's TypeScript and Workspace Trust.
 Set `prose.hover.enabled` to `false` to disable them.
 
+Use **Go to Definition** (`F12` or `Ctrl+click`) on a variable, parameter, or
+function name to jump to its declaration. Imported Prose functions open their
+original `.prose` file, including changes in unsaved buffers. Reassigned variables
+jump to their first assignment. This shares the hover service's TypeScript and
+Workspace Trust requirements; `prose.definition.enabled` controls it separately.
+
 ## Formatting
 
 The formatter standardizes indentation and spacing while keeping your line breaks

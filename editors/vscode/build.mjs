@@ -1,12 +1,12 @@
 // The extension ships the same formatter, parser, and checker as the CLI.
-// Only checking loads the workspace's TypeScript, inside a background worker.
+// Editor analysis loads the workspace's TypeScript inside a background worker.
 import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export function build(output = new URL("./dist/formatter/", import.meta.url)) {
   mkdirSync(output, { recursive: true });
-  for (const name of ["format.js", "transpile.js", "runtime.js", "check.js", "check-project.js", "check-hover.js", "declarations.js", "source-map.js"]) {
+  for (const name of ["format.js", "transpile.js", "runtime.js", "check.js", "check-project.js", "check-hover.js", "check-definition.js", "declarations.js", "source-map.js"]) {
     copyFileSync(new URL(`../../src/${name}`, import.meta.url), new URL(name, output));
   }
   writeFileSync(new URL("package.json", output), '{"type":"module"}\n');

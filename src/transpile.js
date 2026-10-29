@@ -1792,7 +1792,7 @@ export function compile(source, options = {}) {
       if (node.type === "stop") return `${indent}break;`;
       if (node.type === "fail") return `${indent}throw __prose_error(${emit(node.value)});`;
       if (node.type === "try") {
-        const caught = node.name ? `${indent}  ${variable(node.name)} = __error;\n` : "";
+        const caught = node.name ? mapped(node.handler, `${indent}  ${variable(node.name)} = __error;\n`) : "";
         // Anything can be thrown; the checking output trusts the handler to know what it caught.
         const error = check ? "__error: any" : "__error";
         return `${indent}try {\n${emitBlock(node.body, scope, depth + 1)}\n${mapped(node.handler, `${indent}} catch (${error}) {`)}\n${caught}${emitBlock(node.handler, scope, depth + 1)}\n${indent}}`;

@@ -347,10 +347,11 @@ test("packaged worker supplies hover types from unsaved snapshots without changi
     const source = 'function double takes value as number giving number\n    return value * 2\nresult is double 3';
     const main = f.write("src/main.prose", 'print 1');
     const before = snapshot(f.root);
-    const options = { cwd: f.root, targets: [main], hoverTargets: [main], overlays: [[main, source]] };
+    const options = { cwd: f.root, targets: [main], hoverTargets: [main], definitionTargets: [main], overlays: [[main, source]] };
     const result = await startCheck(options).promise;
     assert.deepEqual(result, checkProject(options));
     assert.ok(result.hovers.some(item => item.line === 3 && item.column === 1 && item.code === 'result as number'));
+    assert.ok(result.definitions.some(item => item.line === 3 && item.column === 11 && item.targets[0].line === 1 && item.targets[0].column === 10));
     assert.deepEqual(snapshot(f.root), before);
     const manifest = JSON.parse(readFileSync(new URL("../editors/vscode/package.json", import.meta.url), "utf8"));
     assert.ok(manifest.files.includes('hovering.cjs'));
