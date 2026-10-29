@@ -737,9 +737,60 @@ function conditionOnly(line, functions) {
   return !expr.peek() && !expr.blockFunctions.length;
 }
 
+// Locate the value in an expression statement, assignment, return, or print.
+// Block headers must retain their indented bodies, including nested if blocks.
+const blockHeaders = new Set(["if", "else", "while", "for", "function", "type", "use", "try", "on", "skip", "stop"]);
+function valueStart(tokens) {
+  const start = isWord(tokens[0], "export") ? 1 : 0;
+  const field = isWord(tokens[start + 1], "is") || isWord(tokens[start + 1], "as");
+  if (!field && blockHeaders.has(tokens[start]?.value)) return -1;
+  if (!field && ["return", "print", "fail"].some(word => isWord(tokens[start], word))) {
+    return start + 1 < tokens.length ? start + 1 : -1;
+  }
+  let depth = 0;
+  for (let i = start; i < tokens.length; i++) {
+    if (tokens[i].type === "symbol" && tokens[i].value === "(") depth++;
+    else if (tokens[i].type === "symbol" && tokens[i].value === ")") depth--;
+    else if (!depth && isWord(tokens[i], "is") && ![".", ":"].includes(tokens[i - 1]?.value)) return i + 1;
+  }
+  return start;
+}
+
+function valueOnly(line, functions) {
+  const start = valueStart(line.tokens);
+  if (start < 0 || start >= line.tokens.length) return false;
+  const expr = new Expression(line.tokens.slice(start), line.line, functions);
+  const value = expr.list();
+  const objectBody = value.type === "object" && !value.inline && !value.grouped;
+  return !expr.peek() && !expr.blockFunctions.length && !objectBody;
+}
+
+// Before signatures are known, recognize pending lambda bodies conservatively.
+function canWrapValue(line) {
+  try { return valueOnly(line); }
+  catch {
+    const start = valueStart(line.tokens);
+    return start >= 0 && !line.tokens.slice(start).some(token => isWord(token, "function"));
+  }
+}
+
+function pendingConditional(tokens) {
+  const start = valueStart(tokens);
+  if (start < 0) return false;
+  let pending = 0;
+  for (let i = start; i < tokens.length; i++) {
+    // Properties called if/else are names, including inline object entries.
+    if ([".", ":"].includes(tokens[i - 1]?.value) || ["is", "as"].some(word => isWord(tokens[i + 1], word))) continue;
+    if (isWord(tokens[i], "if")) pending++;
+    else if (isWord(tokens[i], "else")) pending--;
+  }
+  return pending > 0;
+}
+
 // The source's lines with their indentation. A line with a parenthesis still open, or that ends in
 // a comma or an operator, continues on the lines after it that are indented more.
 // Conditions also accept leading and/or at the header's indentation or deeper.
+// Indented if/else may continue a conditional value without opening a block.
 export function sourceLines(source, { locations = false } = {}) {
   const lines = [];
   let open = null;
@@ -753,14 +804,26 @@ export function sourceLines(source, { locations = false } = {}) {
     // indentation, like a closing bracket.
     const closes = indent === open?.indent && isWord(tokens[0], "giving");
     const previous = lines.at(-1);
+    const deeper = previous && indent > previous.indent;
+    const pending = deeper && pendingConditional(previous.tokens);
+    const startsValue = deeper && isWord(tokens[0], "if") &&
+      !["is", "as"].some(word => isWord(tokens[1], word)) && canWrapValue(previous);
+    const endsValue = pending && isWord(tokens[0], "else") &&
+      !["is", "as"].some(word => isWord(tokens[1], word));
     const leading = previous && indent >= previous.indent &&
-      (isWord(tokens[0], "and") || isWord(tokens[0], "or")) && conditionStart(previous.tokens);
-    if (leading) {
-      open = previous;
-      if (!open.leading) Object.defineProperty(open, "leading", { value: [] });
-      open.leading.push({ at: open.tokens.length, line: index + 1 });
+      (isWord(tokens[0], "and") || isWord(tokens[0], "or")) && (conditionStart(previous.tokens) || pending);
+    if (open && (indent > open.indent || closes)) {
       open.tokens.push(...tokens);
-    } else if (open && (indent > open.indent || closes)) {
+    } else if (startsValue || endsValue || leading) {
+      const wasOpen = Boolean(open);
+      open = previous;
+      if (startsValue) {
+        if (!open.conditionalValues) Object.defineProperty(open, "conditionalValues", { value: [] });
+        open.conditionalValues.push({ at: open.tokens.length, line: index + 1 });
+      } else if (leading && conditionStart(open.tokens) && !wasOpen) {
+        if (!open.leading) Object.defineProperty(open, "leading", { value: [] });
+        open.leading.push({ at: open.tokens.length, line: index + 1 });
+      }
       open.tokens.push(...tokens);
     } else {
       open = { line: index + 1, indent, tokens };
@@ -876,6 +939,11 @@ class Parser {
     for (const line of this.lines) for (const continuation of line.leading ?? []) {
       if (!conditionOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions)) {
         fail(continuation.line, "A leading 'and' or 'or' can only continue a condition before its body starts.");
+      }
+    }
+    for (const line of this.lines) for (const continuation of line.conditionalValues ?? []) {
+      if (!valueOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions)) {
+        fail(continuation.line, "An indented trailing 'if' must follow a complete value, not a block header.");
       }
     }
   }

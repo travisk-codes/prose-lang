@@ -38,6 +38,11 @@ the next line, aligned with the header or indented farther. The body starts
 deeper than the first header line. Existing leading-operator layouts stay as
 written when they fit; overlong conditions use the usual reflow rules.
 
+Conditional values can also put `if` and `else` on separate lines, indented more
+than the `return`, assignment, or other expression they continue. The formatter
+preserves fitting layouts, and ordinary function bodies and block conditions
+retain their existing meaning.
+
 The formatter preserves parentheses, strings, patterns, accessors, documentation,
 and program structure. It wraps only where Prose allows a continuation and
 checks the parsed result before returning an edit. A long string or expression
@@ -106,13 +111,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.10.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.11.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.10.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.11.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -137,7 +142,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.10.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.11.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

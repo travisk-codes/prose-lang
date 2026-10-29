@@ -55,11 +55,11 @@ and requires a trusted workspace. Set `prose.check.enabled` to `false` to disabl
 it. Dirty buffers wait until save; highlighting and formatting remain available
 without TypeScript or Workspace Trust.
 
-Install `dist/prose-language-0.1.10.vsix` with **Extensions: Install from VSIX...**
+Install `dist/prose-language-0.1.11.vsix` with **Extensions: Install from VSIX...**
 or run:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.10.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.11.vsix --force
 ```
 
 Reload your VS Code window if an already-open file retains its old coloring.
@@ -573,7 +573,21 @@ print format ("read" if book.done else "to read")
 label is "first" if first else ("second" if second else "neither")
 ```
 
-Continuation lines can break after `if` or `else`, with greater indentation.
+Continuation lines can break before or after `if` and `else`, with greater
+indentation than the expression's first line:
+
+```text
+labels is books.map function takes book
+    return book.title + " (long)"
+        if book.pages > 500
+        else book.title
+```
+
+The same layout works for assignments, `print`, and object property values.
+An `if` aligned with the preceding statement remains a block statement. Function
+bodies and block `else` clauses keep their existing indentation rules. Formatting
+preserves these breaks when they fit the width. The trailing form still requires
+`else`, and nested trailing conditionals still need parentheses.
 
 The prefix form's `else` part extends as far right as it can, so wrap that inline `if`
 in parentheses when more of the expression follows:
