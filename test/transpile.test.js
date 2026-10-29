@@ -158,9 +158,7 @@ test("function declaration, scope, and arity errors report source lines", () => 
     ["function f takes\n    return 1", /Line 1:/],
     ["function f\n    return 1\nfunction f\n    return 2", /Line 3: Duplicate function/],
     ["function f\n    function g\n        return 1", /Line 2:.*top level/],
-    ["function f takes x\n    return x\nprint f", /Line 3: Expected an expression/],
     ["function f takes x, y\n    return x\nprint f 1", /Line 3: Expected ','/],
-    ["function f\n    return 1\nprint f", /Line 3: Expected 'run'/],
     ["function f\n    return 1\nf is 2", /Line 3:.*conflicts/],
     ["function f takes f\n    return 1", /Line 1:.*conflicts/],
     ["function f\n    return 1\nfor f is 1 to 2\n    print f", /Line 3:.*conflicts/]

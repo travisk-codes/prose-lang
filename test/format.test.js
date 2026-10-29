@@ -51,7 +51,7 @@ test("fitting wrapped headers and expressions retain their breaks and continuati
     'listed is labels:some function takes label return',
     '      label = name',
     'lines is (items:map function takes line return',
-    '      (line:replace pattern "[ ]+" everywhere, " "):trim_end run)',
+    '      (line:replace with pattern "[ ]+" everywhere, " "):trim_end run)',
     ''
   ].join('\n');
   layout(source, source);
@@ -90,17 +90,17 @@ test("long lambdas break after return before splitting their body's call argumen
   const prefix = 'function same_tag_name takes label, name\n    return label = name\nfunction check takes labels, name\n';
   layout(prefix + '    listed is labels:some function takes label return same_tag_name label, name',
     prefix + '    listed is labels:some function takes label return\n        same_tag_name label, name\n', { width: 72 });
-  layout('result is (items:map function takes line return (line:replace pattern "[ ]+" everywhere, " "):trim_end run)',
-    'result is (items:map function takes line return\n    (line:replace pattern "[ ]+" everywhere, " "):trim_end run)\n');
+  layout('result is (items:map function takes line return (line:replace with pattern "[ ]+" everywhere, " "):trim_end run)',
+    'result is (items:map function takes line return\n    (line:replace with pattern "[ ]+" everywhere, " "):trim_end run)\n');
 });
 
 test("reflow prefers outer call arguments and object entries to nested call arguments", () => {
-  layout('result is combine (normalize first_argument, second_argument), third_argument, fourth_argument',
-    'result is combine (normalize first_argument, second_argument),\n    third_argument, fourth_argument\n', { width: 76 });
-  layout('result is object first is (normalize first_argument, second_argument), second is third_argument',
-    'result is object first is (normalize first_argument, second_argument),\n    second is third_argument\n', { width: 76 });
-  layout('result is items:map function takes item\n    average is window_average series, (date_from_key key), window, missing_as_zero\n    return average',
-    'result is items:map function takes item\n    average is window_average series, (date_from_key key), window,\n        missing_as_zero\n    return average\n', { width: 72 });
+  layout('result is combine with (normalize with first_argument, second_argument), third_argument, fourth_argument',
+    'result is combine with (normalize with first_argument, second_argument),\n    third_argument, fourth_argument\n', { width: 76 });
+  layout('result is object first is (normalize with first_argument, second_argument), second is third_argument',
+    'result is object first is (normalize with first_argument, second_argument),\n    second is third_argument\n', { width: 76 });
+  layout('result is items:map function takes item\n    average is window_average with series, (date_from_key key), window, missing_as_zero\n    return average',
+    'result is items:map function takes item\n    average is window_average with series, (date_from_key key), window,\n        missing_as_zero\n    return average\n', { width: 72 });
 });
 
 test("header reflow preserves function and tuple parameter types and optional giving", () => {
@@ -166,7 +166,7 @@ test("format preserves parentheses, unary minus, subtraction, accessors, and fun
 test("format never splits or rewrites strings, escapes, or regular expression patterns", () => {
   const source = String.raw`"A long standalone comment that stays on one line because it is a string."
 word is "hello, \"Prose\" 😀"
-print word.replace (pattern "\s+" everywhere), "-"
+print word.replace with (pattern "\s+" everywhere), "-"
 print 0001.00`;
   const formatted = format(source, { width: 30 });
   assert.ok(formatted.includes(String.raw`"hello, \"Prose\" 😀"`));

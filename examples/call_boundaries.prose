@@ -1,0 +1,25 @@
+"Known function counts leave the remaining commas for the array."
+function add takes left, right
+    return left + right
+
+add_value is function takes left, right return left + right
+alias is add
+print add 1, 2, 3
+print add_value 1, 2, 3
+print alias 1, 2, 3
+
+"A callback type supplies its parameter count."
+type Binary is function taking number and number giving number
+function apply takes action as Binary
+    return action 1, 2, 3
+print apply add_value
+
+"Different implementations may have different parameter counts."
+if true
+    action is function takes left, right return left + right
+else
+    action is function takes number return number * 2
+print (action with 1, 2), 3
+
+"JavaScript method signatures are unknown; with marks their argument list."
+print Math.max with 4, 9, 2

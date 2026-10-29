@@ -33,7 +33,7 @@ test("calls through variables, methods, constructors, and run bind before a trai
   assert.deepEqual(run([
     'format is function takes value return "book " + value',
     'print format "Ada" if true else "other"',
-    'print Math.max 2, 7 if false else 11',
+    'print Math.max with 2, 7 if false else 11',
     'print Math.max with 2, 7 if true else 11',
     'greet is function return "hello"', 'print greet run if true else "bye"',
     'collection is new Set if true else null', 'print collection.size'

@@ -110,10 +110,10 @@ const interop = check([
   "",
   '"The day after a YYYY-MM-DD key."',
   "export function nextDay takes key as text, giving text",
-  "    return localDateKey (addDays (dateFromKey key), 1)",
+  "    return localDateKey (addDays with (dateFromKey key), 1)",
   "",
   'seen is new Set ("a", "b", "a")',
-  'print Math:max 4, 9, 2',
+  'print Math:max with 4, 9, 2',
   'document:title is "Written in Prose"'
 ].join("\n"));
 
@@ -134,7 +134,7 @@ const declarations = compile(typed).declarations.split("\n").slice(1).join("\n")
 const errata = [
   { source: "total is 3\nprint totl", token: "totl", message: errorOf("total is 3\nprint totl"),
     note: "Every name has to be assigned, imported, or part of JavaScript, so a typo stops the build." },
-  { source: 'counts is new Map\ncount is 0\ncounts:set "read", count + 1', token: "+", message: errorOf('counts is new Map\ncount is 0\ncounts:set "read", count + 1'),
+  { source: 'counts is new Map\ncount is 0\ncounts:set with "read", count + 1', token: "+", message: errorOf('counts is new Map\ncount is 0\ncounts:set with "read", count + 1'),
     note: "Does the 1 go to the count, or to the result? Prose asks instead of guessing." },
   { source: "ready is true\nif ready count is 5", token: "count", message: errorOf("ready is true\nif ready count is 5"),
     note: "The error message includes the fix." },
@@ -144,7 +144,7 @@ const errata = [
 
 // The compiler itself, for the playground: runtime and transpiler in one script, exporting compile.
 const strip = file => readFileSync(repo + file, "utf8").split("\n").filter(line => !line.startsWith("import ")).join("\n").replace(/^export /gm, "");
-const compiler = `const Prose = (() => {\n${strip("src/runtime.js")}\n${strip("src/check.js")}\n${strip("src/source-map.js")}\n${strip("src/transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`;
+const compiler = `const Prose = (() => {\n${strip("src/runtime.js")}\n${strip("src/check.js")}\n${strip("src/source-map.js")}\n${strip("src/call-arity.js")}\n${strip("src/transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`;
 
 const examples = [
   { name: "Reading list", source: readFileSync(new URL("play.prose", here), "utf8").trim() },

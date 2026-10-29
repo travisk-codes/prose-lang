@@ -22,7 +22,7 @@ print labels.join ", "
 counts is new Map
 for each book in books
     count is counts.get status book otherwise 0
-    counts.set status book, (count + 1)
+    counts.set with status book, (count + 1)
 for each label, count in counts
     print label + ": " + count
 

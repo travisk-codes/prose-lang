@@ -7,7 +7,7 @@ import { inlineScript } from "./scripts.mjs";
 
 const strip = file => readFileSync(new URL("../src/" + file, import.meta.url), "utf8")
   .split("\n").filter(line => !line.startsWith("import ")).join("\n").replace(/^export /gm, "");
-const browserCompiler = inlineScript(`(() => {\n${strip("runtime.js")}\n${strip("check.js")}\n${strip("source-map.js")}\n${strip("transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`);
+const browserCompiler = inlineScript(`(() => {\n${strip("runtime.js")}\n${strip("check.js")}\n${strip("source-map.js")}\n${strip("call-arity.js")}\n${strip("transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`);
 
 test("checking output also works in the browser bundle without TypeScript installed", () => {
   const browser = runInNewContext(browserCompiler, { TextEncoder });

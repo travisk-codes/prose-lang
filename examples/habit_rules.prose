@@ -10,7 +10,7 @@ export function longest_streak takes days
     previous is unset
     for each day in unique
         current is if day = (previous otherwise -2) + 1 then current + 1 else 1
-        best is Math.max best, current
+        best is Math.max with best, current
         previous is day
     return best
 

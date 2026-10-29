@@ -207,8 +207,8 @@ test("the runtime option imports the helpers instead of embedding them", async (
 test("a value followed directly by an argument is a call, with or without with", () => {
   assert.deepEqual(run([
     'words is "a", "b", "c"', 'print words:join "-"', 'print words:join with "-"',
-    "print Math:max 4, 9, 2", "print (words:slice 1):join run",
-    "counts is new Map", 'counts:set "a", (2 + 1)', 'print counts:get "a"', 'print counts:get "z" otherwise 0',
+    "print Math:max with 4, 9, 2", "print (words:slice 1):join run",
+    "counts is new Map", 'counts:set with "a", (2 + 1)', 'print counts:get "a"', 'print counts:get "z" otherwise 0',
     'seen is new Set ("x", "y", "x")', "print seen:size",
     "doubled is (1, 2):map function takes n return n * 2", "print doubled",
     'shout is function takes text return text:toUpperCase run', 'print shout "hi"',
@@ -261,8 +261,8 @@ test("inline if bodies may start with then, which is needed when the condition e
 });
 
 test("calls by adjacency follow the comma and arithmetic rules, and a missing operator fails when it runs", () => {
-  assert.throws(() => transpile("counts is new Map\ncounts:set 1, 2 + 1"), /ambiguous\. Put the last argument in parentheses/);
-  assert.throws(() => transpile("print Math:max Math:min 1, 2"), /needs parentheses: \(f a, b\)/);
+  assert.throws(() => transpile("counts is new Map\ncounts:set with 1, 2 + 1"), /ambiguous\. Put the last argument in parentheses/);
+  assert.throws(() => transpile("print Math:max Math:min with 1, 2"), /needs parentheses: \(f a, b\)/);
   assert.throws(() => run("total is 3\ncount is 4\nprint total count"), /Line 3: Only functions can be called/);
 });
 

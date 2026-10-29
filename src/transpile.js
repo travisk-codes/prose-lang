@@ -1,6 +1,7 @@
 import { runtimeHelpers, runtimeSource } from "./runtime.js";
 import { checkPrelude } from "./check.js";
 import { inlineSourceMap, sourceMapBuilder } from "./source-map.js";
+import { callScopeKey, inferCallArities } from "./call-arity.js";
 
 const reserved = new Set([
   "if", "else", "for", "is", "to", "print", "and", "or", "not",
@@ -62,9 +63,10 @@ const typeTests = {
   object: value => `__prose_is_object(${value})`
 };
 
-function fail(line, message) {
+function fail(line, message, details) {
   const error = new SyntaxError(`Line ${line}: ${message}`);
   error.line = line;
+  if (details) Object.assign(error, details);
   throw error;
 }
 
@@ -140,8 +142,9 @@ const precedence = {
 };
 
 class Expression {
-  constructor(tokens, line, functions = new Map()) {
+  constructor(tokens, line, functions = new Map(), callAnalysis = null, callScope = null, loose = true) {
     this.tokens = tokens; this.line = line; this.functions = functions; this.pos = 0;
+    this.callAnalysis = callAnalysis; this.callScope = callScope; this.loose = loose;
     // Functions on this line whose bodies are the indented lines after it.
     this.blockFunctions = [];
     // How many call argument lists the parser is inside, outside parentheses.
@@ -169,7 +172,8 @@ class Expression {
     const next = this.peek();
     if (isWord(next, "if") && this.trailingIf()) return false;
     if (next.type === "symbol" && next.value === "-" && next.spaced && this.tokens[this.pos + 1] && !this.tokens[this.pos + 1].spaced) {
-      fail(this.line, "'-' here could start a negative argument or subtract. Write with before a negative argument (items:at with -1), or put spaces around a minus that subtracts.");
+      if (!this.loose) fail(this.line, "'-' here could start a negative argument or subtract. Write with before a negative argument (items:at with -1), or put spaces around a minus that subtracts.");
+      return true;
     }
     if (next.type === "number" || next.type === "string") return true;
     if (next.type === "symbol") return next.value === "(";
@@ -311,27 +315,34 @@ class Expression {
     return { type: "array", elements };
   }
   // The arguments after `with`: every comma-separated value up to the end of the list.
-  arguments() {
+  arguments(explicit = true) {
+    const first = this.peek();
     const nested = this.argumentDepth > 0;
     this.argumentDepth++;
     const args = [this.parse(60)];
+    if (!explicit && this.at(",") && !this.loose) {
+      fail(this.tokens[this.pos].source?.line ?? this.line,
+        "This call's parameter count is unknown, so the comma could separate arguments or array elements. Use with for arguments, or close the call in parentheses before the comma.",
+        { code: "PROSE_CALL_BOUNDARY", callBoundary: first?.source && { line: first.source.line, column: first.source.start, text: "with " } });
+    }
     while (this.at(",")) { this.take(","); args.push(this.parse(60)); }
     this.argumentDepth--;
-    if (nested && args.length > 1) {
+    if (nested && args.length > 1 && !this.loose) {
       fail(this.line, "Inside another call's arguments, a call with several arguments needs parentheses: (f a, b).");
     }
-    this.noArithmeticAfterArguments();
+    if (explicit) this.noArithmeticAfterArguments();
     return args;
   }
   // Readers split `f a, b + 1` both ways, so neither reading is chosen silently.
   noArithmeticAfterArguments() {
+    if (this.loose) return;
     const next = this.peek();
     if ((next?.type === "symbol" && "+-*/%".includes(next.value)) || isWord(next, "mod") || isWord(next, "xor") || this.shiftAt()) {
       fail(this.line, `'${next.value}' right after a call's arguments is ambiguous. Put the last argument in parentheses to include it, or the whole call to use its result.`);
     }
   }
-  call(name) {
-    const { params, builtin } = this.functions.get(name);
+  call(name, signature = this.functions.get(name), callee = null) {
+    const { params, builtin } = signature;
     const args = [];
     if (this.at("with")) {
       this.take("with");
@@ -356,7 +367,23 @@ class Expression {
     if (args.some(arg => arg.type === "spread")) {
       fail(this.line, `'${name}' takes a fixed number of arguments, so 'each of' can't spread a list into it.`);
     }
-    return { type: "call", name, args, builtin, line: this.line };
+    return callee ? { type: "invoke", callee, args, line: this.line } : { type: "call", name, args, builtin, line: this.line };
+  }
+  calleeArity(node) {
+    if (node.type === "name") return this.callScope?.lookup(node.value) ?? this.functions.get(node.value)?.params.length ?? null;
+    if (node.type === "lambda") return node.params.length;
+    if (node.type === "conditional") {
+      const left = this.calleeArity(node.then), right = this.calleeArity(node.otherwise);
+      return left === right ? left : null;
+    }
+    return null;
+  }
+  startsArguments() {
+    const next = this.peek();
+    if (!next) return false;
+    if (this.at("if") && this.trailingIf()) return false;
+    return ["number", "string", "pattern"].includes(next.type) || next.type === "symbol" && ["(", "-"].includes(next.value) ||
+      next.type === "word" && (!reserved.has(next.value) || ["function", "if", "new", "not", "maybe", "array", "object", "unset", "true", "false", "null", "each"].includes(next.value));
   }
   // `takes` names, each optionally followed by `as` and a type, then an optional `giving` type.
   parameters() {
@@ -472,16 +499,20 @@ class Expression {
     }
     return { type: "pattern", literal: `/${regex.source}/${regex.flags}` };
   }
-  lambda() {
+  lambda(token) {
     const { names, types, returns } = this.parameters();
     const node = { type: "lambda", params: names, types, returns, line: this.line };
+    Object.defineProperty(node, "callScopeKey", { value: callScopeKey(token) });
     if (this.at("return")) {
       this.take("return");
       // A function's result is its own expression, even inside a Prose call's arguments.
       const adjacent = this.adjacentValues;
+      const scope = this.callScope;
+      this.callScope = this.callAnalysis?.scopes.get(node.callScopeKey) ?? null;
       this.adjacentValues = 0;
       node.value = this.parse();
       this.adjacentValues = adjacent;
+      this.callScope = scope;
     } else {
       node.body = [];
       this.blockFunctions.push(node);
@@ -553,7 +584,7 @@ class Expression {
       left = this.parse(70);
       markMaybe(left);
     } else if (token.value === "function") {
-      left = this.lambda();
+      left = this.lambda(token);
     } else if (token.value === "if") {
       const condition = this.parse();
       this.take("then");
@@ -570,10 +601,12 @@ class Expression {
       }
       const args = [];
       if (this.at("with")) {
-        this.take("with");
-        args.push(...this.arguments());
+        const count = this.calleeArity(callee);
+        if (count === null) { this.take("with"); args.push(...this.arguments()); }
+        else args.push(...this.call(callee.value ?? "constructor", { params: new Array(count) }, callee).args);
       } else if (this.peek() && this.callsByAdjacency({ type: "name" })) {
-        args.push(...this.arguments());
+        const count = this.calleeArity(callee);
+        args.push(...(count === null ? this.arguments(false) : this.call(callee.value ?? "constructor", { params: new Array(count) }, callee).args));
       }
       left = { type: "new", callee, args, line: this.line };
     } else if (token.value === "not" || token.value === "-") {
@@ -589,9 +622,12 @@ class Expression {
       this.take("for");
       left = { type: "await", value: this.parse(60), line: this.line };
     } else if (token.type === "word" && !reserved.has(token.value)) {
-      left = this.functions.has(token.value)
-        ? this.call(token.value)
-        : { type: "name", value: token.value, line: this.line };
+      left = located({ type: "name", value: token.value, line: this.line }, token);
+      const count = this.calleeArity(left);
+      if (count !== null && (this.functions.get(token.value)?.builtin || this.at("with") || this.at("run") || count > 0 && this.startsArguments())) {
+        left = this.functions.has(token.value) ? this.call(token.value)
+          : this.call(token.value, { params: new Array(count) }, left);
+      }
     } else {
       fail(this.line, `Unexpected token ${JSON.stringify(token.value)} in expression.`);
     }
@@ -628,18 +664,25 @@ class Expression {
         continue;
       }
       if (this.at("with") && min <= 70) {
-        this.take("with");
-        left = { type: "invoke", callee: left, args: this.arguments(), line: this.line };
+        const count = this.calleeArity(left);
+        if (count === null) {
+          this.take("with");
+          left = { type: "invoke", callee: left, args: this.arguments(), line: this.line };
+        } else left = this.call(left.value ?? "function", { params: new Array(count) }, left);
         continue;
       }
       if (this.at("run") && min <= 70) {
+        const count = this.calleeArity(left);
+        if (count !== null && count > 0) fail(this.line, `This function takes ${count} argument${count === 1 ? "" : "s"}; run supplies none.`);
         this.take("run");
         left = { type: "invoke", callee: left, args: [], line: this.line };
         continue;
       }
       if (min <= 70 && this.callsByAdjacency(left)) {
         this.adjacentCall = true;
-        left = { type: "invoke", callee: left, args: this.arguments(), line: this.line };
+        const count = this.calleeArity(left);
+        left = count === null ? { type: "invoke", callee: left, args: this.arguments(false), line: this.line }
+          : this.call(left.value ?? "function", { params: new Array(count) }, left);
         continue;
       }
       // Type tests rank with comparisons, and shifts with multiplication.
@@ -729,10 +772,10 @@ function conditionStart(tokens) {
 }
 
 // Once function argument counts are known, make sure no inline body has started.
-function conditionOnly(line, functions) {
+function conditionOnly(line, functions, analysis, scope, loose) {
   const start = conditionStart(line.tokens);
   if (!start) return false;
-  const expr = new Expression(line.tokens.slice(start), line.line, functions);
+  const expr = new Expression(line.tokens.slice(start), line.line, functions, analysis, scope, loose);
   expr.parse();
   return !expr.peek() && !expr.blockFunctions.length;
 }
@@ -756,10 +799,10 @@ function valueStart(tokens) {
   return start;
 }
 
-function valueOnly(line, functions) {
+function valueOnly(line, functions, analysis, scope, loose) {
   const start = valueStart(line.tokens);
   if (start < 0 || start >= line.tokens.length) return false;
-  const expr = new Expression(line.tokens.slice(start), line.line, functions);
+  const expr = new Expression(line.tokens.slice(start), line.line, functions, analysis, scope, loose);
   const value = expr.list();
   const objectBody = value.type === "object" && !value.inline && !value.grouped;
   return !expr.peek() && !expr.blockFunctions.length && !objectBody;
@@ -847,7 +890,8 @@ function exportsOf(source) {
       values.add(tokens[1].value);
     }
   }
-  return { functions, values };
+  const { analysis } = discoverCallArities(source, {}, false);
+  return { functions, values, valueArities: new Map([...values].map(name => [name, analysis.root.lookup(name)])) };
 }
 
 function readExports(use, readModule) {
@@ -897,11 +941,13 @@ function destructuresAt(tokens, pos) {
 }
 
 class Parser {
-  constructor(source, options = {}) {
+  constructor(source, options = {}, analysis = null, loose = true, readImports = true) {
     this.pos = 0;
     // How many loops enclose the line being parsed, within the current function.
     this.loopDepth = 0;
-    this.lines = sourceLines(source, { locations: Boolean(options.sourceMap) });
+    this.lines = sourceLines(source, { locations: true });
+    this.callAnalysis = analysis; this.callScope = analysis?.root ?? null; this.loose = loose;
+    this.lineScopes = new Map(); this.valueArities = new Map();
     // Discover top-level signatures before parsing calls, supporting forward recursion.
     this.functions = new Map(["length", "char_to_number", "number_to_char"].map(name =>
       [name, { name, params: ["value"], builtin: true }]
@@ -917,7 +963,7 @@ class Parser {
     for (const line of this.lines.filter(line => line.indent === 0 && isWord(line.tokens[0], "use"))) {
       const use = useStatement(line.tokens, line.line);
       if (use.typeOnly) continue;
-      const exported = use.source.endsWith(".prose") ? readExports(use, options.readModule) : null;
+      const exported = readImports && use.source.endsWith(".prose") ? readExports(use, options.readModule) : null;
       for (const name of use.names) {
         const header = exported?.functions.get(name);
         if (header) {
@@ -927,6 +973,7 @@ class Parser {
           fail(use.line, `"${use.source}" doesn't export '${name}'.`);
         } else {
           values.push([name, use.line]);
+          this.valueArities.set(name, exported?.valueArities.get(name) ?? null);
         }
       }
     }
@@ -934,21 +981,33 @@ class Parser {
       for (const param of header.params) this.checkVariable(param, header.line);
     }
     for (const [name, line] of values) this.checkVariable(name, line);
+  }
+  validateContinuations() {
     // Recheck with declared/imported argument counts: a string after the last
     // argument can already be an inline body, rather than part of a call.
     for (const line of this.lines) for (const continuation of line.leading ?? []) {
-      if (!conditionOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions)) {
+      if (!conditionOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions, this.callAnalysis, this.lineScopes.get(line), this.loose)) {
         fail(continuation.line, "A leading 'and' or 'or' can only continue a condition before its body starts.");
       }
     }
     for (const line of this.lines) for (const continuation of line.conditionalValues ?? []) {
-      if (!valueOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions)) {
+      if (!valueOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions, this.callAnalysis, this.lineScopes.get(line), this.loose)) {
         fail(continuation.line, "An indented trailing 'if' must follow a complete value, not a block header.");
       }
     }
   }
   expression(line, tokens = line.tokens) {
-    return new Expression(tokens, line.line, this.functions);
+    this.lineScopes.set(line, this.callScope);
+    return new Expression(tokens, line.line, this.functions, this.callAnalysis, this.callScope, this.loose);
+  }
+  program() {
+    try { return this.block(); }
+    catch (error) {
+      // A malformed continuation can make a later body look misindented.
+      // Prefer the diagnostic at the continuation that caused it.
+      this.validateContinuations();
+      throw error;
+    }
   }
   checkVariable(name, line) {
     if (this.functions.has(name)) fail(line, `Variable '${name}' conflicts with a function name.`);
@@ -987,16 +1046,17 @@ class Parser {
     if (functions.length > 1 || (functions.length && value?.type === "object" && !value.inline)) {
       fail(line.line, "Only one indented body can follow a line.");
     }
-    if (functions.length) functions[0].body = this.functionBody(line);
+    if (functions.length) functions[0].body = this.functionBody(line, functions[0]);
     else if (value?.type === "object" && !value.inline) this.objectBody(value, line);
   }
   // A function's body starts outside any loop, so skip and stop can't reach a loop around the function.
-  functionBody(line) {
+  functionBody(line, fn) {
     const loops = this.loopDepth;
+    const scope = this.callScope;
     this.loopDepth = 0;
-    const body = this.body(line, true);
-    this.loopDepth = loops;
-    return body;
+    this.callScope = this.callAnalysis?.scopes.get(fn ? callScopeKey(fn) : callScopeKey(line.tokens[0])) ?? null;
+    try { return this.body(line, true); }
+    finally { this.loopDepth = loops; this.callScope = scope; }
   }
   loopBody(line, inFunction) {
     this.loopDepth++;
@@ -1123,7 +1183,7 @@ class Parser {
       const startsCall = first?.value === "(" || isWord(first, "new") || isWord(first, "maybe") ||
         (first?.type === "word" && !reserved.has(first.value));
       const value = startsCall ? expr.parse() : null;
-      if (!["call", "invoke", "new", "await"].includes(value?.type)) {
+      if (!startsCall || !this.loose && !["call", "invoke", "new", "await"].includes(value?.type)) {
         fail(expr.line, "Expected assignment, print, return, a string expression, or a function call; this syntax is not supported yet.");
       }
       node = { type: "expression", value };
@@ -1292,7 +1352,7 @@ function awaits(node) {
 function createScope(params, body, parent) {
   const locals = assignedNames(body);
   for (const param of params) locals.delete(param);
-  return { parent, locals, names: new Set([...params, ...locals.keys()]), imports: new Set() };
+  return { parent, locals, names: new Set([...params, ...locals.keys(), ...body.filter(node => node.type === "function").map(node => node.name)]), imports: new Set() };
 }
 
 function resolve(node, scope) {
@@ -1489,7 +1549,36 @@ function declarationsFor(program) {
 
 /** Parse a program, also used to verify that formatting preserves its meaning. */
 export function parse(source, options = {}) {
-  return new Parser(source, options).block();
+  const modules = new Map();
+  const settings = { ...options, readModule: options.readModule && (specifier => {
+    if (!modules.has(specifier)) modules.set(specifier, options.readModule(specifier));
+    return modules.get(specifier);
+  }) };
+  const { analysis } = discoverCallArities(source, settings);
+  const final = new Parser(source, settings, analysis, false);
+  const result = final.program();
+  final.validateContinuations();
+  return result;
+}
+
+function discoverCallArities(source, settings, readImports = true) {
+  const discovery = new Parser(source, settings, null, true, readImports);
+  let analysis = inferCallArities(discovery.program(), discovery.functions, discovery.valueArities);
+  const invalidated = new Set();
+  for (let iteration = 0; iteration < 64; iteration++) {
+    const parser = new Parser(source, settings, analysis, true, readImports);
+    const program = parser.program();
+    let next = inferCallArities(program, parser.functions, parser.valueArities, invalidated);
+    for (const [key, before] of analysis.scopes) for (const [name, count] of before.bindings) {
+      if (count !== null && next.scopes.get(key)?.bindings.get(name) !== count) invalidated.add(`${key}/${name}`);
+    }
+    next = inferCallArities(program, parser.functions, parser.valueArities, invalidated);
+    if (next.fingerprint === analysis.fingerprint) {
+      return { analysis: next };
+    }
+    analysis = next;
+  }
+  fail(1, "Call boundaries could not be inferred consistently. Use with to make the argument lists explicit.");
 }
 
 /**

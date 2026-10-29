@@ -10,20 +10,20 @@ function check_in takes day, note
 "Each call takes its own two arguments,"
 "so commas between calls separate the check-ins."
 log is new Map
-log.set "Stretch", (
+log.set with "Stretch", (
     check_in 1, "stiff",
     check_in 2, unset,
     check_in 3, "loose",
     check_in 5, unset
     )
-log.set "Read", (
+log.set with "Read", (
     check_in 1, unset,
     check_in 2, "two chapters",
     check_in 3, unset,
     check_in 4, unset,
     check_in 5, unset
     )
-log.set "Walk", (check_in 4, unset,)
+log.set with "Walk", (check_in 4, unset,)
 
 "for each takes Map entries apart. Imported Prose functions keep their argument"
 "counts; with leaves out an optional one."

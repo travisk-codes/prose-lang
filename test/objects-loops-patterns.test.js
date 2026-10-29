@@ -23,7 +23,7 @@ test("inline objects work as arguments, returns, list elements, and function res
   assert.deepEqual(run([
     "runs is array", "runs:push object start is 1, end is 2, length is 2", "print runs",
     "function bounds takes low, high", "    return object low, high, span is high - low", "print bounds 2, 9",
-    "hours is Array:from (object length is 3), function takes ignored, hour return hour * 2", "print hours",
+    "hours is Array:from with (object length is 3), function takes ignored, hour return hour * 2", "print hours",
     "pairs is (object n is 1), (object n is 2)", "print pairs",
     "make is function takes n return object n, double is n * 2", "print make 4",
     "handler is object", '    label is "save"', "print handler"
@@ -47,7 +47,7 @@ test("indented object bodies accept like lines, and inline objects may hold an i
 test("inline objects follow the comma rules and reject other entries", () => {
   for (const [source, expected] of [
     ["print object a is 1, 2", /Line 1: Expected an object entry/],
-    ["print object a is Math:max 1, 2", /Line 1:.*needs parentheses/],
+    ["print object a is Math:max with 1, 2", /Line 1:.*needs parentheses/],
     ["x is object a is 1\n    b is 2", /Line 2: Unexpected indentation/],
     ["value is 1\nprint object like", /Line 2: Expected an expression/]
   ]) assert.throws(() => transpile(source), expected, source);
@@ -119,10 +119,10 @@ test("skip and stop must be inside a loop of the same function", () => {
 test("patterns are regular expressions with raw text, flag words, and Unicode always on", () => {
   assert.deepEqual(run([
     'print ("2026-10-28":match pattern "^(\\d{4})-(\\d{2})").2',
-    'print "a  b   c":replace (pattern "\\s+" everywhere), " "',
+    'print "a  b   c":replace with (pattern "\\s+" everywhere), " "',
     'print "Hello":match pattern "hello" ignoring case = null',
     'print ("one\\ntwo":match pattern "^two$" by line) != null',
-    'print "say \\"hi\\"":replace (pattern "\\"" everywhere), "\'"',
+    'print "say \\"hi\\"":replace with (pattern "\\"" everywhere), "\'"',
     'print "😀":match pattern "^.$" != null',
     'print "#mood and #sleep":match pattern "#(\\p{L}+)" everywhere',
     'print pattern "x" everywhere ignoring case by line:flags',

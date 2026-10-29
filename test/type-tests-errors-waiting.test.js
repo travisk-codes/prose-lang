@@ -119,7 +119,7 @@ test("xor and shifts work on 32-bit integers, binding like multiplication", () =
     "print 1 + 2 xor 3", "print (1 + 2) xor 3", "print 3 shifted left by 1 + 1",
     "left is 8", "right is 2", "print left shifted right by right"
   ].join("\n")), [5, 16, 15, 2, 0, 7, 2]);
-  assert.throws(() => transpile("print Math:max 1, 2 xor 3"), /'xor' right after a call's arguments is ambiguous/);
+  assert.throws(() => transpile("print Math:max with 1, 2 xor 3"), /'xor' right after a call's arguments is ambiguous/);
 });
 
 test("a computed property reads and writes the property a value names", () => {

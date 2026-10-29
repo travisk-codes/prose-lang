@@ -331,7 +331,9 @@ print (multiply 2, 3) + 4
 These print `14` and `10`, respectively. With several arguments, arithmetic
 right after the last one could belong to it or to the call's result, so
 `multiply 2, 3 + 4` is a syntax error, as it is for JavaScript calls. A call
-consumes the declared number of arguments. Nested calls follow the same rule; parentheses make grouping explicit.
+consumes the declared number of arguments. This also applies to function values,
+aliases, and callbacks with a known function type. Nested calls follow the same
+rule; parentheses make grouping explicit.
 Missing arguments produce a syntax error. A comma after a complete call starts
 another array element, as described below.
 
@@ -567,7 +569,7 @@ how Prose counts positions.
 
 ```text
 if text:match pattern "^\d{4}$" then print "a year"
-clean is name:replace (pattern "\s*\([^()]*\)$"), ""
+clean is name:replace with (pattern "\s*\([^()]*\)$"), ""
 tags is note:match pattern "#(\p{L}+)" everywhere
 ```
 
@@ -718,9 +720,44 @@ labels is books:map function takes book
 ```
 
 A function with an indented body can appear anywhere on a line, including
-before other arguments (`later function, 5`), but only one per line, and
+before other arguments (`later with function, 5`), but only one per line, and
 not in `if`, `while`, or `for` lines or inline conditionals. Call a function
 value by putting its arguments after it (`shout "hi"`), or `run` when it takes none.
+
+Named functions and function values use the same argument boundaries:
+
+```text
+function add takes left, right
+    return left + right
+
+add_value is function takes left, right return left + right
+alias is add_value
+print add 1, 2, 3
+print add_value 1, 2, 3
+print alias 1, 2, 3
+```
+
+All three print `[3, 3]`: the two-argument call finishes before the last comma.
+A named function can also be used as a value (`alias is add`). A function type
+supplies the same boundary for a callback:
+
+```text
+function apply takes action as function taking number and number giving number
+    return action 1, 2, 3
+```
+
+Inference uses all assignments to a binding in its function or program scope,
+including branches and loops. Implementations with the same parameter count
+keep that count. Different counts, an untyped parameter, or a value whose
+signature cannot be proved leave the count unknown. Reassignment is allowed;
+Prose does not guess boundaries from a runtime function's `length`.
+
+An unknown-count call can take one argument or use `run`. A comma requires an
+explicit boundary: `action with 1, 2` passes two arguments, while `(action 1), 2`
+is an array containing a one-argument call and `2`. For a two-argument call
+followed by an array element, write `(action with 1, 2), 3`. Parentheses alone
+can contain an array, so `(action 1, 2)` still needs `with`. These are parsing
+rules; whether the arguments have valid types is checked separately.
 
 Function values can read the variables around them. Like named functions,
 assigning a name inside one creates a local: it does not change an outer
@@ -734,34 +771,35 @@ When no Prose variable has the name, common JavaScript globals are available:
 `Promise`, `console`, `document`, `window`, `localStorage`, `fetch`, and more.
 
 A name, property, position, or parenthesized value followed directly by a
-value is a call, and the value and any comma-separated values after it are its
+value is a call. For an unknown parameter count, use `with` before multiple
 arguments. `run` calls with no arguments. Create objects with `new`:
 
 ```text
 print name:toUpperCase run
 print words:join ", "
 seen is new Set ("a", "b", "a")
-print Math:max 3, 9, 4
+print Math:max with 3, 9, 4
+date is new Date with 2026, 0, 1
 ```
 
 Prose cannot tell whether `items:pop` is a property or a method, or how many
 arguments a JavaScript function takes, so these rules decide instead. `with`
-may still come before the arguments (`words:join with ", "`), and it is
-needed in one place: before a negative first argument. Prose reads
+also works with one argument (`words:join with ", "`), and can introduce a
+negative first argument. Prose reads
 `items:at -1` as ambiguous (the space before the minus but not after suggests
 a negative number) and asks for `items:at with -1`, `items:at (-1)`, or a
 spaced `items:at - 1` to subtract.
 
-A call takes every comma-separated value that follows it. Two places where
-that could be read two ways are syntax errors, so a program never silently
-means the other reading:
+A `with` call takes every comma-separated value that follows it. An unknown
+call without `with` followed by a comma is a syntax error. Two other places
+where a call could be read two ways also require explicit parentheses:
 
-- Arithmetic right after the arguments. `counts:set key, count + 1`
+- Arithmetic right after explicit arguments. `counts:set with key, count + 1`
   could add one to the count or to the call's result. Write
-  `counts:set key, (count + 1)` or `(counts:get key) + 1`.
+  `counts:set with key, (count + 1)` or `(counts:get key) + 1`.
 - A call with several arguments inside another call's arguments.
-  `addDays dateFromKey key, 1` could pass the `1` to either call.
-  Write `addDays (dateFromKey key), 1`.
+  `outer with inner with 1, 2` could pass the `2` to either call.
+  Write `outer with (inner with 1, 2)`.
 
 Comparisons, `and`, `or`, and `otherwise` after a call apply to its result:
 `counts:get key otherwise 0` and `localDateKey day = key` need no
@@ -778,7 +816,7 @@ Because any variable can hold a function, a missing operator such as
 can be called."
 
 JavaScript methods keep their JavaScript behavior, including zero-based
-positions: `words:slice 0, 2` takes the first two items, while `words.1`
+positions: `words:slice with 0, 2` takes the first two items, while `words.1`
 reads the first item. `:` reads properties of any value except `null` and
 unset, including strings (`name:length` is JavaScript's UTF-16 length; the
 standard-library `length` counts code points). Property assignment requires
@@ -1063,7 +1101,7 @@ updated is object like tag, value is title
 Later entries replace earlier ones, so `updated` is a copy of `tag` with a new
 `value`. An indented body can also contain `like` lines. Like a call, a
 one-line object takes every comma after it, so put it in parentheses when more
-arguments or list items follow: `Array:from (object length is 24), make_hour`.
+arguments or list items follow: `Array:from with (object length is 24), make_hour`.
 
 Run `npm.cmd run example:objects` to try the example.
 

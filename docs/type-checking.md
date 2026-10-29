@@ -182,7 +182,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.15 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.16 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.

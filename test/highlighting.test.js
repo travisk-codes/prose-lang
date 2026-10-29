@@ -188,8 +188,8 @@ test("type annotations, type declarations, and type imports have type scopes onl
   hasScope('use type Datum from "../types"', "type", "keyword.other.prose");
   hasScope('use type Datum from "../types"', "Datum", "support.class.prose");
   hasScope("seen is new Set items", "Set", "support.class.prose");
-  hasScope("print Math:max 4, 9", "Math", "support.class.prose");
-  hasScope("print Math:max 4, 9", "max", "variable.other.property.prose");
+  hasScope("print Math:max with 4, 9", "Math", "support.class.prose");
+  hasScope("print Math:max with 4, 9", "max", "variable.other.property.prose");
   hasScope("print total", "total", "variable.other.readwrite.prose");
   hasScope("for number is 1 to 10", "number", "variable.other.iterator.prose");
   hasScope("print text + number", "number", "variable.other.readwrite.prose");
@@ -197,7 +197,7 @@ test("type annotations, type declarations, and type imports have type scopes onl
 });
 
 test("patterns, inline objects, spreads, destructuring, and loop control have scopes", () => {
-  const replace = 'clean is name:replace (pattern "\\s*\\([^()]*\\)$" everywhere ignoring case), ""';
+  const replace = 'clean is name:replace with (pattern "\\s*\\([^()]*\\)$" everywhere ignoring case), ""';
   hasScope(replace, "pattern", "keyword.other.prose");
   hasScope(replace, "\\s*", "string.regexp.prose");
   hasScope(replace, "\\s*", "constant.character.escape.prose");

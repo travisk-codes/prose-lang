@@ -172,19 +172,19 @@ print after function, 5
 
 "--- JavaScript: globals, methods called with the values after them, run for"
 "none, and new."
-print Math.max 4, 9, 2
+print Math.max with 4, 9, 2
 print (Math.round (10 / 3)).to_fixed 1
 print "Prose".to_upper_case run
 print JSON.stringify point
 seen is new Set ("a", "b", "a")
 print seen.size
 lookup is new Map
-lookup.set "key", ("val" + "ue")
+lookup.set with "key", ("val" + "ue")
 "Parentheses say what a call's result does next, and which call gets each"
 "argument."
 print (lookup.get "key") + "!"
-print Math.max (Math.min 5, 8), 6
-"with is optional, and needed before a negative first argument."
+print Math.max with (Math.min with 5, 8), 6
+"with bounds unknown argument counts, and allows a negative first argument."
 print Math.min with 3, 1
 print numbers.at with -1
 "then starts an inline if's body when the condition ends in a call."
@@ -229,7 +229,7 @@ print picked
 date is "2026-10-28"
 year, month are (date.match pattern "^(\d{4})-(\d{2})").slice 1
 print year + "/" + month
-print "a  b   c".replace pattern "\s+" everywhere, " "
+print "a  b   c".replace with pattern "\s+" everywhere, " "
 print "Prose".match pattern "^prose$" ignoring case != null
 
 "--- Types: optional annotations that describe exports to TypeScript. They"
@@ -245,7 +245,7 @@ export function distance takes
     from_point as Point,
     to_point as Point,
 giving number
-    return Math.hypot (to_point.x - from_point.x), (to_point.y - from_point.y)
+    return Math.hypot with (to_point.x - from_point.x), (to_point.y - from_point.y)
 export function welcome takes name as text, giving Greeting
     return greet name, "."
 origin as Point is make_point 0, 0

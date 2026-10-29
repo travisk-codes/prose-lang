@@ -152,13 +152,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.15.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.16.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.15.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.16.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -183,7 +183,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.15.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.16.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.
