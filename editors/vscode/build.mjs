@@ -4,7 +4,7 @@ import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 
 const output = new URL("./dist/formatter/", import.meta.url);
 mkdirSync(output, { recursive: true });
-for (const name of ["format.js", "transpile.js", "runtime.js"]) {
+for (const name of ["format.js", "transpile.js", "runtime.js", "source-map.js"]) {
   copyFileSync(new URL(`../../src/${name}`, import.meta.url), new URL(name, output));
 }
 writeFileSync(new URL("package.json", output), '{"type":"module"}\n');

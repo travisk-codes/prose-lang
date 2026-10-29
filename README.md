@@ -103,6 +103,47 @@ inside this repository) and call `format(source, { width: 80, readModule })`.
 As with the compiler, `readModule(path)` supplies the text of imported Prose
 files when their function signatures are needed.
 
+## Source maps and debugging
+
+`node bin/prose.js program.prose --run` enables source maps automatically.
+Runtime errors show stack frames pointing to the original `.prose` files,
+including imported modules and asynchronous functions. Syntax errors retain
+their short file-and-line messages.
+
+JavaScript printed by the CLI includes an inline source map with the original
+Prose text. To use it after saving the output, enable Node's source-map support:
+
+```powershell
+node bin/prose.js examples/fizzbuzz.prose > fizzbuzz.js
+node --enable-source-maps fizzbuzz.js
+```
+
+The Vite plugin returns maps for each transformed Prose file. Vite can compose
+them with later transforms; use `build: { sourcemap: true }` to include maps in
+a production build. In the playground, a runtime error displays its Prose line
+and column, with the mapped stack trace in Output. Browser developer tools can
+also read the worker program's inline map.
+
+The compiler API accepts `sourceMap: true` to return a separate map, or
+`sourceMap: "inline"` to append it to the JavaScript as well:
+
+```javascript
+const { code, map } = compile(source, {
+    filename: "notes.prose",
+    sourceMap: true
+});
+```
+
+Maps follow [ECMA-426](https://tc39.es/ecma426/) and are off by default in the
+compiler API (`map` is then `null`). They include
+the original source and locations at statement and expression starts, including
+continuation lines. Generated runtime helpers and local declarations remain
+unmapped. Debugger breakpoints use the Prose locations; debugger locals still
+use the generated JavaScript bindings.
+
+If registering the Node loader yourself, start Node with `--enable-source-maps`
+or call `process.setSourceMapsEnabled(true)` before importing Prose files.
+
 ## Landing page
 
 The source of the Prose landing page, including a playground that runs this
@@ -765,7 +806,7 @@ are recompiled. For TypeScript, generate a declaration file beside each Prose
 file, such as `dates.d.prose.ts` (see [Types](#types)), and enable
 `allowArbitraryExtensions` in `tsconfig.json`.
 
-`compile(source, options)` returns `{ code, module }`; `transpile(source, options)`
+`compile(source, options)` returns `{ code, map, module, declarations }`; `transpile(source, options)`
 returns only the code. Options:
 
 - `runtime`: a module path to import the runtime helpers from instead of
@@ -773,6 +814,10 @@ returns only the code. Options:
 - `readModule(path)`: returns the source of an imported `.prose` file, for
   reading its exported functions. Compiling a file that imports one without
   this option is an error. The CLI and the Vite plugin provide it.
+- `sourceMap`: `true` for a separate map, `"inline"` to embed it too, or `false`
+  (the default) to omit it.
+- `filename`: the original source path or URL recorded in a map; defaults to
+  `program.prose`. The CLI and Vite plugin supply it automatically.
 
 To run `.prose` files in your own Node.js program, register the module hook in
 `src/node-hooks.js` with `module.register`; the CLI's `--run` does this.

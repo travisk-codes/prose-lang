@@ -25,14 +25,18 @@ if (!args.length || args.includes("--help")) {
   process.exit(args.includes("--help") ? 0 : 1);
 }
 
-function compileFile(file) {
+function compileFile(file, sourceMap = false) {
   try {
-    return compile(readFileSync(file, "utf8"), { readModule: moduleReader(file) });
+    return compile(readFileSync(file, "utf8"), {
+      readModule: moduleReader(file), filename: pathToFileURL(file).href,
+      sourceMap: sourceMap ? "inline" : false
+    });
   } catch (error) {
     throw new Error(`${relative(process.cwd(), file)}: ${error.message}`);
   }
 }
 
+let running = false;
 try {
   if (args[0] === "format") {
     formatCommand(args.slice(1));
@@ -65,14 +69,17 @@ try {
     }
     const file = resolve(args[0]);
     if (args[1] === "--run") {
+      running = true;
+      process.setSourceMapsEnabled(true);
       // The hook compiles this file and every .prose file it imports as Node loads them.
       register("../src/node-hooks.js", import.meta.url);
       await import(pathToFileURL(file).href);
     } else {
-      process.stdout.write(compileFile(file).code);
+      process.stdout.write(compileFile(file, true).code);
     }
   }
 } catch (error) {
-  console.error(error.message);
+  const syntax = error?.name === "SyntaxError" && /Line \d+:/.test(error.message);
+  console.error(running && !syntax ? (error?.stack ?? error?.message ?? error) : (error?.message ?? error));
   process.exitCode = 1;
 }

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { compile } from "./transpile.js";
 
 const runtime = new URL("./runtime.js", import.meta.url).href;
@@ -14,6 +14,13 @@ export function moduleReader(file) {
 export async function load(url, context, nextLoad) {
   if (!url.startsWith("file:") || !url.split(/[?#]/)[0].endsWith(".prose")) return nextLoad(url, context);
   const file = fileURLToPath(url);
-  const { code } = compile(readFileSync(file, "utf8"), { runtime, readModule: moduleReader(file) });
-  return { format: "module", source: code, shortCircuit: true };
+  try {
+    const { code } = compile(readFileSync(file, "utf8"), {
+      runtime, readModule: moduleReader(file), sourceMap: "inline", filename: pathToFileURL(file).href
+    });
+    return { format: "module", source: code, shortCircuit: true };
+  } catch (error) {
+    if (error.line !== undefined) error.message = `${file}: ${error.message}`;
+    throw error;
+  }
 }

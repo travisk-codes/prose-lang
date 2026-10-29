@@ -163,14 +163,14 @@
         new Function("console", event.data)({ log });
         self.postMessage({ lines });
       } catch (error) {
-        self.postMessage({ lines, error: String((error && error.message) || error), name: error && error.name });
+        self.postMessage({ lines, error: String((error && error.message) || error), name: error && error.name, stack: error && error.stack });
       }
     };`;
 
   let workerUrl = null;
   try { workerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" })); } catch {}
 
-  function run(code) {
+  function run(code, map) {
     cancelRun();
     output.textContent = "";
     let current;
@@ -194,7 +194,14 @@
       if (!data.error) setStatus(data.lines.length ? "Compiled and ran." : "Compiled and ran. Nothing was printed.");
       else if (data.name === "EvalError" || /unsafe-eval|Content Security Policy/i.test(data.error)) {
         setStatus("This browser cannot run the program here. You can still read its JavaScript in Compiled.", "error");
-      } else setStatus(data.error, "error");
+      } else {
+        const trace = Prose.mapStackTrace(data.stack || data.error, map, { generatedFile: "prose-playground.js", lineOffset: 2 });
+        const location = trace.location;
+        setStatus(location ? `Line ${location.line}, column ${location.column}: ${data.error}` : data.error, "error");
+        const stack = trace.stack.split("\n").filter((line, index) =>
+          index === 0 || (!line.includes("prose-playground.js:") && !line.includes(workerUrl))).join("\n");
+        output.textContent += (data.lines.length ? "\n\n" : "") + stack;
+      }
     };
     current.onerror = event => {
       if (worker !== current) return;
@@ -202,7 +209,9 @@
       cancelRun();
       setStatus(event.message || "The program could not run. Try a different example.", "error");
     };
-    current.postMessage(code);
+    // Function constructors add two lines before the body. Adjust the inline
+    // map for browser tools; the displayed trace uses the original map above.
+    current.postMessage(code + "\n" + Prose.inlineSourceMap(map, 2) + "\n//# sourceURL=prose-playground.js");
   }
 
   function update() {
@@ -211,7 +220,7 @@
     let shown, runnable;
     try {
       shown = Prose.compile(source.value, { runtime: "prose-runtime" });
-      runnable = Prose.compile(source.value);
+      runnable = Prose.compile(source.value, { sourceMap: true, filename: "playground.prose" });
     } catch (error) {
       output.textContent = "";
       compiled.textContent = "";
@@ -225,7 +234,7 @@
       setStatus("Programs with use or export need a bundler to run. Their JavaScript is ready in Compiled.", "idle");
       return;
     }
-    run(runnable.code);
+    run(runnable.code, runnable.map);
   }
 
   function schedule() {

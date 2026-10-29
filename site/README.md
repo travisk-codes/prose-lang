@@ -1,5 +1,9 @@
 # Prose landing page
 
+Playground runtime errors report their original Prose line and column and show
+a mapped stack trace in Output. The generated worker program also carries an
+inline source map for browser developer tools. Runtime helpers remain unmapped.
+
 The source of the Prose landing page. Build it from the repository root:
 
 ```sh

@@ -386,7 +386,8 @@ test("the CLI runs programs whose Prose files import each other, and prints thei
     writeFileSync(join(folder, "crash.prose"), "value is 5\nvalue run");
     const crash = spawnSync(process.execPath, [cli, join(folder, "crash.prose"), "--run"], { encoding: "utf8" });
     assert.equal(crash.status, 1);
-    assert.equal(crash.stderr.trim(), "Line 2: Only functions can be called.");
+    assert.match(crash.stderr, /^TypeError: Line 2: Only functions can be called\./);
+    assert.match(crash.stderr, /crash\.prose:2:1/);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }

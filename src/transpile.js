@@ -1,4 +1,5 @@
 import { runtimeHelpers, runtimeSource } from "./runtime.js";
+import { inlineSourceMap, sourceMapBuilder } from "./source-map.js";
 
 const reserved = new Set([
   "if", "else", "for", "is", "to", "print", "and", "or", "not",
@@ -67,6 +68,12 @@ function fail(line, message) {
 }
 
 const isWord = (token, value) => token?.type === "word" && token.value === value;
+
+// Locations are metadata, excluded from syntax comparisons used by the formatter.
+function located(node, token) {
+  if (token?.source) Object.defineProperty(node, "location", { value: token.source, configurable: true });
+  return node;
+}
 
 // Prose's words for TypeScript's basic types.
 const builtinTypes = {
@@ -512,6 +519,10 @@ class Expression {
     return { type: "typeTest", value, kind, negated, line: this.line };
   }
   parse(min = 0) {
+    const token = this.peek();
+    return located(this.parseValue(min), token);
+  }
+  parseValue(min = 0) {
     const token = this.tokens[this.pos++];
     if (!token) fail(this.line, "Expected an expression.");
     let left;
@@ -718,6 +729,7 @@ export function sourceLines(source, { locations = false } = {}) {
     const prefix = /^\s*/.exec(text)[0];
     const indent = prefix.replace(/\t/g, "    ").length;
     const tokens = tokenize(text.slice(prefix.length), index + 1, locations);
+    if (locations) for (const token of tokens) token.source.start += prefix.length + (index === 0 && source.startsWith("\uFEFF") ? 1 : 0);
     // A header's parameters can each take a line, with its giving line back at the header's
     // indentation, like a closing bracket.
     const closes = indent === open?.indent && isWord(tokens[0], "giving");
@@ -799,7 +811,7 @@ class Parser {
     this.pos = 0;
     // How many loops enclose the line being parsed, within the current function.
     this.loopDepth = 0;
-    this.lines = sourceLines(source);
+    this.lines = sourceLines(source, { locations: Boolean(options.sourceMap) });
     // Discover top-level signatures before parsing calls, supporting forward recursion.
     this.functions = new Map(["length", "char_to_number", "number_to_char"].map(name =>
       [name, { name, params: ["value"], builtin: true }]
@@ -1023,7 +1035,7 @@ class Parser {
     } else if (indented) {
       this.indentedValue(expr, node.value, parent);
     }
-    return node;
+    return located(node, first);
   }
   block(indent = 0, inFunction = false) {
     const result = [];
@@ -1060,7 +1072,7 @@ class Parser {
       } else if (expr.at("if")) {
         expr.take("if");
         const condition = this.condition(expr);
-        const branches = [{ condition, body: this.ifBody(expr, line, inFunction) }];
+        const branches = [located({ condition, body: this.ifBody(expr, line, inFunction) }, line.tokens[0])];
         let otherwise = [];
         while (this.pos < this.lines.length) {
           const next = this.lines[this.pos];
@@ -1071,9 +1083,9 @@ class Parser {
           if (tail.at("if")) {
             tail.take("if");
             const condition = this.condition(tail);
-            branches.push({ condition, body: this.ifBody(tail, next, inFunction) });
+            branches.push(located({ condition, body: this.ifBody(tail, next, inFunction) }, next.tokens[0]));
           } else {
-            otherwise = this.conditionalBody(tail, next, inFunction);
+            otherwise = located(this.conditionalBody(tail, next, inFunction), next.tokens[0]);
             break;
           }
         }
@@ -1093,7 +1105,7 @@ class Parser {
         // `on error problem` names what failed, usually an Error with a message.
         const name = handler.peek() ? handler.variableName() : null;
         handler.end();
-        result.push({ type: "try", body, name, handler: this.body(next, inFunction), line: next.line });
+        result.push({ type: "try", body, name, handler: located(this.body(next, inFunction), next.tokens[0]), line: next.line });
       } else if (expr.at("while")) {
         expr.take("while");
         const condition = this.condition(expr);
@@ -1120,6 +1132,7 @@ class Parser {
       } else {
         result.push(this.simple(expr, inFunction, line));
       }
+      located(result.at(-1), line.tokens[0]);
     }
     return result;
   }
@@ -1304,9 +1317,15 @@ export function parse(source, options = {}) {
 /**
  * Compile Prose to JavaScript: a script, or an ES module if it uses modules or imports its runtime.
  * `declarations` is a TypeScript declaration file for the module's exports, or null.
+ * `sourceMap: true` returns a map; "inline" also embeds it. `filename` identifies the source.
  */
 export function compile(source, options = {}) {
+  if (![undefined, false, true, "inline"].includes(options.sourceMap)) throw new TypeError('sourceMap must be true, false, or "inline".');
   const program = parse(source, options);
+  const mapper = options.sourceMap ? sourceMapBuilder(source, options.filename ?? "program.prose") : null;
+  const mapped = (node, code) => mapper && node?.location
+    ? mapper.mark(node.location, code, ["name", "call", "function"].includes(node.type) ? (node.value ?? node.name) : undefined) : code;
+  const unmapped = code => mapper ? mapper.mark(null, code) : code;
   const imports = program.filter(node => node.type === "use" && !node.typeOnly);
   const programScope = createScope([], program, null);
   for (const node of imports) {
@@ -1325,6 +1344,10 @@ export function compile(source, options = {}) {
   let loopId = 0;
 
   function expression(node, scope, depth) {
+    return mapped(node, expressionValue(node, scope, depth));
+  }
+
+  function expressionValue(node, scope, depth) {
     const emit = child => expression(child, scope, depth);
     // Lists and arguments may spread a collection into them with `each of`.
     const element = child => child.type === "spread" ? spread(child, scope, depth) : emit(child);
@@ -1427,7 +1450,7 @@ export function compile(source, options = {}) {
   function emitBlock(nodes, scope, depth) {
     const indent = pad(depth);
     const emit = node => expression(node, scope, depth);
-    return nodes.filter(node => node.type !== "use" && node.type !== "typeDeclaration").map(node => {
+    const statement = node => {
       if (node.type === "function") {
         const inner = createScope(node.params, node.body, scope);
         return `${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}(${node.params.map(variable).join(", ")}) {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
@@ -1448,14 +1471,14 @@ export function compile(source, options = {}) {
       if (node.type === "fail") return `${indent}throw __prose_error(${emit(node.value)});`;
       if (node.type === "try") {
         const caught = node.name ? `${indent}  ${variable(node.name)} = __error;\n` : "";
-        return `${indent}try {\n${emitBlock(node.body, scope, depth + 1)}\n${indent}} catch (__error) {\n${caught}${emitBlock(node.handler, scope, depth + 1)}\n${indent}}`;
+        return `${indent}try {\n${emitBlock(node.body, scope, depth + 1)}\n${mapped(node.handler, `${indent}} catch (__error) {`)}\n${caught}${emitBlock(node.handler, scope, depth + 1)}\n${indent}}`;
       }
       if (node.type === "if") {
         const branches = node.branches.map((branch, index) =>
-          `${indent}${index ? "else if" : "if"} (${emit(branch.condition)}) {\n${emitBlock(branch.body, scope, depth + 1)}\n${indent}}`
+          `${mapped(branch, `${indent}${index ? "else if" : "if"} (${emit(branch.condition)}) {`)}\n${emitBlock(branch.body, scope, depth + 1)}\n${indent}}`
         ).join(" ");
         return branches + (node.otherwise.length
-          ? ` else {\n${emitBlock(node.otherwise, scope, depth + 1)}\n${indent}}` : "");
+          ? `${mapped(node.otherwise, " else {")}\n${emitBlock(node.otherwise, scope, depth + 1)}\n${indent}}` : "");
       }
       if (node.type === "while") {
         return `${indent}while (${emit(node.condition)}) {\n${emitBlock(node.body, scope, depth + 1)}\n${indent}}`;
@@ -1468,28 +1491,31 @@ export function compile(source, options = {}) {
       const limit = `_limit${loopId++}`;
       const counter = variable(node.name);
       return `${indent}{\n${indent}  const ${limit} = ${emit(node.end)};\n${indent}  for (${counter} = ${emit(node.start)}; ${counter} <= ${limit}; ${counter}++) {\n${emitBlock(node.body, scope, depth + 2)}\n${indent}  }\n${indent}}`;
-    }).join("\n");
+    };
+    return nodes.filter(node => node.type !== "use" && node.type !== "typeDeclaration")
+      .map(node => mapped(node, statement(node))).join("\n");
   }
 
   function emitScope(nodes, scope, depth) {
     const locals = [...scope.locals.keys()];
     const declarations = locals.length ? `${pad(depth)}let ${locals.map(variable).join(", ")};\n` : "";
-    return declarations + emitBlock(nodes, scope, depth);
+    return unmapped(declarations) + emitBlock(nodes, scope, depth);
   }
 
   const body = emitScope(program, programScope, 0);
   const module = Boolean(options.runtime) || imports.length > 0 || exports.size > 0 ||
     program.some(node => node.typeOnly || (node.type === "typeDeclaration" && node.exported));
-  const code = [
+  const markedCode = [
     module ? "" : '"use strict";',
     options.runtime ? `import { ${runtimeHelpers.join(", ")} } from ${JSON.stringify(options.runtime)};` : "",
     ...imports.map(node =>
-      `import { ${node.names.map(name => `${camel(name)} as ${variable(name)}`).join(", ")} } from ${JSON.stringify(node.source)};`),
+      mapped(node, `import { ${node.names.map(name => `${camel(name)} as ${variable(name)}`).join(", ")} } from ${JSON.stringify(node.source)};`)),
     options.runtime ? "" : runtimeSource,
     body,
     exports.size ? `export { ${[...exports].map(([name, local]) => `${local} as ${name}`).join(", ")} };` : ""
   ].filter(Boolean).join("\n") + "\n";
-  return { code, module, declarations: declarationsFor(program) };
+  const { code, map } = mapper ? mapper.finish(markedCode) : { code: markedCode, map: null };
+  return { code: options.sourceMap === "inline" ? code + inlineSourceMap(map) + "\n" : code, map, module, declarations: declarationsFor(program) };
 }
 
 /**

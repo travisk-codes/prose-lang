@@ -30,9 +30,9 @@ export default function prose({ declarations = false } = {}) {
         return readFileSync(path, "utf8");
       };
       try {
-        const result = compile(source, { runtime: runtimeId, readModule });
+        const result = compile(source, { runtime: runtimeId, readModule, sourceMap: true, filename: file });
         if (declarations && result.declarations) writeDeclarations(file, result.declarations);
-        return { code: result.code, map: null };
+        return { code: result.code, map: result.map };
       } catch (error) {
         if (error.line === undefined) throw error;
         this.error({ message: `${file}: ${error.message}`, id: file, loc: { file, line: error.line, column: 0 } });
