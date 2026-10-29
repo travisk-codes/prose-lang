@@ -47,4 +47,6 @@ The playground runs automatically by default. Turn off **Auto-run** to edit firs
 
 The textarea owns scrolling. Its highlighted layer shares the same system monospace font, padding, and line height, follows its scroll offsets, and resizes with it. Keep token styles from changing font weight or italics inside this overlay: different glyph widths can move the visible text away from the caret.
 
+Identifier underscores and access dots use `c-separator` at 55% opacity so the words stand out, in Prose and in the compiled JavaScript and TypeScript. The editor extension uses the equivalent solid color on the site's dark code background.
+
 For a quick site-only check, run `node --test site/scripts.test.mjs site/syntax.test.mjs`. When changing editor layout, also check clicking into colored text after horizontal/vertical scrolling and after resizing between desktop and mobile widths.

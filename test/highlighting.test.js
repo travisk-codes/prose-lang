@@ -240,3 +240,24 @@ test("array keywords and comma lists have syntax scopes without turning literals
   hasScope("person:array", "array", "variable.other.property.prose");
   assert.ok(!scopesAt('"Ada", "Grace"', "Ada").includes("comment.line.string.prose"));
 });
+
+test("dot members use property scopes without treating keywords or builtins as calls", () => {
+  for (const name of ["name", "length", "if", "array", "i"]) {
+    hasScope(`person.${name}`, ".", "punctuation.accessor.prose");
+    hasScope(`person.${name}`, name, "variable.other.property.prose");
+  }
+  hasScope('person.("name")', "name", "string.quoted.double.prose");
+  hasScope("people.1.name", "1", "constant.numeric.prose");
+  hasScope("people.1.name", "name", "variable.other.property.prose");
+});
+
+test("underscores inside identifiers receive a separator scope", () => {
+  for (const line of [
+    "read_file is 1", "function read_file takes input_path", "print person.first_name",
+    "for item_count is 1 to 3", "export type Book_Info is object"
+  ]) {
+    const underscore = line.indexOf("_");
+    hasScope(line, line.slice(underscore), "punctuation.separator.name.prose");
+  }
+  hasScope('print "keep_this"', "_this", "string.quoted.double.prose");
+});

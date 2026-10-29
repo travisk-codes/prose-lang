@@ -8,6 +8,7 @@
   const typeWords = new Set(["list", "set", "map", "of", "from", "to", "taking", "giving", "or", "and", "maybe", "function"]);
   const escapeHtml = text => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const wrap = (classes, text) => `<span class="${classes}">${escapeHtml(text)}</span>`;
+  const identifier = (classes, text) => `<span class="${classes}">${escapeHtml(text).replace(/_/g, '<span class="c-separator">_</span>')}</span>`;
 
   function highlightLine(line) {
     if (/^\s*"(?:[^"\\]|\\.)*"\s*$/.test(line)) return wrap("c-comment it", line);
@@ -22,7 +23,7 @@
       if (string) classes = "c-green";
       else if (number) classes = "c-orange";
       else if (operator) classes = "c-pink";
-      else if (accessor) classes = "c-teal2";
+      else if (accessor) classes = "c-separator";
       else if (punct) {
         classes = "c-punct";
         if (text === ",") inType = false;
@@ -30,7 +31,7 @@
         if (inType && (word === "is" || word === "return")) inType = false;
         if (match.index === bindingAt) classes = "c-blue";
         else if (inType) classes = typeWords.has(word) ? "c-purple" : /^[A-Z]/.test(word) || ["text", "number", "boolean", "any", "nothing", "object"].includes(word) || constants.has(word) ? "c-rose" : "c-rose it";
-        else if (previous === ":") classes = "c-teal";
+        else if (previous === ":" || previous === ".") classes = "c-teal";
         else if (afterFunction && !["takes", "return", "giving"].includes(word)) classes = "c-yellow bd";
         else if (control.has(word)) classes = "c-red";
         else if (word === "function") classes = "c-yellow";
@@ -52,7 +53,7 @@
         loopNext = word === "for";
       }
       if (!word) afterFunction = loopNext = false;
-      html += wrap(classes, text);
+      html += word ? identifier(classes, text) : wrap(classes, text);
       previous = text;
     }
     return html;

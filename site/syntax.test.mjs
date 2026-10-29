@@ -19,6 +19,14 @@ test("syntax highlighting escapes user text instead of creating HTML elements", 
   assert.equal(text, source);
 });
 
+test("JavaScript names and member dots have quiet separators without changing literals", () => {
+  const html = highlightCode('const read_file = person.first_name; const text = "keep_this"; const n = 3.14;');
+  assert.match(html, /read<span class="c-separator">_<\/span>file/);
+  assert.match(html, /class="token punctuation c-separator">\.<\/span>/);
+  assert.match(html, /class="token string">"keep_this"<\/span>/);
+  assert.match(html, /class="token number">3\.14<\/span>/);
+});
+
 test("the embedded browser bundle matches build highlighting, including TypeScript", () => {
   const script = inlineScript(syntaxSource);
   assert.doesNotThrow(() => new Script(script));
