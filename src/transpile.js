@@ -1,4 +1,5 @@
 import { runtimeHelpers, runtimeSource } from "./runtime.js";
+import { checkPrelude } from "./check.js";
 import { inlineSourceMap, sourceMapBuilder } from "./source-map.js";
 
 const reserved = new Set([
@@ -1266,6 +1267,106 @@ function literalType(value) {
   return value.value === null ? "null" : typeof value.value;
 }
 
+// A function's parameters as TypeScript writes them, from each name as it appears there.
+// Trailing parameters that are untyped or maybe can be left out, as Prose's with calls allow.
+function parameterList(node, nameOf, untyped = name => name) {
+  const types = node.types ?? [];
+  let optionalFrom = node.params.length;
+  while (optionalFrom > 0 && (!types[optionalFrom - 1] || types[optionalFrom - 1].kind === "maybe")) optionalFrom--;
+  return node.params.map((name, index) => {
+    const type = types[index];
+    if (index < optionalFrom) return type ? `${nameOf(name)}: ${parameterType(type)}` : untyped(nameOf(name));
+    return `${nameOf(name)}?: ${parameterType(type?.kind === "maybe" ? type.of : type)}`;
+  }).join(", ");
+}
+
+// A function that waits for something gives a promise of its result.
+function returnType(node) {
+  const promised = node.returns?.kind === "named" && node.returns.name === "Promise";
+  return awaits(node.body ?? node.value) && !promised ? `Promise<${typeText(node.returns)}>` : typeText(node.returns);
+}
+
+function typeDeclarationLines(node) {
+  const prefix = node.exported ? "export " : "";
+  if (!node.fields) {
+    return [...docComment(node.doc), `${prefix}type ${node.name}${generic(typeVariables([node.value]))} = ${typeText(node.value)};`];
+  }
+  const lines = [...docComment(node.doc), `${prefix}interface ${node.name}${generic(typeVariables(node.fields.map(field => field.type)))} {`];
+  for (const field of node.fields) {
+    const optional = field.type.kind === "maybe";
+    lines.push(...docComment(field.doc, "  "), `  ${camel(field.name)}${optional ? "?" : ""}: ${typeText(optional ? field.type.of : field.type)};`);
+  }
+  return [...lines, "}"];
+}
+
+// The types written on a body's variables (`count as number is 0`). Nested functions have their own.
+function declaredTypes(nodes, types = new Map()) {
+  for (const node of nodes) {
+    if (node.type === "assign" && node.declaredType && !types.has(node.name)) types.set(node.name, node.declaredType);
+    if (node.type === "try") declaredTypes(node.handler, types);
+    if (node.type === "if") {
+      for (const branch of node.branches) declaredTypes(branch.body, types);
+      declaredTypes(node.otherwise, types);
+    } else if (node.body && node.type !== "function") {
+      declaredTypes(node.body, types);
+    }
+  }
+  return types;
+}
+
+// Variables a body assigns exactly once, directly (not in a branch, loop, or handler). The
+// checking output declares them const there, which keeps literal types and narrowing.
+function singleAssignments(nodes) {
+  const counts = new Map();
+  const count = (name, by) => counts.set(name, (counts.get(name) ?? 0) + by);
+  const visit = list => {
+    for (const node of list) {
+      if (node.type === "assign") count(node.name, 1);
+      // Loops, destructuring, and handlers assign as they run, so they rule const out.
+      if (node.type === "for") count(node.name, 2);
+      if (node.type === "foreach" || node.type === "destructure") for (const name of node.names) count(name, 2);
+      if (node.type === "try" && node.name) count(node.name, 2);
+      if (node.type === "try") visit(node.handler);
+      if (node.type === "if") {
+        for (const branch of node.branches) visit(branch.body);
+        visit(node.otherwise);
+      } else if (node.body && node.type !== "function") {
+        visit(node.body);
+      }
+    }
+  };
+  visit(nodes);
+  return new Set(nodes.filter(node => node.type === "assign" && counts.get(node.name) === 1).map(node => node.name));
+}
+
+// Properties written onto variables after they're made (`stats:best is 3`), by variable name.
+// Prose objects can gain properties; TypeScript's need them from the start.
+function laterProperties(node, scope, innerScope, found = new Map()) {
+  if (Array.isArray(node)) {
+    for (const child of node) laterProperties(child, scope, innerScope, found);
+  } else if (node && typeof node === "object") {
+    if (node.type === "function" || node.type === "lambda") {
+      return laterProperties(node.body ?? node.value, innerScope(node, scope), innerScope, found);
+    }
+    const target = node.type === "assignTarget" && node.target;
+    if (target?.type === "property" && !target.key && target.object.type === "name") {
+      const name = target.object.value;
+      let binding = scope;
+      while (binding && !binding.names.has(name)) binding = binding.parent;
+      if (binding?.locals.has(name)) {
+        if (!found.has(binding)) found.set(binding, new Map());
+        const names = found.get(binding);
+        if (!names.has(name)) names.set(name, new Set());
+        names.get(name).add(target.name);
+      }
+    }
+    for (const child of Object.values(node)) {
+      if (child && typeof child === "object") laterProperties(child, scope, innerScope, found);
+    }
+  }
+  return found;
+}
+
 // A TypeScript declaration file for a module's exports, or null when it exports nothing.
 function declarationsFor(program) {
   if (!program.some(node => node.exported)) return null;
@@ -1275,35 +1376,15 @@ function declarationsFor(program) {
   }
   for (const node of program) {
     if (node.type === "function" && node.exported) {
-      // Trailing parameters that are untyped or maybe can be left out, as Prose's with calls allow.
-      let optionalFrom = node.params.length;
-      while (optionalFrom > 0 && (!node.types[optionalFrom - 1] || node.types[optionalFrom - 1].kind === "maybe")) optionalFrom--;
-      const params = node.params.map((name, index) => {
-        const type = node.types[index];
-        if (index < optionalFrom) return `${parameterName(camel(name))}: ${parameterType(type)}`;
-        return `${parameterName(camel(name))}?: ${parameterType(type?.kind === "maybe" ? type.of : type)}`;
-      });
+      const params = parameterList(node, name => parameterName(camel(name)), name => `${name}: any`);
       const variables = typeVariables([...node.types, node.returns]);
-      // A function that waits for something gives a promise of its result.
-      const promised = node.returns?.kind === "named" && node.returns.name === "Promise";
-      const returns = awaits(node.body) && !promised ? `Promise<${typeText(node.returns)}>` : typeText(node.returns);
       lines.push(...docComment(node.doc),
-        `export function ${camel(node.name)}${generic(variables)}(${params.join(", ")}): ${returns};`);
+        `export function ${camel(node.name)}${generic(variables)}(${params}): ${returnType(node)};`);
     } else if (node.type === "assign" && node.exported) {
       lines.push(...docComment(node.doc),
         `export let ${camel(node.name)}: ${node.declaredType ? typeText(node.declaredType) : literalType(node.value)};`);
     } else if (node.type === "typeDeclaration") {
-      const prefix = node.exported ? "export " : "";
-      if (node.fields) {
-        lines.push(...docComment(node.doc), `${prefix}interface ${node.name}${generic(typeVariables(node.fields.map(field => field.type)))} {`);
-        for (const field of node.fields) {
-          const optional = field.type.kind === "maybe";
-          lines.push(...docComment(field.doc, "  "), `  ${camel(field.name)}${optional ? "?" : ""}: ${typeText(optional ? field.type.of : field.type)};`);
-        }
-        lines.push("}");
-      } else {
-        lines.push(...docComment(node.doc), `${prefix}type ${node.name}${generic(typeVariables([node.value]))} = ${typeText(node.value)};`);
-      }
+      lines.push(...typeDeclarationLines(node));
     }
   }
   return lines.join("\n") + "\n";
@@ -1342,9 +1423,99 @@ export function compile(source, options = {}) {
     exports.set(camel(node.name), variable(node.name));
   }
   let loopId = 0;
+  // The checking output is TypeScript written to be type-checked, never run: plain property
+  // access, calls, and positions instead of runtime helpers, so the checker sees every type.
+  const check = Boolean(options.check);
+  const scopes = new WeakMap();
+  function innerScope(node, parent) {
+    if (!check) return createScope(node.params, node.body ?? [], parent);
+    if (!scopes.has(node)) {
+      const inner = createScope(node.params, node.body ?? [], parent);
+      const inherited = parent.typeVariables ?? new Set();
+      inner.ownTypeVariables = new Set([...typeVariables([...(node.types ?? []), node.returns])].filter(name => !inherited.has(name)));
+      inner.typeVariables = new Set([...inherited, ...inner.ownTypeVariables]);
+      scopes.set(node, inner);
+    }
+    return scopes.get(node);
+  }
+  const later = check ? laterProperties(program, programScope, innerScope) : new Map();
 
   function expression(node, scope, depth) {
-    return mapped(node, expressionValue(node, scope, depth));
+    return mapped(node, (check && checkValue(node, scope, depth)) || expressionValue(node, scope, depth));
+  }
+
+  function visible(name, scope) {
+    for (let current = scope; current; current = current.parent) if (current.names.has(name)) return true;
+    return false;
+  }
+
+  // An expression as the checking output writes it, or undefined where both outputs agree.
+  function checkValue(node, scope, depth) {
+    const emit = child => expression(child, scope, depth);
+    const element = child => child.type === "spread" ? spread(child, scope, depth) : emit(child);
+    const args = nodes => nodes.map(element).join(", ");
+    if (node.type === "object") return checkObject(node, scope, depth);
+    // An empty list can be added to later, so it isn't a list of nothing.
+    if (node.type === "array" && !node.elements.length) return "([] as any[])";
+    if (node.type === "property") return checkAccess(node, scope, depth, node.maybe);
+    if (node.type === "index") {
+      const position = node.index.type === "literal" ? String(node.index.value - 1) : `${emit(node.index)} - 1`;
+      return `${emit(node.object)}${node.maybe ? "?." : ""}[${position}]`;
+    }
+    if (node.type === "invoke") {
+      const callee = node.callee.type === "property" ? checkAccess(node.callee, scope, depth, node.maybe) : emit(node.callee);
+      return `${callee}${node.maybe ? "?." : ""}(${args(node.args)})`;
+    }
+    if (node.type === "new") return `new (${emit(node.callee)})(${args(node.args)})`;
+    if (node.type === "lambda") {
+      const inner = innerScope(node, scope);
+      // Untyped parameters take their types from where the function is passed.
+      const params = node.params.map((name, index) => node.types?.[index]
+        ? `${variable(name)}: ${parameterType(node.types[index])}` : variable(name)).join(", ");
+      const returns = node.returns ? `: ${returnType(node)}` : "";
+      const async = awaits(node.body ?? node.value) ? "async " : "";
+      const variables = generic([...inner.ownTypeVariables]);
+      if (node.body) return `(${async}${variables}(${params})${returns} => {\n${emitScope(node.body, inner, depth + 1)}\n${pad(depth)}})`;
+      return `(${async}${variables}(${params})${returns} => ${expression(node.value, inner, depth)})`;
+    }
+    return undefined;
+  }
+
+  // An object in the checking output. Unset and null properties can be filled in later, and
+  // `extra` names the properties the program adds after making it, so each exists up front.
+  function checkObject(node, scope, depth, extra = new Set()) {
+    const value = child => child.type === "unset" ? "(undefined as any)"
+      : child.type === "literal" && child.value === null ? "(null as any)" : expression(child, scope, depth);
+    const own = new Set(node.properties.filter(property => !property.spread).map(property => property.name));
+    const entries = node.properties.map(property => property.spread
+      ? `...${expression(property.value, scope, depth)}` : `${camel(property.name)}: ${value(property.value)}`);
+    for (const name of extra) if (!own.has(name)) entries.push(`${camel(name)}: (undefined as any)`);
+    // An empty object, such as a fallback after otherwise, can hold anything.
+    return entries.length ? `({${entries.join(", ")}})` : "({} as any)";
+  }
+
+  // A property, or a dot that may be a position, read in the checking output.
+  function checkAccess(node, scope, depth, maybe) {
+    const object = expression(node.object, scope, depth);
+    const helper = maybe ? "__prose_maybe_" : "__prose_";
+    if (node.contextual && node.key) return `${helper}dot_key(${object}, ${expression(node.key, scope, depth)})`;
+    if (node.contextual && visible(node.name, scope)) {
+      return `${helper}dot(${object}, ${variable(node.name)}, ${JSON.stringify(camel(node.name))})`;
+    }
+    if (node.key) return `${object}${maybe ? "?." : ""}[${expression(node.key, scope, depth)}]`;
+    return `${object}${maybe ? "?." : "."}${camel(node.name)}`;
+  }
+
+  // An assignment to a property or position in the checking output.
+  function checkWrite(target, value, scope, depth) {
+    const object = expression(target.object, scope, depth);
+    if (target.type === "index") return `__prose_set_at(${object}, ${expression(target.index, scope, depth)}, ${value})`;
+    if (target.contextual && target.key) return `__prose_dot_key_set(${object}, ${expression(target.key, scope, depth)}, ${value})`;
+    if (target.contextual && visible(target.name, scope)) {
+      return `__prose_dot_set(${object}, ${variable(target.name)}, ${JSON.stringify(camel(target.name))}, ${value})`;
+    }
+    if (target.key) return `${object}[${expression(target.key, scope, depth)}] = ${value}`;
+    return `${object}.${camel(target.name)} = ${value}`;
   }
 
   function expressionValue(node, scope, depth) {
@@ -1452,10 +1623,26 @@ export function compile(source, options = {}) {
     const emit = node => expression(node, scope, depth);
     const statement = node => {
       if (node.type === "function") {
-        const inner = createScope(node.params, node.body, scope);
-        return `${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}(${node.params.map(variable).join(", ")}) {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
+        const inner = innerScope(node, scope);
+        const signature = check
+          ? `${generic(typeVariables([...node.types, node.returns]))}(${parameterList(node, variable)})${node.returns ? `: ${returnType(node)}` : ""}`
+          : `(${node.params.map(variable).join(", ")})`;
+        return `${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}${signature} {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
+      }
+      if (node.type === "assign" && check) {
+        const extra = !scope.types.has(node.name) && later.get(scope)?.get(node.name);
+        // A list made empty here takes its type from what's added to it later.
+        let value = node.value.type === "unset" && !scope.types.has(node.name) ? "(undefined as any)"
+          : node.value.type === "array" && !node.value.elements.length ? "[]"
+          : node.value.type === "object" ? mapped(node.value, checkObject(node.value, scope, depth, extra || undefined))
+          : emit(node.value);
+        if (extra?.size && node.value.type !== "object") {
+          value = `__prose_open(${value}, ${[...extra].map(name => JSON.stringify(camel(name))).join(", ")})`;
+        }
+        return `${indent}${scope.constants.has(node.name) ? `const ${typed(node.name, scope)}` : variable(node.name)} = ${value};`;
       }
       if (node.type === "assign") return `${indent}${variable(node.name)} = ${emit(node.value)};`;
+      if (node.type === "assignTarget" && check) return `${indent}${checkWrite(node.target, emit(node.value), scope, depth)};`;
       // Rebuilding a string assigns its binding; mutating an object property does not.
       if (node.type === "assignTarget") return `${indent}${reference(node.target, scope, depth)}.set(${emit(node.value)});`;
       if (node.type === "print") {
@@ -1464,14 +1651,18 @@ export function compile(source, options = {}) {
       if (node.type === "return") return `${indent}return${node.value ? " " + emit(node.value) : ""};`;
       if (node.type === "expression") return `${indent}(${emit(node.value)});`;
       if (node.type === "destructure") {
-        return `${indent}([${node.names.map(variable).join(", ")}] = __prose_each(${emit(node.value)}, ${node.line}));`;
+        // Destructuring a pair directly keeps the type of each of its positions.
+        const value = check ? emit(node.value) : `__prose_each(${emit(node.value)}, ${node.line})`;
+        return `${indent}([${node.names.map(variable).join(", ")}] = ${value});`;
       }
       if (node.type === "skip") return `${indent}continue;`;
       if (node.type === "stop") return `${indent}break;`;
       if (node.type === "fail") return `${indent}throw __prose_error(${emit(node.value)});`;
       if (node.type === "try") {
         const caught = node.name ? `${indent}  ${variable(node.name)} = __error;\n` : "";
-        return `${indent}try {\n${emitBlock(node.body, scope, depth + 1)}\n${mapped(node.handler, `${indent}} catch (__error) {`)}\n${caught}${emitBlock(node.handler, scope, depth + 1)}\n${indent}}`;
+        // Anything can be thrown; the checking output trusts the handler to know what it caught.
+        const error = check ? "__error: any" : "__error";
+        return `${indent}try {\n${emitBlock(node.body, scope, depth + 1)}\n${mapped(node.handler, `${indent}} catch (${error}) {`)}\n${caught}${emitBlock(node.handler, scope, depth + 1)}\n${indent}}`;
       }
       if (node.type === "if") {
         const branches = node.branches.map((branch, index) =>
@@ -1497,12 +1688,33 @@ export function compile(source, options = {}) {
   }
 
   function emitScope(nodes, scope, depth) {
-    const locals = [...scope.locals.keys()];
-    const declarations = locals.length ? `${pad(depth)}let ${locals.map(variable).join(", ")};\n` : "";
+    // In the checking output, a variable assigned once is declared const where it's assigned.
+    // The rest are declared bare up front, so TypeScript follows each value assigned to them.
+    scope.constants = check ? new Set([...singleAssignments(nodes)].filter(name => scope.locals.has(name))) : new Set();
+    scope.types = check ? declaredTypes(nodes) : new Map();
+    const locals = [...scope.locals.keys()].filter(name => !scope.constants.has(name));
+    const declarations = locals.length ? `${pad(depth)}let ${locals.map(name => typed(name, scope)).join(", ")};\n` : "";
     return unmapped(declarations) + emitBlock(nodes, scope, depth);
   }
 
+  const typed = (name, scope) => scope.types.has(name) ? `${variable(name)}: ${typeText(scope.types.get(name))}` : variable(name);
+
   const body = emitScope(program, programScope, 0);
+  const exported = exports.size ? `export { ${[...exports].map(([name, local]) => `${local} as ${name}`).join(", ")} };` : "";
+  if (check) {
+    const checkCode = [
+      checkPrelude,
+      ...program.filter(node => node.type === "use" && node.typeOnly).map(node =>
+        mapped(node, `import type { ${node.names.join(", ")} } from ${JSON.stringify(node.source)};`)),
+      ...imports.map(node =>
+        mapped(node, `import { ${node.names.map(name => `${camel(name)} as ${variable(name)}`).join(", ")} } from ${JSON.stringify(node.source)};`)),
+      ...program.filter(node => node.type === "typeDeclaration").map(node => mapped(node, typeDeclarationLines(node).join("\n"))),
+      body,
+      exported || "export {};"
+    ].join("\n") + "\n";
+    const { code, map } = mapper ? mapper.finish(checkCode) : { code: checkCode, map: null };
+    return { code: options.sourceMap === "inline" ? code + inlineSourceMap(map) + "\n" : code, map, module: true, declarations: declarationsFor(program) };
+  }
   const module = Boolean(options.runtime) || imports.length > 0 || exports.size > 0 ||
     program.some(node => node.typeOnly || (node.type === "typeDeclaration" && node.exported));
   const markedCode = [
@@ -1512,7 +1724,7 @@ export function compile(source, options = {}) {
       mapped(node, `import { ${node.names.map(name => `${camel(name)} as ${variable(name)}`).join(", ")} } from ${JSON.stringify(node.source)};`)),
     options.runtime ? "" : runtimeSource,
     body,
-    exports.size ? `export { ${[...exports].map(([name, local]) => `${local} as ${name}`).join(", ")} };` : ""
+    exported
   ].filter(Boolean).join("\n") + "\n";
   const { code, map } = mapper ? mapper.finish(markedCode) : { code: markedCode, map: null };
   return { code: options.sourceMap === "inline" ? code + inlineSourceMap(map) + "\n" : code, map, module, declarations: declarationsFor(program) };

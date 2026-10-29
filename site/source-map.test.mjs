@@ -7,7 +7,17 @@ import { inlineScript } from "./scripts.mjs";
 
 const strip = file => readFileSync(new URL("../src/" + file, import.meta.url), "utf8")
   .split("\n").filter(line => !line.startsWith("import ")).join("\n").replace(/^export /gm, "");
-const browserCompiler = inlineScript(`(() => {\n${strip("runtime.js")}\n${strip("source-map.js")}\n${strip("transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`);
+const browserCompiler = inlineScript(`(() => {\n${strip("runtime.js")}\n${strip("check.js")}\n${strip("source-map.js")}\n${strip("transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`);
+
+test("checking output also works in the browser bundle without TypeScript installed", () => {
+  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const source = 'export function twice takes n as number, giving number\n    return n * 2';
+  const options = { check: true, sourceMap: true, filename: 'twice.prose' };
+  const actual = browser.compile(source, options);
+  const expected = compile(source, options);
+  assert.equal(actual.code, expected.code);
+  assert.equal(JSON.stringify(actual.map), JSON.stringify(expected.map));
+});
 
 test("the browser compiler emits the same maps as the Node compiler", () => {
   const browser = runInNewContext(browserCompiler, { TextEncoder });

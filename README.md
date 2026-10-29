@@ -838,6 +838,8 @@ returns only the code. Options:
   (the default) to omit it.
 - `filename`: the original source path or URL recorded in a map; defaults to
   `program.prose`. The CLI and Vite plugin supply it automatically.
+- `check`: `true` to generate TypeScript for type checking instead of executable
+  JavaScript. This is the checking-output stage; see [Type checking](docs/type-checking.md).
 
 To run `.prose` files in your own Node.js program, register the module hook in
 `src/node-hooks.js` with `module.register`; the CLI's `--run` does this.
@@ -847,7 +849,10 @@ To run `.prose` files in your own Node.js program, register the module hook in
 Annotations are optional and change nothing about how a program runs. They
 describe a module's exports to TypeScript: the compiler turns them into a
 declaration file (`text.d.prose.ts` beside `text.prose`), so TypeScript code
-that imports the module is type-checked. Prose code itself is not checked yet.
+that imports the module is type-checked. The compiler also supports checking-only
+TypeScript output through `compile(source, { check: true })`; the project-level
+`prose check` command and editor diagnostics are still to come. See
+[the checking-output documentation](docs/type-checking.md).
 
 ```text
 use type Datum from "../types"
