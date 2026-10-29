@@ -1,15 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runInNewContext } from "node:vm";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { transpile } from "../src/transpile.js";
-
-function run(source, globals = {}) {
-  const output = [];
-  runInNewContext(transpile(source), { ...globals, console: { log: value => output.push(value) } }, { timeout: 1000 });
-  return structuredClone(output);
-}
+import { run } from "./run.js";
 
 test("trailing conditionals work in returns, assignments, print, and lists", () => {
   assert.deepEqual(run([

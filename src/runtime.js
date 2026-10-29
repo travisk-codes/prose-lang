@@ -188,7 +188,8 @@ export function __prose_maybe_method(value, name, args, line) {
 
 export function __prose_each(value, line) {
   if (value === undefined || value === null || typeof value[Symbol.iterator] !== "function") {
-    throw new TypeError(`Line ${line}: 'for each' requires an array, string, or other collection.`);
+    // Shared by for each, each of, and are, so the message names no one of them.
+    throw new TypeError(`Line ${line}: Expected a list, text, or other collection.`);
   }
   return value;
 }

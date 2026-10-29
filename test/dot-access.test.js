@@ -2,12 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
 import { compile, transpile } from "../src/transpile.js";
-
-function run(source, globals = {}) {
-  const output = [];
-  runInNewContext(transpile(source), { ...globals, console: { log: (...values) => output.push(...values) } }, { timeout: 1000 });
-  return structuredClone(output);
-}
+import { run } from "./run.js";
 
 test("dots read and write named properties, including chains, keywords, and camelCase", () => {
   assert.deepEqual(run([

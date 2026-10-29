@@ -2,12 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
 import { compile, transpile } from "../src/transpile.js";
-
-function run(source) {
-  const output = [];
-  runInNewContext(transpile(source), { console: { log: (...values) => output.push(values.length === 1 ? values[0] : values) } }, { timeout: 1000 });
-  return structuredClone(output);
-}
+import { run } from "./run.js";
 
 // Runs a program whose output may come after it waits for promises.
 async function runWaiting(source) {

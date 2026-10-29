@@ -1,13 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runInNewContext } from "node:vm";
 import { camel, compile, transpile } from "../src/transpile.js";
-
-function run(source, globals = {}) {
-  const output = [];
-  runInNewContext(transpile(source), { ...globals, console: { log: value => output.push(value) } }, { timeout: 1000 });
-  return structuredClone(output);
-}
+import { run } from "./run.js";
 
 test("snake_case names are camelCase to JavaScript, acronyms included", () => {
   assert.equal(camel("same_tag_name"), "sameTagName");

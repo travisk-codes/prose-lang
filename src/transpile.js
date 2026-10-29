@@ -1255,21 +1255,30 @@ function docAbove(nodes, line) {
 const variable = name => `_prose_${name}`;
 const pad = depth => "  ".repeat(depth);
 
-// The variables a body assigns, with the line of each one's first assignment. Nested functions have their own.
-function assignedNames(nodes, names = new Map()) {
+// Visits a body's statements, including those in its branches, loops, and handlers, but not
+// those of the functions declared in it, which have their own variables.
+function eachStatement(nodes, visit) {
   for (const node of nodes) {
+    visit(node);
+    if (node.type === "try") eachStatement(node.handler, visit);
+    if (node.type === "if") {
+      for (const branch of node.branches) eachStatement(branch.body, visit);
+      eachStatement(node.otherwise, visit);
+    } else if (node.body && node.type !== "function") {
+      eachStatement(node.body, visit);
+    }
+  }
+}
+
+// The variables a body assigns, with the line of each one's first assignment.
+function assignedNames(nodes) {
+  const names = new Map();
+  eachStatement(nodes, node => {
     const assigned = node.type === "assign" || node.type === "for" ? [node.name]
       : node.type === "foreach" || node.type === "destructure" ? node.names
       : node.type === "try" && node.name ? [node.name] : [];
     for (const name of assigned) if (!names.has(name)) names.set(name, node.line);
-    if (node.type === "try") assignedNames(node.handler, names);
-    if (node.type === "if") {
-      for (const branch of node.branches) assignedNames(branch.body, names);
-      assignedNames(node.otherwise, names);
-    } else if (node.body && node.type !== "function") {
-      assignedNames(node.body, names);
-    }
-  }
+  });
   return names;
 }
 
@@ -1403,18 +1412,12 @@ function typeDeclarationLines(node,
   return [...lines, "}"];
 }
 
-// The types written on a body's variables (`count as number is 0`). Nested functions have their own.
-function declaredTypes(nodes, types = new Map()) {
-  for (const node of nodes) {
+// The types written on a body's variables (`count as number is 0`).
+function declaredTypes(nodes) {
+  const types = new Map();
+  eachStatement(nodes, node => {
     if (node.type === "assign" && node.declaredType && !types.has(node.name)) types.set(node.name, node.declaredType);
-    if (node.type === "try") declaredTypes(node.handler, types);
-    if (node.type === "if") {
-      for (const branch of node.branches) declaredTypes(branch.body, types);
-      declaredTypes(node.otherwise, types);
-    } else if (node.body && node.type !== "function") {
-      declaredTypes(node.body, types);
-    }
-  }
+  });
   return types;
 }
 
@@ -1423,23 +1426,13 @@ function declaredTypes(nodes, types = new Map()) {
 function singleAssignments(nodes) {
   const counts = new Map();
   const count = (name, by) => counts.set(name, (counts.get(name) ?? 0) + by);
-  const visit = list => {
-    for (const node of list) {
-      if (node.type === "assign") count(node.name, 1);
-      // Loops, destructuring, and handlers assign as they run, so they rule const out.
-      if (node.type === "for") count(node.name, 2);
-      if (node.type === "foreach" || node.type === "destructure") for (const name of node.names) count(name, 2);
-      if (node.type === "try" && node.name) count(node.name, 2);
-      if (node.type === "try") visit(node.handler);
-      if (node.type === "if") {
-        for (const branch of node.branches) visit(branch.body);
-        visit(node.otherwise);
-      } else if (node.body && node.type !== "function") {
-        visit(node.body);
-      }
-    }
-  };
-  visit(nodes);
+  eachStatement(nodes, node => {
+    if (node.type === "assign") count(node.name, 1);
+    // Loops, destructuring, and handlers assign as they run, so they rule const out.
+    if (node.type === "for") count(node.name, 2);
+    if (node.type === "foreach" || node.type === "destructure") for (const name of node.names) count(name, 2);
+    if (node.type === "try" && node.name) count(node.name, 2);
+  });
   return new Set(nodes.filter(node => node.type === "assign" && counts.get(node.name) === 1).map(node => node.name));
 }
 

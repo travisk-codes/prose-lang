@@ -13,7 +13,7 @@ From the Prose checkout:
 node bin/prose.js check
 node bin/prose.js check examples/arrays.prose
 node bin/prose.js check src --project tsconfig.json
-node bin/prose.js check --project D:/Datums/datums --json
+node bin/prose.js check --project ../my-app --json
 npm.cmd run check -- examples/arrays.prose
 ```
 
@@ -39,8 +39,8 @@ Prose's development dependency.
   ES2023, ES modules, bundler resolution, and the standard TypeScript libraries.
 
 The checker forces TypeScript's strict family of checks even when the project
-turns them off, overrides `noCheck`, disables unused-name lint, and filters the draft's implicit-any
-and unknown-value diagnostics in generated Prose code. Fresh `.d.prose.ts`
+turns them off, overrides `noCheck`, disables unused-name lint, and filters
+implicit-any and unknown-value diagnostics, since untyped Prose is allowed. Fresh `.d.prose.ts`
 declarations exist only in memory and override stale on-disk copies. Imports
 use declared export contracts; unannotated exports can still be `any`.
 
@@ -160,24 +160,6 @@ only null, and become required when excluding unset. Standalone callbacks, expli
 compound tests, truthiness tests, nested properties, and contextual sequence positions
 retain their existing behavior.
 
-## Reproduce the Datums measurement
-
-From this checkout:
-
-```powershell
-node scripts/measure-check.mjs D:/Datums/datums
-node scripts/measure-check.mjs D:/Datums/datums --json
-```
-
-The harness delegates to the public checker, explicitly selecting all `.prose`
-files under `src/` and preserving the audit's relative-path JSON format. Both
-commands now reproduce 24 diagnostics across 46 Datums modules with TypeScript
-6.0.3, down from 28 before the literal-flow and null-field inference fixes,
-without modifying application files.
-
-See [the Datums results](type-checking-datums.md) for the remaining diagnostic
-groups and the annotation issue found during the handoff.
-
 ## VS Code diagnostics
 
 Prose Language 0.1.13 checks open, saved Prose files and their imported Prose
@@ -198,7 +180,7 @@ require TypeScript or Workspace Trust.
   Literal unions can need `as` or `giving` annotations.
 - More complex guards and relationships between separate lookups still need
   explicit narrowing. A successful lookup does not prove a repeated lookup safe.
-- `any` and `unknown` remain unchecked under the draft's policy. New dynamic
+- `any` and `unknown` values remain unchecked. New dynamic
   fields and empty placeholders also make deliberate holes in checking.
 - Position helpers do not prove bounds, valid write gaps, or one-code-point
   string replacements. Out-of-range reads return unset at runtime. Contextual

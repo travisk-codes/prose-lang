@@ -10,7 +10,7 @@ print "Hello world!"
 2. Use as few non-letter characters as possible.
 3. Transpile to JavaScript so I can use it.
 
-## Try the first transpiler
+## Try it
 
 Requires Node.js 20.6 or newer. The compiler has no runtime dependencies or installation step. On Windows PowerShell, use `npm.cmd`
 to avoid the script execution policy restriction on `npm.ps1`.
@@ -39,7 +39,7 @@ load. Run programs you trust; execution has ordinary Node.js permissions.
 files; see [Type checking](docs/type-checking.md).
 
 `examples/tour.prose` uses every feature below in one program, and
-`examples/habits.prose` shows the newest ones across two files.
+`examples/habits.prose` shows one Prose file importing another.
 
 ## VS Code support
 
@@ -55,14 +55,9 @@ and requires a trusted workspace. Set `prose.check.enabled` to `false` to disabl
 it. Dirty buffers wait until save; highlighting and formatting remain available
 without TypeScript or Workspace Trust.
 
-Install `dist/prose-language-0.1.13.vsix` with **Extensions: Install from VSIX...**
-or run:
-
-```powershell
-code.cmd --install-extension dist/prose-language-0.1.13.vsix --force
-```
-
-Reload your VS Code window if an already-open file retains its old coloring.
+Build and install the extension as [its README](editors/vscode/README.md#install)
+describes, then reload your VS Code window if an already-open file retains its
+old coloring.
 User-defined function calls currently use identifier coloring; function
 declarations and built-in calls have distinct scopes.
 
@@ -371,8 +366,8 @@ points, so 😀 takes one position. Combining marks remain separate code points.
 - Missing reads return unset (`undefined` in emitted JavaScript).
 - A write replaces an existing position or appends at `length + 1`.
 - Writes cannot skip positions or use a non-positive or fractional index.
-- This milestone supports assigning exactly one code point per indexed write.
-  Multi-character replacements are not supported yet.
+- Each indexed write replaces exactly one code point; a multi-character
+  replacement is an error.
 - Strings are values: indexed assignment creates the updated string for that
   variable; copies and the caller's string are unchanged.
 
@@ -1063,30 +1058,27 @@ Run `npm.cmd run example:objects` to try the example.
 ## Caesar cipher
 
 Run `npm.cmd run example:cipher` to encode `hello` as `khoor`, decode it again,
-and demonstrate wrapping in both directions. The corrected cipher example
-uses `mod 26` and an explicit empty string so empty input returns `""`.
+and demonstrate wrapping in both directions. The cipher uses `mod 26`, so
+negative rotations wrap too, and starts from an empty string, so empty input
+returns `""`.
 
 The example targets lowercase `a–z`: it applies that same mapping to every
 input character. Case-preserving or punctuation-preserving behavior would
 require additional branches in the example.
 
-## Design examples and next steps
+## More examples
 
-FizzBuzz, Fibonacci, both factorial functions, and the Caesar cipher are executable. The Fibonacci recursive calls now use
-parentheses to follow the call-order rule. `fibonacci_demo.prose` includes the
-function and a loop that prints its values; `fibonacci.prose` defines the function
-without calling it.
+`fibonacci.prose`, `factorial.prose`, and `caesar_cipher.prose` define functions
+without calling them; each one's `_demo` file adds the calls. Run
+`npm.cmd run example:factorial` to print both factorial implementations' answers
+for each integer from 0 through 10 (two identical lines per input).
 
-Run `npm.cmd run example:factorial` to print both implementations' answers for
-each integer from 0 through 10 (two identical lines per input). The corrected
-`factorial.prose` definitions are preserved; `factorial_demo.prose` adds the calls.
+`reading_list.prose` demonstrates `for each`, function values, and JavaScript
+methods; `habits.prose` adds `maybe` and imports between Prose files;
+`tour.prose` covers everything. `MusicTicker.prose` is a design sketch that
+doesn't compile.
 
-The corrected `caesar_cipher.prose` is preserved; `caesar_cipher_demo.prose` adds
-calls that exercise it. `reading_list.prose` demonstrates `for each`, function
-values, and JavaScript methods; `habits.prose` adds `maybe` and imports between
-Prose files; `tour.prose` covers everything. MusicTicker remains a design sketch. Computed
-object keys, nested named functions, default imports, `typeof` and
-`instanceof`, `try`/`catch`, and async are not implemented yet. Unsupported
+Nested named functions and default imports aren't implemented. Unsupported
 syntax produces a line-numbered error.
 
 The library entry points are `compile` and `transpile` in `src/transpile.js`.

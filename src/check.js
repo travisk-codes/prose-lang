@@ -1,6 +1,6 @@
 // TypeScript's "implicitly has an 'any' type" errors. Untyped Prose is allowed to be untyped,
 // so the checker drops these instead of reporting them.
-export const implicitAnyCodes = new Set([7005, 7006, 7008, 7010, 7011, 7015, 7016, 7018, 7019, 7022, 7023, 7024, 7031, 7034, 7053]);
+const implicitAnyCodes = new Set([7005, 7006, 7008, 7010, 7011, 7015, 7016, 7018, 7019, 7022, 7023, 7024, 7031, 7034, 7053]);
 
 // TypeScript turns untyped values into unknown ones on their way through generic functions:
 // Array.from on an untyped parameter gives unknown[], and new Set gives Set<unknown>. In

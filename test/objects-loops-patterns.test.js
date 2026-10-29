@@ -1,13 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runInNewContext } from "node:vm";
 import { transpile } from "../src/transpile.js";
-
-function run(source) {
-  const output = [];
-  runInNewContext(transpile(source), { console: { log: (...values) => output.push(values.length === 1 ? values[0] : values) } }, { timeout: 1000 });
-  return structuredClone(output);
-}
+import { run } from "./run.js";
 
 test("inline objects take name is value entries, bare names, and like copies", () => {
   assert.deepEqual(run([
@@ -68,7 +62,7 @@ test("each of spreads a collection into lists, call arguments, and print", () =>
     "print each of counts",
     "print Math:min with each of counts, 1"
   ].join("\n")), [9, [1, 2, 3, 4], ["a", "😀"], ["x", "y", "z"], [3, 9, 4], 1]);
-  assert.throws(() => run("value is 5\nprint (each of value,)"), /Line 2: 'for each' requires an array/);
+  assert.throws(() => run("value is 5\nprint (each of value,)"), /Line 2: Expected a list, text, or other collection/);
   assert.throws(() => transpile("items is 1, 2\nx is each of items"), /Line 2: 'each of' can only spread/);
   assert.throws(() => transpile("function twice takes n\n    return n * 2\nitems is (1,)\nprint twice each of items"),
     /Line 4: 'twice' takes a fixed number of arguments/);
@@ -85,7 +79,7 @@ test("are assigns several names from a list by position, including swaps and str
   ].join("\n").replace("print left otherwise \"outer left is untouched\"", "")), [90, [2, 1], "x", 7, "kv", 2]);
   assert.throws(() => transpile("a, a are 1, 2"), /Line 1: Duplicate variable name/);
   assert.throws(() => transpile("a, b are"), /Line 1: Expected a list after 'are'/);
-  assert.throws(() => run("a, b are 5"), /Line 1: 'for each' requires an array/);
+  assert.throws(() => run("a, b are 5"), /Line 1: Expected a list, text, or other collection/);
 });
 
 test("skip continues and stop breaks the innermost loop", () => {
