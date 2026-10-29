@@ -1,8 +1,8 @@
 "A reading list built from JavaScript arrays, maps, methods, and functions as"
 "values."
 
-shelf is 
-    ("Middlemarch", 880, true), 
+shelf is
+    ("Middlemarch", 880, true),
     ("Piranesi", 272, false),
     ("Beloved", 324, true)
 

@@ -17,7 +17,7 @@ function spaceBefore(tokens, i) {
   if (!i) return "";
   const previous = tokens[i - 1], token = tokens[i];
   // `matrix.1 .2` needs this space: joining it would lex 1.2 as one number.
-  if (previous.type === "number" && symbol(token, ".")) return " ";
+  if (previous.type === "number" && symbol(token, ".") && tokens[i + 1]?.type === "number") return " ";
   if (accessor(previous) || accessor(token) || symbol(token, ",") || symbol(token, ")") || symbol(previous, "(")) return "";
   if (unaryMinus(tokens, i - 1) && !symbol(token, "-")) return "";
   return " ";

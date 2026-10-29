@@ -145,11 +145,14 @@ test("format preserves parentheses, unary minus, subtraction, accessors, and fun
     "items is 1, 2", "print items.at with -1", "print items : length",
     'matrix is ("first", "second"), ("third", "fourth")', 'print matrix.1 .2',
     'name is "Ada"', "action is name . to_upper_case", "print name.to_upper_case run",
-    'person is object name is "Grace"', 'key is "name"', "print person . (key)"
+    'person is object name is "Grace"', 'key is "name"', "print person . (key)",
+    "people is (person,)", "print people.1 . name"
   ].join("\n");
   const formatted = format(source, { width: 20 });
   assert.match(formatted, /print value - 1/);
   assert.match(formatted, /print -1/);
+  assert.match(formatted, /print matrix\.1 \.2/);
+  assert.match(formatted, /print people\.1\.name/);
   assert.match(formatted, /action is\s+name.to_upper_case/);
   assert.match(formatted, /print person.\(key\)/);
   const run = text => {
