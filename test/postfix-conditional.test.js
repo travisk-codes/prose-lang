@@ -91,9 +91,9 @@ test("missing else clauses and values report the source line", () => {
   assert.throws(() => transpile('print "read" if true else'), /Line 1: Expected an expression/);
 });
 
-test("reading_list_simplified prints the correct average with a numeric pages variable", () => {
+test("reading_list prints the correct average with a numeric pages variable", () => {
   const cli = fileURLToPath(new URL("../bin/prose.js", import.meta.url));
-  const example = fileURLToPath(new URL("../examples/reading_list_simplified.prose", import.meta.url));
+  const example = fileURLToPath(new URL("../examples/reading_list.prose", import.meta.url));
   const result = spawnSync(process.execPath, [cli, example, "--run"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.stdout.trim().split(/\r?\n/), [

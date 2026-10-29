@@ -21,7 +21,7 @@ Each program is standalone. Quoted strings on their own lines explain the code.
 | [postcard_station.prose](postcard_station.prose) | Unicode strings, `length`, character conversions, mathematical `mod`, negative rotations, string replacement/appending, unset declarations, `while`, zero-argument calls, early returns, and escapes |
 | [pascal_triangle.prose](pascal_triangle.prose) | Recursion, returning arrays, empty and one-item arrays, nested arrays, calculated indexes, and copied array arguments |
 | [copy_workshop.prose](copy_workshop.prose) | Shared arrays and objects, copying with `slice`, changes made through function arguments, empty objects, missing properties, division, `%`, and prefix `remainder` |
-| [reading_list.prose](reading_list.prose) | `for each` with several variables, inline `if`, functions as values with inline and indented bodies, JavaScript methods called with the values after them or `run`, `new Map`, `Math`, and `otherwise` |
+| [reading_list.prose](reading_list.prose) | `for each` with several variables, trailing `if`/`else` values, functions as values with inline and indented bodies, JavaScript methods called with the values after them or `run`, `new Map`, `Math`, and `otherwise` |
 | [habits.prose](habits.prose) and [habit_rules.prose](habit_rules.prose) | The newest features: one Prose file importing another and calling its functions like local ones, `with` for optional arguments, `maybe` on properties and methods, Map entries in `for each`, and the parentheses a call needs when arithmetic follows it |
 | [tour.prose](tour.prose) and [tour_helpers.prose](tour_helpers.prose) | Every construct Prose supports, section by section, including imports from Prose and from Node.js (`node:path`) and exports |
 
@@ -29,9 +29,10 @@ Each program is standalone. Quoted strings on their own lines explain the code.
 empty-`is` unset declarations; numbers, strings with escapes, booleans, null,
 and `unset`; arithmetic, comparison, logical, and `otherwise` operators;
 parentheses; ordinary and zero-argument functions; expression returns and bare
-returns; recursion; `if`/`else if`/`else`; inline conditionals and inline `if`
-values; `for`, `for each`, and `while` with `skip` and `stop`; indented and
-one-line objects with `like`; `:` property access; one-based `.` indexing;
+returns; recursion; `if`/`else if`/`else`; inline conditionals and `if` values,
+in front or trailing; `for`, `for each`, and `while` with `skip` and `stop`;
+indented and one-line objects with `like`; `.` and `:` property access and
+computed names; one-based `.` indexing;
 comma arrays with `each of` spreading and `are` destructuring; string and array
 writes; functions as values; JavaScript globals, methods, and `new`; `maybe`;
 patterns; types; `use` and `export`; and the three standard-library string

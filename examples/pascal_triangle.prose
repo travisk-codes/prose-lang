@@ -2,7 +2,7 @@
 
 function next_row takes previous
     row is array
-    for i is 1 to (length previous + 1)
+    for i is 1 to length previous + 1
         left is 0
         right is 0
         if i > 1 left is previous.(i - 1)
@@ -15,23 +15,22 @@ function triangle takes count
     "A one-element array containing another one-element array."
     if count = 1 return ((1,),)
     rows is triangle (count - 1)
-    last_row is rows.(length rows)
-    rows.(length rows + 1) is next_row last_row
+    rows.(length rows + 1) is next_row rows.(length rows)
     return rows
 
 rows is triangle 6
-print "Triangle rows: " + (length rows)
+print "Triangle rows: " + length rows
 for i is 1 to length rows
     print rows.i
 
 "Parentheses distinguish nested literal indexes from decimal numbers."
-print "Third entry of row six: " + ((rows.6).3)
+print "Third entry of row six: " + (rows.6).3
 
 "next_row builds a new array and only reads its argument, so the seed is"
 "unchanged."
 seed is (1,)
 grown is next_row seed
-print "Seed length: " + (length seed)
+print "Seed length: " + length seed
 print grown
 
 corners is (rows.1).1, (rows.6).1

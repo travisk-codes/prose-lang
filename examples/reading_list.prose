@@ -2,9 +2,9 @@
 "values."
 
 shelf is 
-    ("Middlemarch", 880, true ), 
-    ("Piranesi",    272, false), 
-    ("Beloved",     324, true )
+    ("Middlemarch", 880, true), 
+    ("Piranesi", 272, false),
+    ("Beloved", 324, true)
 
 books is array
 for each title, pages, done in shelf
@@ -12,37 +12,36 @@ for each title, pages, done in shelf
 
 "An inline if chooses between two values."
 function status takes book
-    return if book:done then "read" else "to read"
+    return "read" if book.done else "to read"
 
 "An inline function: everything after return is its result."
-finished is books:filter function takes book return book:done
-titles is finished:map function takes book return book:title
-print "Finished: " + (titles:join ", ")
+finished is books.filter function takes book return book.done
+titles is finished.map function takes book return book.title
+print "Finished: " + titles.join ", "
 
 "A function with an indented body, passed as the last argument."
-labels is books:map function takes book
-    if book:pages > 500 return book:title + " (long)"
-    return book:title
-print labels:join ", "
+labels is books.map function takes book
+    return book.title + " (long)" if book.pages > 500 else book.title
+print labels.join ", "
 
 "A Map from JavaScript counts books by status; otherwise supplies 0 the first"
 "time."
 counts is new Map
 for each book in books
-    count is counts:get (status book) otherwise 0
-    counts:set (status book), (count + 1)
+    count is counts.get status book otherwise 0
+    counts.set status book, (count + 1)
 for each label, count in counts
     print label + ": " + count
 
 "Arguments bind before arithmetic, so the division needs parentheses."
 total is 0
 for each book in books
-    total is total + book:pages
-print "Average pages: " + (Math:round (total / length books))
+    total is total + book.pages
+print "Average pages: " + Math.round (total / length books)
 
 "Functions are values: store one, then call it with a value after it, or with"
 "run when it takes nothing."
-shout is function takes text return text:to_upper_case run
+shout is function takes text return text.to_upper_case run
 print shout "done"
-abandoned is counts:get "abandoned"
+abandoned is counts.get "abandoned"
 print "Abandoned: " + (abandoned otherwise 0)

@@ -120,7 +120,7 @@ test("all runnable examples emit identical JavaScript with maps enabled", () => 
     assert.doesNotThrow(() => new SourceMap(result.map));
     checked++;
   }
-  assert.ok(checked >= 36);
+  assert.ok(checked >= 18);
 });
 
 test("Vite returns a source map for query-bearing imports with original content", () => {

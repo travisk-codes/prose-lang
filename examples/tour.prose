@@ -29,12 +29,13 @@ print -1 mod 26
 
 "--- Comparison and logic. otherwise replaces only unset and null; or replaces"
 "any false value."
-print 3 >= 3 and 2 != 3 and not (1 > 2) and 1 < 2 and 2 <= 2
+print 3 >= 3 and 2 != 3 and not 1 > 2 and 1 < 2 and 2 <= 2
 print no or "or fallback"
 print nothing otherwise "otherwise fallback"
 print 0 otherwise 5
 
-"--- Branches: if, else if, else, inline statements, and inline if values."
+"--- Branches: if, else if, else, inline statements, and if values, in front or"
+"trailing."
 function size_of takes n
     if n < 10
         return "small"
@@ -50,6 +51,7 @@ if false print "not printed"
 else if yes print "inline else if"
 else print "not printed either"
 print if ratio > 2 then "big ratio" else "small ratio"
+print "big ratio" if ratio > 2 else "small ratio"
 
 "--- Loops: counting with for, while, and for each over lists, strings, and"
 "pairs."
@@ -102,27 +104,29 @@ built.1 is "o"
 built.2 is "k"
 print built
 
-"--- Objects: nested literals, colon access, changes, function values, and"
-"returning objects."
+"--- Objects: nested literals, dot and colon access, changes, function values,"
+"and returning objects."
 person is object
     name is "Ada"
     address is object
         city is "London"
-    describe is function takes who return who:name + " of " + who:address:city
-print person:address:city
-person:address:city is "Paris"
-person:name.1 is "E"
-print person:describe person
+    describe is function takes who return who.name + " of " + who.address.city
+print person.address.city
+person.address.city is "Paris"
+person.name.1 is "E"
+print person.describe person
+"A colon always reads the property by its literal name. A name in parentheses"
+"is worked out first."
+field is "city"
+print person:name + " in " + person.address.(field)
 empty is object
-empty:added is "later"
-print empty:added
-print empty:nothing = unset
+empty.added is "later"
+print empty.added
+print empty.nothing = unset
 function make_point takes x, y
-    return object
-        x is x
-        y is y
+    return object x, y
 point is make_point 3, 4
-print point:x + point:y
+print point.x + point.y
 
 "--- Arrays: commas, one item, empty, nesting, positions, appending, sharing,"
 "and copies."
@@ -139,27 +143,27 @@ print grid.row.column
 numbers.(length numbers + 1) is 4
 shared is numbers
 shared.1 is 30
-copy is numbers:slice run
+copy is numbers.slice run
 copy.1 is 300
 print numbers
 print copy.1
 
 "--- Function values: inline and indented bodies, passed to methods and to"
 "Prose functions."
-sorted is numbers:to_sorted function takes a, b return a - b
+sorted is numbers.to_sorted function takes a, b return a - b
 print sorted
-evens is sorted:filter function takes n return n mod 2 = 0
+evens is sorted.filter function takes n return n mod 2 = 0
 print evens
-labels is sorted:map function takes n, index
+labels is sorted.map function takes n, index
     prefix is "#" + (index + 1)
     return prefix + "=" + n
-print labels:join ", "
+print labels.join ", "
 square is function takes n return n * n
 print square 9
 seven is function return 7
 print seven run
 function apply_twice takes action, value
-    return action (action value)
+    return action action value
 print apply_twice square, 3
 function after takes action, delay
     return action run + " after " + delay
@@ -168,76 +172,80 @@ print after function, 5
 
 "--- JavaScript: globals, methods called with the values after them, run for"
 "none, and new."
-print Math:max 4, 9, 2
-print (Math:round (10 / 3)):to_fixed 1
-print "Prose":to_upper_case run
-print JSON:stringify point
+print Math.max 4, 9, 2
+print (Math.round (10 / 3)).to_fixed 1
+print "Prose".to_upper_case run
+print JSON.stringify point
 seen is new Set ("a", "b", "a")
-print seen:size
+print seen.size
 lookup is new Map
-lookup:set "key", ("val" + "ue")
+lookup.set "key", ("val" + "ue")
 "Parentheses say what a call's result does next, and which call gets each"
 "argument."
-print (lookup:get "key") + "!"
-print Math:max (Math:min 5, 8), 6
+print (lookup.get "key") + "!"
+print Math.max (Math.min 5, 8), 6
 "with is optional, and needed before a negative first argument."
-print Math:min with 3, 1
-print numbers:at with -1
+print Math.min with 3, 1
+print numbers.at with -1
 "then starts an inline if's body when the condition ends in a call."
 found is false
-if seen:has "a" then found is true
+if seen.has "a" then found is true
 print found
 
 "--- maybe: reading through values that might be missing."
 profile is object
     name is "Grace"
     nickname is
-print maybe profile:address:city
-print maybe profile:address:city otherwise "no city"
-print maybe profile:name:to_upper_case run
-print maybe profile:nickname:length otherwise 0
-print maybe profile:tags.1 otherwise "no tags"
+print maybe profile.address.city
+print maybe profile.address.city otherwise "no city"
+print maybe profile.name.to_upper_case run
+print maybe profile.nickname.length otherwise 0
+print maybe profile.tags.1 otherwise "no tags"
 callback is unset
 maybe callback run
-print (maybe callback run) otherwise "no callback"
+print maybe callback run otherwise "no callback"
 
 "--- Objects on one line, spreading with each of, and taking lists apart with"
 "are."
 title is "Dr."
 greeting_card is object title, name is "Ada", lines is 2
 updated_card is object like greeting_card, lines is 3
-print JSON:stringify updated_card
-print greeting_card:lines
+print JSON.stringify updated_card
+print greeting_card.lines
 low, high are 4, 9
 low, high are high, low
-print (each of numbers, low, high)
-print Math:min each of numbers
+print each of numbers, low, high
+print Math.min each of numbers
 
 "--- skip moves to the next turn of a loop, and stop leaves it."
 picked is array
 for each n in 1, 2, 3, 4, 5, 6
     if n mod 2 = 0 skip
     if n > 4 stop
-    picked:push n
+    picked.push n
 print picked
 
 "--- Patterns: regular expressions, with backslashes kept as typed."
 date is "2026-10-28"
-year, month are (date:match pattern "^(\d{4})-(\d{2})"):slice 1
+year, month are (date.match pattern "^(\d{4})-(\d{2})").slice 1
 print year + "/" + month
-print "a  b   c":replace (pattern "\s+" everywhere), " "
-print "Prose":match pattern "^prose$" ignoring case != null
+print "a  b   c".replace pattern "\s+" everywhere, " "
+print "Prose".match pattern "^prose$" ignoring case != null
 
 "--- Types: optional annotations that describe exports to TypeScript. They"
 "don't change what runs."
+
 "A point on a grid."
 export type Point is object
     x as number
     y as number
     "Points may have a label."
     label as maybe text
-export function distance takes from_point as Point, to_point as Point, giving number
-    return Math:hypot (to_point:x - from_point:x), (to_point:y - from_point:y)
+export function distance takes
+    from_point as Point,
+    to_point as Point,
+giving number
+    return Math.hypot (to_point.x - from_point.x), (to_point.y - from_point.y)
 export function welcome takes name as text, giving Greeting
     return greet name, "."
 origin as Point is make_point 0, 0
@@ -253,4 +261,4 @@ print double 21
 export function stop_count giving number
     return 18
 export version as text is "tour 1"
-print "Tour stops: " + (stop_count run) + ", " + version
+print "Tour stops: " + stop_count run + ", " + version

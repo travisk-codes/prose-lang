@@ -1,17 +1,17 @@
 function factorial1 takes number
-	if number < 0 print "Number must be positive."
-	answer is 1
-	while number > 1
-		answer is answer * number
-		number is number - 1
-	return answer
+    if number < 0 print "Number must be positive."
+    answer is 1
+    while number > 1
+        answer is answer * number
+        number is number - 1
+    return answer
 
 function factorial2 takes number
-	answer is 1
-	for n is 1 to number
-		answer is answer * n
-	return answer
+    answer is 1
+    for n is 1 to number
+        answer is answer * n
+    return answer
 
 for number is 0 to 10
-	print factorial1 number
-	print factorial2 number
+    print factorial1 number
+    print factorial2 number

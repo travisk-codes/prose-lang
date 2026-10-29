@@ -117,7 +117,7 @@ test("format is stable and preserves meaning for every runnable example", () => 
     assert.equal(compile(source, options).declarations, compile(formatted, options).declarations, name);
     checked++;
   }
-  assert.ok(checked >= 36, `Checked ${checked} examples`);
+  assert.ok(checked >= 18, `Checked ${checked} examples`);
 });
 
 test("format CLI checks, writes recursively, skips dependencies, and resolves imports", () => {

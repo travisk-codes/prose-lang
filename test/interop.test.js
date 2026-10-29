@@ -414,9 +414,9 @@ test("CLI runs the tour of every feature", () => {
   assert.deepEqual(runExample("tour.prose"), [
     "42", 'She said "hi"!', "true", "12", "-10", "2", "2", "-1", "25", "true", "or fallback",
     "otherwise fallback", "0", "small", "medium", "large", "inline if statement", "inline else if",
-    "big ratio", "10", "3", "2", "1", "a", "😀", "first 1", "second 2", "120", "7", "7", "announcing",
+    "big ratio", "big ratio", "10", "3", "2", "1", "a", "😀", "first 1", "second 2", "120", "7", "7", "announcing",
     "Hello, Ada!", "Hello, Grace?", "Hello", "today.txt", "5", "😀", "65", "a", "H😀llo!", "ok",
-    "London", "Eda of Paris", "later", "true", "7", "4", "3", "2", "3", "[ 30, 1, 2, 4 ]", "300",
+    "London", "Eda of Paris", "Eda in Paris", "later", "true", "7", "4", "3", "2", "3", "[ 30, 1, 2, 4 ]", "300",
     "[ 1, 2, 4, 30 ]", "[ 2, 4, 30 ]", "#1=1, #2=2, #3=4, #4=30", "81", "7", "81", "ran after 5",
     "9", "3.0", "PROSE", '{"x":3,"y":4}', "2", "value!", "6", "1", "4", "true", "undefined", "no city", "GRACE", "0",
     "no tags", "no callback", '{"title":"Dr.","name":"Ada","lines":3}', "2", "[ 30, 1, 2, 4, 9, 4 ]", "1",

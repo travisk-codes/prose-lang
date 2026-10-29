@@ -68,7 +68,7 @@ The formatter standardizes indentation and spacing and wraps long expressions
 at safe continuation points. Its default width is 80 columns:
 
 ```powershell
-node bin/prose.js format examples/reading_list_simplified.prose --width 80
+node bin/prose.js format examples/reading_list.prose --width 80
 node bin/prose.js format src --check
 npm.cmd run format -- examples/fizzbuzz.prose
 ```
@@ -88,8 +88,8 @@ For a preview, use standard input; `--stdin-filepath` resolves Prose imports
 relative to the named file:
 
 ```powershell
-Get-Content -Raw examples/reading_list_simplified.prose |
-    node bin/prose.js format - --stdin-filepath examples/reading_list_simplified.prose
+Get-Content -Raw examples/reading_list.prose |
+    node bin/prose.js format - --stdin-filepath examples/reading_list.prose
 ```
 
 In VS Code, use **Format Document** (`Shift+Alt+F` on Windows). The extension

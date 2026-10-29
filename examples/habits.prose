@@ -5,38 +5,44 @@ use longest_streak, note_length, summary from "./habit_rules.prose"
 
 "A check-in is a day number and an optional note."
 function check_in takes day, note
-    entry is object
-        day is day
-        note is note
-    return entry
+    return object day, note
 
 "Each call takes its own two arguments, so commas between calls separate the"
 "check-ins."
 log is new Map
-log:set "Stretch", (check_in 1, "stiff", check_in 2, unset, check_in 3, "loose", check_in 5, unset)
-log:set "Read", (check_in 1, unset, check_in 2, "two chapters", check_in 3, unset, check_in 4, unset, check_in 5, unset)
-log:set "Walk", (check_in 4, unset,)
+log.set "Stretch", (
+    check_in 1, "stiff",
+    check_in 2, unset,
+    check_in 3, "loose",
+    check_in 5, unset)
+log.set "Read", (
+    check_in 1, unset,
+    check_in 2, "two chapters",
+    check_in 3, unset,
+    check_in 4, unset,
+    check_in 5, unset)
+log.set "Walk", (check_in 4, unset,)
 
 "for each takes Map entries apart. Imported Prose functions keep their argument"
 "counts; with leaves out an optional one."
 for each name, entries in log
-    days is entries:map function takes entry return entry:day
-    print summary with name, (longest_streak days)
-    noted is entries:filter function takes entry return note_length entry > 0
+    days is entries.map function takes entry return entry.day
+    print summary with name, longest_streak days
+    noted is entries.filter function takes entry return note_length entry > 0
     if length noted > 0
-        notes is noted:map function takes entry return entry:note
-        print "  notes: " + (notes:join "; ")
+        notes is noted.map function takes entry return entry.note
+        print "  notes: " + notes.join "; "
 
 "summary with all three arguments, using its marker."
-print summary "Read", (longest_streak (5, 6, 7)), "*"
+print summary "Read", longest_streak (5, 6, 7), "*"
 
 "maybe also covers methods: a habit with no check-ins has no list to call map"
 "on."
-swim is log:get "Swim"
-swim_days is maybe swim:map function takes entry return entry:day
+swim is log.get "Swim"
+swim_days is maybe swim.map function takes entry return entry.day
 print "Swim days: " + (swim_days otherwise "none yet")
 
 "Arithmetic right after a call's arguments must say what it means, so this uses"
 "parentheses."
-read_days is (log:get "Read"):map function takes entry return entry:day
-print "Day 3 is check-in number " + ((read_days:index_of 3) + 1)
+read_days is (log.get "Read").map function takes entry return entry.day
+print "Day 3 is check-in number " + ((read_days.index_of 3) + 1)

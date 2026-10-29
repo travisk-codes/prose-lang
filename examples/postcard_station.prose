@@ -42,7 +42,7 @@ stamp.2 is "😀"
 stamp.1 is "A"
 stamp.(length stamp + 1) is "!"
 print "Stamp: " + stamp
-print "Stamp positions: " + (length stamp)
+print "Stamp positions: " + length stamp
 
 "The alternate unset declaration uses an empty right side."
 spare is

@@ -8,7 +8,7 @@ same.1 is "Changed"
 print names.1
 
 "slice makes a separate copy."
-copy is names:slice run
+copy is names.slice run
 copy.1 is "Copied"
 print names.1
 print copy.1
