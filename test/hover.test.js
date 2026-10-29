@@ -153,3 +153,94 @@ test("hover types use Prose names for builtins, maybe values, maps, and generics
     assert.equal(at(result, source, 'print number_to_char', 'number_to_char').code, 'function number_to_char takes value as number giving text');
   } finally { f.close(); }
 });
+
+test("interop hovers distinguish code points, UTF-16 units, and native method positions", () => {
+  const f = fixture();
+  const source = [
+    'word is "😀a"', 'print length word', 'print word.length',
+    'print word.slice with 0, 2', 'print word.at 0', 'print word.index_of "a"',
+    'print word.1', 'print word.("length")', 'print word:("length")',
+    'print word.(1)',
+    'for i is 1 to 2', '    print word.i',
+    'function first takes items as list of text', '    return items:at 0'
+  ].join('\n');
+  try {
+    const result = f.check(f.write('main.prose', source));
+    assert.deepEqual(result.diagnostics, []);
+    assert.match(at(result, source, 'print length', 'length').notes.join('\n'), /Unicode code points.*length "😀" is 1/);
+    assert.match(at(result, source, 'word.length', 'length').notes.join('\n'), /UTF-16 code units.*length 2/);
+    for (const needle of ['word.("length")', 'word:("length")']) {
+      assert.match(at(result, source, needle, '"length"').notes.join('\n'), /used literally.*UTF-16 code units/s);
+    }
+    assert.match(at(result, source, 'word.slice', 'slice').notes.join('\n'), /zero-based.*end is excluded.*UTF-16/);
+    assert.match(at(result, source, 'word.at', 'at').notes.join('\n'), /0 is the first item.*negative/);
+    assert.match(at(result, source, 'word.index_of', 'index_of').notes.join('\n'), /indexOf returns a zero-based position, or -1/);
+    assert.match(at(result, source, 'word.1', '1').notes.join('\n'), /positions start at 1.*Unicode code point/);
+    assert.match(at(result, source, 'word.(1)', '1').notes.join('\n'), /positions start at 1/);
+    assert.match(at(result, source, 'word.i\n', 'i').notes.join('\n'), /Here i supplies the position.*:i/);
+    assert.match(at(result, source, 'items:at', 'at').notes.join('\n'), /Colon access.*zero-based/s);
+  } finally { f.close(); }
+});
+
+test("property spelling, colon escapes, and literal keys explain exactly what is accessed", () => {
+  const f = fixture();
+  const source = [
+    'record is object user_id is 7', 'print record.user_id', 'print record:user_id',
+    'words is "first", "second"', 'map is 1', 'print words.map',
+    'print words:map function takes word return word',
+    'data is JSON.parse "{}"', 'print data.("user_id")', 'print data:(1)',
+    'print data.("😀")', 'print "text with data.(\\"user_id\\") inside it"',
+    'print pattern "data.(user_id)"'
+  ].join('\r\n');
+  try {
+    const result = f.check(f.write('main.prose', source));
+    assert.deepEqual(result.diagnostics, []);
+    assert.match(at(result, source, 'record.user_id', 'user_id').notes.join('\n'), /"user_id" is spelled "userId".*\.\("user_id"\)/);
+    assert.match(at(result, source, 'record:user_id', 'user_id').notes.join('\n'), /Colon access reads the JavaScript property "userId"/);
+    assert.match(at(result, source, 'words.map', 'map').notes.join('\n'), /Here map supplies the position.*:map/);
+    assert.match(at(result, source, 'words:map', 'map').notes.join('\n'), /Colon access.*"map"/);
+    assert.match(at(result, source, 'data.("user_id")', '"user_id"').notes.join('\n'), /used literally.*without snake_case/);
+    assert.match(at(result, source, 'data:(1)', '1').notes.join('\n'), /JavaScript property.*one-based position adjustment/);
+    assert.match(at(result, source, 'data.("😀")', '"😀"').notes.join('\n'), /used literally/);
+    const quoted = source.split('\r\n').findIndex(line => line.startsWith('print "text with')) + 1;
+    assert.ok(!result.hovers.some(item => item.line === quoted));
+    assert.doesNotThrow(() => JSON.stringify(result));
+  } finally { f.close(); }
+});
+
+test("custom fields and unknown receivers do not receive native-method claims", () => {
+  const f = fixture();
+  const source = [
+    'custom is object length is 2, slice is function takes start, end return start',
+    'print custom.length', 'print custom.slice with 0, 2',
+    'function inspect takes value', '    print value.length', '    return value.slice with 0, 2',
+    'function dynamic takes values, i', '    return values.i'
+  ].join('\n');
+  try {
+    const result = f.check(f.write('main.prose', source));
+    assert.deepEqual(result.diagnostics, []);
+    for (const [needle, word] of [['custom.length', 'length'], ['custom.slice', 'slice'], ['value.length', 'length'], ['value.slice', 'slice']]) {
+      assert.equal(at(result, source, needle, word).notes, undefined, needle);
+    }
+    assert.match(at(result, source, 'values.i', 'i').notes.join('\n'), /numeric i.*otherwise.*property "i"/);
+  } finally { f.close(); }
+});
+
+test("computed numeric dots distinguish list positions from object property keys", () => {
+  const f = fixture();
+  const source = [
+    'use type Table from "./types"', 'table as Table is JSON.parse "{}"',
+    'print table.(1)', 'print table:(1)', 'unknown is JSON.parse "{}"',
+    'print unknown.(1)', 'items is "first", "second"', 'print items.(1)',
+    'print items:(1)'
+  ].join('\n');
+  try {
+    f.write('types.ts', 'export interface Table { [key: number]: string }');
+    const result = f.check(f.write('main.prose', source));
+    assert.deepEqual(result.diagnostics, []);
+    assert.match(at(result, source, 'table.(1)', '1').notes.join('\n'), /On this object.*JavaScript property key/);
+    assert.match(at(result, source, 'unknown.(1)', '1').notes.join('\n'), /one-based position.*other receivers/);
+    assert.match(at(result, source, 'items.(1)', '1').notes.join('\n'), /positions start at 1/);
+    for (const needle of ['table:(1)', 'items:(1)']) assert.match(at(result, source, needle, '1').notes.join('\n'), /used literally.*without.*one-based position adjustment/);
+  } finally { f.close(); }
+});

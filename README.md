@@ -376,6 +376,8 @@ print word
 
 This prints `😀`, `z`, and `abz!`. Positions and `length` count Unicode code
 points, so 😀 takes one position. Combining marks remain separate code points.
+JavaScript string methods use UTF-16 offsets instead; see the
+[Prose and JavaScript conventions](docs/javascript-interop.md) guide for examples.
 
 - Missing reads return unset (`undefined` in emitted JavaScript).
 - A write replaces an existing position or appends at `length + 1`.
@@ -765,6 +767,10 @@ variable with the same name. Changing an outer array or object (for example,
 `seen:push value`) does affect it.
 
 ## Using JavaScript
+
+The [Prose and JavaScript conventions](docs/javascript-interop.md) guide compares
+positions, Unicode lengths, contextual dots, explicit colons, and literal JSON
+keys. VS Code hovers explain these boundaries at the relevant access or call.
 
 When no Prose variable has the name, common JavaScript globals are available:
 `Math`, `JSON`, `Object`, `Array`, `Map`, `Set`, `Date`, `Number`, `String`,

@@ -33,7 +33,8 @@ function createLanguageFeatures(vscode, { runCheck = startCheck } = {}) {
   async function query(document, position, cancellation, feature, retry = true) {
     if (disposed || cancellation.isCancellationRequested || !enabled(document, feature)) return;
     const line = document.getText().split(/\r?\n/)[position.line] ?? "";
-    if (!/[A-Za-z_0-9]/.test(line[position.character] ?? "")) return;
+    // String-key and numeric-position hints also cover quotes and Unicode.
+    if (!(feature === "hover" ? /\S/u : /[A-Za-z_0-9]/).test(line[position.character] ?? "")) return;
     const version = document.version;
     const { key, cwd, project } = group(document);
     const { documents, stamp } = snapshot(document);
@@ -87,6 +88,7 @@ function createLanguageFeatures(vscode, { runCheck = startCheck } = {}) {
     markdown.supportHtml = false;
     markdown.appendCodeblock(item.code, "prose");
     if (item.documentation) markdown.appendText("\n\n" + item.documentation);
+    for (const note of item.notes ?? []) markdown.appendText("\n\n" + note);
     return new vscode.Hover(markdown, range(item));
   }
   async function provideDefinition(document, position, cancellation) {

@@ -83,6 +83,13 @@ Types use Prose names, such as `text`, `list of text`, and `maybe number`.
 Functions show their parameters and return type, followed by documentation when
 available. Object values show their fields. Named project types keep their names.
 
+Hovers also explain Prose/JavaScript conventions at the relevant access: Unicode
+code-point length versus JavaScript UTF-16 length, one-based Prose positions
+versus zero-based native methods, explicit colon properties, and property-name
+conversion. Numeric dot positions and quoted computed keys have hover reminders
+too. Native-method hints require a known text/list receiver and a standard
+library signature. See [Prose and JavaScript conventions](../../docs/javascript-interop.md).
+
 Hovers read current Prose and TypeScript/JavaScript editor buffers, including
 unsaved changes in imported files. They run on demand in a background worker;
 moving between words reuses the project's snapshot. Editing, saving, changes on
@@ -152,13 +159,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.16.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.17.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.16.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.17.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -183,7 +190,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.16.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.17.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

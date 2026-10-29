@@ -2,7 +2,7 @@
   "name": "prose-language",
   "displayName": "Prose Language",
   "description": "Syntax highlighting, formatting, type checking, hover types, and Go to Definition for Prose.",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],

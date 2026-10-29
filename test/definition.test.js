@@ -167,3 +167,15 @@ test("unnamed function-type parameters do not shadow real Prose parameters", () 
     assert.equal(result.hovers.find(item => item.line === target.line && item.column === target.column).code, 'arg1 as number');
   } finally { f.close(); }
 });
+
+test("interop hover notes keep contextual index definitions and add no literal targets", () => {
+  const f = fixture();
+  const source = 'items is 10, 20\noffset is 1\nprint items.offset\nprint items.1\ndata is JSON.parse "{}"\nprint data.("user_id")';
+  try {
+    const file = f.write('main.prose', source), result = f.check(file, { hoverTargets: [file] });
+    goesTo(result, source, 'items.offset', 'offset', file, source, 'offset is 1');
+    assert.ok(result.hovers.some(item => item.notes?.some(note => /used literally/.test(note))));
+    assert.equal(find(result, source, 'items.1', '1'), undefined);
+    assert.equal(find(result, source, 'data.("user_id")', '"user_id"'), undefined);
+  } finally { f.close(); }
+});

@@ -1,0 +1,25 @@
+"Prose counts code points; JavaScript counts UTF-16 code units."
+word is "😀"
+print length word
+print word:length
+print word.1
+print word:slice with 0, 2
+
+"Prose starts at 1; JavaScript list methods start at 0."
+words is "first", "second", "third"
+print words.1
+print words:at 0
+print words:slice with 0, 2
+js_position is words:index_of "second"
+if js_position >= 0
+    print words.(js_position + 1)
+
+"A colon forces a property, even when a numeric variable has that name."
+map is 1
+print words.map
+print words:map function takes item return item:to_upper_case run
+
+"Bare property names become camelCase; quoted keys preserve their spelling."
+data is JSON.parse "{\"userId\":\"converted\",\"user_id\":\"literal\"}"
+print data.user_id
+print data.("user_id")

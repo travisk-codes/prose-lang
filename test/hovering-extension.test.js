@@ -130,6 +130,23 @@ test("edits cancel pending snapshots and older results cannot replace current ho
   } finally { e.close(); }
 });
 
+test("interop notes render as safe text and quoted Unicode keys can be hovered", async () => {
+  const e = editor(), document = e.add('main.prose', 'print record.("😀")');
+  try {
+    const pending = e.request(document, cancellation(), { line: 0, character: 14 });
+    const value = result(document, '"😀"', 'Project documentation');
+    Object.assign(value.hovers[0], { column: 15, endColumn: 19, notes: ['Literal key: [unsafe](command:danger) <script>'] });
+    e.jobs[0].resolve(value);
+    const hover = await pending;
+    assert.deepEqual(hover.contents[0].parts, [
+      { code: '"😀"', language: 'prose' }, { text: '\n\nProject documentation' },
+      { text: '\n\nLiteral key: [unsafe](command:danger) <script>' }
+    ]);
+    assert.equal(hover.contents[0].isTrusted, false);
+    assert.equal(hover.contents[0].supportHtml, false);
+  } finally { e.close(); }
+});
+
 test("canceling a hover returns promptly while its snapshot can serve the next request", async () => {
   const e = editor(), document = e.add('main.prose');
   try {

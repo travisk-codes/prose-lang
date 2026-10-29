@@ -182,7 +182,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.16 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.17 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
@@ -195,6 +195,10 @@ exists) and in the Prose output channel. Highlighting and formatting do not
 require TypeScript or Workspace Trust.
 
 ## Current limits
+
+Hover types include [Prose/JavaScript convention notes](javascript-interop.md)
+for text lengths, positions, native methods, and property spelling. These explain
+runtime conventions; they do not add new type checks or prove index bounds.
 
 - TypeScript still widens unannotated object fields and some collection elements.
   Literal unions can need `as` or `giving` annotations.

@@ -75,7 +75,64 @@ export function collectSourceInfo(ts, checker, generated, record, { hover = true
   const lines = sourceLines(record.source, { locations: true });
   const owners = new Map();
   for (const line of lines) for (const token of line.tokens) owners.set(token.source.line, line);
-  const found = new Map();
+  const found = new Map(), computedNotes = new Map();
+  const positionNote = "Prose positions start at 1. In text, each Unicode code point occupies one position; an emoji such as 😀 occupies one. JavaScript methods use their own zero-based positions.";
+  function receiverKind(type) {
+    type = checker.getNonNullableType(type);
+    if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.TypeParameter)) return "unknown";
+    if (type.flags & ts.TypeFlags.StringLike) return "text";
+    if (checker.isArrayType(type) || checker.isTupleType(type)) return "list";
+    if (type.isIntersection()) {
+      const kinds = type.types.map(receiverKind);
+      return kinds.includes("text") ? "text" : kinds.includes("list") ? "list" : "object";
+    }
+    if (type.isUnion()) {
+      const kinds = type.types.map(receiverKind);
+      return kinds.every(kind => kind === kinds[0]) ? kinds[0]
+        : kinds.every(kind => ["text", "list", "sequence"].includes(kind)) ? "sequence" : "unknown";
+    }
+    return "object";
+  }
+  function propertyNotes(receiver, token, name, selector, explicit = false) {
+    const notes = [], kind = receiverKind(receiver);
+    const spelling = token.value !== name && `For property access, ${JSON.stringify(token.value)} is spelled ${JSON.stringify(name)} in JavaScript. Use .(${JSON.stringify(token.value)}) for the literal key ${JSON.stringify(token.value)}.`;
+    const sequence = ["text", "list", "sequence"].includes(kind);
+    const indexType = selector && checker.getTypeAtLocation(selector);
+    const numeric = indexType && Boolean(indexType.flags & ts.TypeFlags.NumberLike);
+    if (selector && !explicit) {
+      if (sequence && numeric) return [positionNote, `Here ${token.value} supplies the position. Use :${token.value} to force property access.`];
+      if (kind !== "object" && (!indexType || !(indexType.flags & (ts.TypeFlags.StringLike | ts.TypeFlags.BooleanLike)))) {
+        return [`Dot access uses a numeric ${token.value} as a one-based position on text or lists; otherwise it reads the JavaScript property ${JSON.stringify(name)}. Use :${token.value} to force property access.`, ...(spelling ? [spelling] : [])];
+      }
+    }
+    if (explicit) notes.push(`Colon access reads the JavaScript property ${JSON.stringify(name)}. A variable with the same name cannot turn it into a Prose position.`);
+    if (spelling) notes.push(spelling);
+    const symbol = checker.getPropertyOfType(checker.getNonNullableType(receiver), name);
+    const native = symbol?.getDeclarations()?.length && symbol.getDeclarations().every(declaration => {
+      const file = declaration.getSourceFile();
+      return file.isDeclarationFile && /(?:^|[/\\])lib\.[^/\\]+\.d\.ts$/i.test(file.fileName);
+    });
+    if (!native) return notes;
+    if (kind === "text" && name === "length") notes.push('JavaScript text.length counts UTF-16 code units: "😀" has length 2. Prose length counts Unicode code points, so length "😀" is 1.');
+    if (sequence) {
+      const methods = {
+        slice: "JavaScript slice uses zero-based start and end positions; the end is excluded. slice with 0, 2 selects the first two items.",
+        at: "JavaScript at uses zero-based positions: 0 is the first item, and negative positions count from the end.",
+        indexOf: "JavaScript indexOf returns a zero-based position, or -1 when the value is missing.",
+        lastIndexOf: "JavaScript lastIndexOf returns a zero-based position, or -1 when the value is missing.",
+        findIndex: "JavaScript findIndex returns a zero-based position, or -1 when no item matches.",
+        findLastIndex: "JavaScript findLastIndex returns a zero-based position, or -1 when no item matches.",
+        substring: "JavaScript substring uses zero-based start and end positions; the end is excluded.",
+        charAt: "JavaScript charAt uses a zero-based position.",
+        charCodeAt: "JavaScript charCodeAt uses a zero-based position.",
+        codePointAt: "JavaScript codePointAt uses a zero-based UTF-16 position."
+      };
+      if (methods[name]) notes.push(methods[name] + (kind === "text"
+        ? " Text positions in JavaScript count UTF-16 code units; Prose text positions start at 1 and count Unicode code points."
+        : " Prose positions start at 1."));
+    }
+    return notes;
+  }
   const anchor = node => {
     const start = generated.getLineAndCharacterOfPosition(node.getStart(generated));
     return record.lookup(start.line, start.character);
@@ -140,7 +197,7 @@ export function collectSourceInfo(ts, checker, generated, record, { hover = true
     if (!token) return;
     const key = `${token.source.line}:${token.source.start}`;
     if (found.has(key) && found.get(key).priority >= priority) return;
-    let code, documentation;
+    let code, documentation, notes;
     if (hover) {
       const rendered = builtin ? hoverSignature(ts, checker, type.getCallSignatures()[0], node, new Set(), true) : hoverType(ts, checker, type, node);
       code = rendered.startsWith("function")
@@ -148,11 +205,38 @@ export function collectSourceInfo(ts, checker, generated, record, { hover = true
       if (code.length > 2400) code = code.slice(0, 2399) + "…";
       const documented = symbol?.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
       documentation = documented ? ts.displayPartsToString(documented.getDocumentationComment(checker)) : "";
+      if (builtin && token.value === "length") notes = ['Prose length counts list elements or Unicode code points in text. length "😀" is 1; JavaScript "😀".length is 2 because it counts UTF-16 code units.'];
+      const parent = node.parent;
+      if (ts.isIdentifier(node) && ts.isPropertyAccessExpression(parent) && parent.name === node) {
+        const operator = line.tokens[line.tokens.indexOf(token) - 1]?.value;
+        notes = propertyNotes(checker.getTypeAtLocation(parent.expression), token, node.text, undefined, operator === ":");
+      } else if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && ["__prose_dot", "__prose_maybe_dot"].includes(node.expression.text)) {
+        notes = propertyNotes(checker.getTypeAtLocation(node.arguments[0]), token, node.arguments[2].text, node.arguments[1]);
+      }
     }
     found.set(key, { file: record.file, line: token.source.line, column: token.source.start + 1,
-      endColumn: token.source.start + token.source.raw.length + 1, code, documentation, priority, node, symbol });
+      endColumn: token.source.start + token.source.raw.length + 1, code, documentation, ...(notes?.length ? { notes } : {}), priority, node, symbol });
   }
   function visit(node) {
+    if (hover) {
+      const keyed = ts.isCallExpression(node) && ts.isIdentifier(node.expression) &&
+        ["__prose_dot_key", "__prose_maybe_dot_key"].includes(node.expression.text);
+      const receiver = keyed ? node.arguments[0] : ts.isElementAccessExpression(node) ? node.expression : null;
+      const key = keyed ? node.arguments[1] : ts.isElementAccessExpression(node) ? node.argumentExpression : null;
+      if (receiver && key && (ts.isStringLiteral(key) || ts.isNumericLiteral(key))) {
+        const original = anchor(key), line = original && owners.get(original.line);
+        const token = line?.tokens.find(token => token.source.line === original.line && token.source.start === original.column - 1 &&
+          (token.type === "string" ? token.value === key.text : token.type === "number" && token.value === Number(key.text)));
+        if (token) {
+          const type = checker.getTypeAtLocation(receiver);
+          const kind = receiverKind(type);
+          computedNotes.set(`${token.source.line}:${token.source.start}`, token.type === "string" ? propertyNotes(type, token, key.text)
+            : [kind === "object" ? "On this object, the computed number is a JavaScript property key; there is no one-based position adjustment."
+              : ["text", "list", "sequence"].includes(kind) ? positionNote
+              : "A computed numeric dot selects a one-based position on text or lists, and a JavaScript property key on other receivers."]);
+        }
+      }
+    }
     // The console call belongs to `print`, not to any word named console or log
     // in its argument. User-written console.log calls keep their ordinary path.
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
@@ -187,5 +271,20 @@ export function collectSourceInfo(ts, checker, generated, record, { hover = true
     ts.forEachChild(node, visit);
   }
   visit(generated);
+  if (hover) for (const line of lines) for (let index = 0; index < line.tokens.length; index++) {
+    const token = line.tokens[index], previous = line.tokens[index - 1];
+    const position = token.type === "number" && previous?.value === ".";
+    const literalKey = ["string", "number"].includes(token.type) && previous?.value === "(" &&
+      [".", ":"].includes(line.tokens[index - 2]?.value) && line.tokens[index + 1]?.value === ")";
+    if (!position && !literalKey) continue;
+    const key = `${token.source.line}:${token.source.start}`;
+    if (found.has(key)) continue;
+    const notes = position ? [positionNote] : token.type === "number" && line.tokens[index - 2]?.value === "."
+      ? computedNotes.get(key) ?? ["A computed numeric dot selects a one-based position on text or lists, and a JavaScript property key on other receivers."]
+      : ["This computed key is used literally as a JavaScript property, without snake_case conversion or a one-based position adjustment.", ...(token.type === "string" ? computedNotes.get(key) ?? [] : [])];
+    found.set(key, { file: record.file, line: token.source.line, column: token.source.start + 1,
+      endColumn: token.source.start + token.source.raw.length + 1, code: token.source.raw, documentation: "",
+      notes, priority: 0 });
+  }
   return [...found.values()].sort((a, b) => a.line - b.line || a.column - b.column);
 }
