@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/transpile.js",
     "./format": "./src/format.js",
+    "./check": "./src/check-project.js",
     "./vite": "./src/vite.js"
   },
   "bin": {
@@ -15,6 +16,7 @@
   "scripts": {
     "test": "node --test",
     "format": "node bin/prose.js format",
+    "check": "node bin/prose.js check",
     "example": "node bin/prose.js examples/fizzbuzz.prose --run",
     "example:fibonacci": "node bin/prose.js examples/fibonacci_demo.prose --run",
     "example:factorial": "node bin/prose.js examples/factorial_demo.prose --run",

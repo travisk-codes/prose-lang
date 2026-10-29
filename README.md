@@ -35,6 +35,8 @@ The CLI writes JavaScript to standard output by default. Add `--run` to
 execute it with Node.js; any `.prose` files it imports are compiled as they
 load. Run programs you trust; execution has ordinary Node.js permissions.
 `node bin/prose.js types <folder>` writes TypeScript declarations; see [Types](#types).
+`node bin/prose.js check <folder>` checks Prose without running it or writing
+files; see [Type checking](docs/type-checking.md).
 
 `examples/tour.prose` uses every feature below in one program, and
 `examples/habits.prose` shows the newest ones across two files.
@@ -839,7 +841,7 @@ returns only the code. Options:
 - `filename`: the original source path or URL recorded in a map; defaults to
   `program.prose`. The CLI and Vite plugin supply it automatically.
 - `check`: `true` to generate TypeScript for type checking instead of executable
-  JavaScript. This is the checking-output stage; see [Type checking](docs/type-checking.md).
+  JavaScript. See [Type checking](docs/type-checking.md).
 
 To run `.prose` files in your own Node.js program, register the module hook in
 `src/node-hooks.js` with `module.register`; the CLI's `--run` does this.
@@ -849,10 +851,23 @@ To run `.prose` files in your own Node.js program, register the module hook in
 Annotations are optional and change nothing about how a program runs. They
 describe a module's exports to TypeScript: the compiler turns them into a
 declaration file (`text.d.prose.ts` beside `text.prose`), so TypeScript code
-that imports the module is type-checked. The compiler also supports checking-only
-TypeScript output through `compile(source, { check: true })`; the project-level
-`prose check` command and editor diagnostics are still to come. See
-[the checking-output documentation](docs/type-checking.md).
+that imports the module is type-checked. The `check` command also checks Prose
+function bodies using the project's TypeScript 5 or 6 and `tsconfig.json`:
+
+```sh
+node bin/prose.js check
+node bin/prose.js check src
+node bin/prose.js check src/notes.prose --project tsconfig.json --json
+npm.cmd run check -- src
+```
+
+Diagnostics point to the original Prose file, line, and column. Checking keeps
+fresh import declarations in memory and never runs the application or writes
+files. Exit status is 0 for a clean check, 1 for source errors, and 2 for setup
+errors. If TypeScript is missing, install it in the project with
+`npm.cmd install --save-dev typescript`. See [Type checking](docs/type-checking.md)
+for selection rules, JSON output, and current limits. Editor diagnostics and
+automatic build checks are still to come.
 
 ```text
 use type Datum from "../types"
@@ -898,7 +913,7 @@ A type inside a namespace is written with a colon: `Intl:DateTimeFormatOptions`.
 level; type names start with a capital letter. `use type A, B from "path"`
 imports types for the declarations, from TypeScript or other Prose files.
 Function values may be annotated too (`function takes n as number giving number
-return n * 2`); those annotations are not used yet.
+return n * 2`); the checker uses those annotations too.
 
 Write or refresh the declaration files with the `types` command, and add
 `--check` to fail when one is out of date:

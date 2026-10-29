@@ -70,4 +70,8 @@ Reproduce from the Prose checkout with:
 
 ```powershell
 node scripts/measure-check.mjs D:/Datums/datums --json
+node bin/prose.js check --project D:/Datums/datums --json
 ```
+
+The public command reproduces the same 28 diagnostics across 46 modules. The
+measurement script now uses that checker while keeping the audit's JSON format.

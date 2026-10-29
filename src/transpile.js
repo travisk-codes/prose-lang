@@ -386,9 +386,10 @@ class Expression {
     return this.typeExpression();
   }
   typeExpression() {
+    const token = this.peek();
     const options = [this.singleType()];
     while (this.at("or")) { this.take("or"); options.push(this.singleType()); }
-    return options.length === 1 ? options[0] : { kind: "union", options };
+    return located(options.length === 1 ? options[0] : { kind: "union", options }, token);
   }
   singleType() {
     const token = this.tokens[this.pos++];
@@ -932,7 +933,7 @@ class Parser {
       const name = expr.propertyName();
       if (!expr.at("as")) fail(line.line, "Object types contain only fields written as name as type.");
       expr.take("as");
-      fields.push({ name, type: expr.typeExpression(), doc });
+      fields.push(located({ name, type: expr.typeExpression(), doc }, line.tokens[0]));
       expr.end();
       doc = undefined;
     }
@@ -1269,14 +1270,15 @@ function literalType(value) {
 
 // A function's parameters as TypeScript writes them, from each name as it appears there.
 // Trailing parameters that are untyped or maybe can be left out, as Prose's with calls allow.
-function parameterList(node, nameOf, untyped = name => name) {
+function parameterList(node, nameOf, untyped = name => name,
+  typeOf = (type, optional) => parameterType(optional && type?.kind === "maybe" ? type.of : type)) {
   const types = node.types ?? [];
   let optionalFrom = node.params.length;
   while (optionalFrom > 0 && (!types[optionalFrom - 1] || types[optionalFrom - 1].kind === "maybe")) optionalFrom--;
   return node.params.map((name, index) => {
     const type = types[index];
-    if (index < optionalFrom) return type ? `${nameOf(name)}: ${parameterType(type)}` : untyped(nameOf(name));
-    return `${nameOf(name)}?: ${parameterType(type?.kind === "maybe" ? type.of : type)}`;
+    if (index < optionalFrom) return type ? `${nameOf(name)}: ${typeOf(type, false)}` : untyped(nameOf(name));
+    return `${nameOf(name)}?: ${typeOf(type, true)}`;
   }).join(", ");
 }
 
@@ -1286,15 +1288,17 @@ function returnType(node) {
   return awaits(node.body ?? node.value) && !promised ? `Promise<${typeText(node.returns)}>` : typeText(node.returns);
 }
 
-function typeDeclarationLines(node) {
+function typeDeclarationLines(node,
+  typeOf = (type, optional) => typeText(optional && type?.kind === "maybe" ? type.of : type),
+  fieldOf = (field, code) => code) {
   const prefix = node.exported ? "export " : "";
   if (!node.fields) {
-    return [...docComment(node.doc), `${prefix}type ${node.name}${generic(typeVariables([node.value]))} = ${typeText(node.value)};`];
+    return [...docComment(node.doc), `${prefix}type ${node.name}${generic(typeVariables([node.value]))} = ${typeOf(node.value)};`];
   }
   const lines = [...docComment(node.doc), `${prefix}interface ${node.name}${generic(typeVariables(node.fields.map(field => field.type)))} {`];
   for (const field of node.fields) {
     const optional = field.type.kind === "maybe";
-    lines.push(...docComment(field.doc, "  "), `  ${camel(field.name)}${optional ? "?" : ""}: ${typeText(optional ? field.type.of : field.type)};`);
+    lines.push(...docComment(field.doc, "  "), fieldOf(field, `  ${camel(field.name)}${optional ? "?" : ""}: ${typeOf(field.type, optional)};`));
   }
   return [...lines, "}"];
 }
@@ -1471,8 +1475,8 @@ export function compile(source, options = {}) {
       const inner = innerScope(node, scope);
       // Untyped parameters take their types from where the function is passed.
       const params = node.params.map((name, index) => node.types?.[index]
-        ? `${variable(name)}: ${parameterType(node.types[index])}` : variable(name)).join(", ");
-      const returns = node.returns ? `: ${returnType(node)}` : "";
+        ? `${variable(name)}: ${mapped(node.types[index], parameterType(node.types[index]))}` : variable(name)).join(", ");
+      const returns = node.returns ? `: ${mapped(node.returns, returnType(node))}` : "";
       const async = awaits(node.body ?? node.value) ? "async " : "";
       const variables = generic([...inner.ownTypeVariables]);
       if (node.body) return `(${async}${variables}(${params})${returns} => {\n${emitScope(node.body, inner, depth + 1)}\n${pad(depth)}})`;
@@ -1625,7 +1629,7 @@ export function compile(source, options = {}) {
       if (node.type === "function") {
         const inner = innerScope(node, scope);
         const signature = check
-          ? `${generic(typeVariables([...node.types, node.returns]))}(${parameterList(node, variable)})${node.returns ? `: ${returnType(node)}` : ""}`
+          ? `${generic(typeVariables([...node.types, node.returns]))}(${parameterList(node, variable, undefined, checkedParameter)})${node.returns ? `: ${mapped(node.returns, returnType(node))}` : ""}`
           : `(${node.params.map(variable).join(", ")})`;
         return `${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}${signature} {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
       }
@@ -1697,7 +1701,9 @@ export function compile(source, options = {}) {
     return unmapped(declarations) + emitBlock(nodes, scope, depth);
   }
 
-  const typed = (name, scope) => scope.types.has(name) ? `${variable(name)}: ${typeText(scope.types.get(name))}` : variable(name);
+  const checkedParameter = (type, optional) => mapped(type, parameterType(optional && type?.kind === "maybe" ? type.of : type));
+  const checkedType = (type, optional) => mapped(type, typeText(optional && type?.kind === "maybe" ? type.of : type));
+  const typed = (name, scope) => scope.types.has(name) ? `${variable(name)}: ${checkedType(scope.types.get(name))}` : variable(name);
 
   const body = emitScope(program, programScope, 0);
   const exported = exports.size ? `export { ${[...exports].map(([name, local]) => `${local} as ${name}`).join(", ")} };` : "";
@@ -1708,7 +1714,7 @@ export function compile(source, options = {}) {
         mapped(node, `import type { ${node.names.join(", ")} } from ${JSON.stringify(node.source)};`)),
       ...imports.map(node =>
         mapped(node, `import { ${node.names.map(name => `${camel(name)} as ${variable(name)}`).join(", ")} } from ${JSON.stringify(node.source)};`)),
-      ...program.filter(node => node.type === "typeDeclaration").map(node => mapped(node, typeDeclarationLines(node).join("\n"))),
+      ...program.filter(node => node.type === "typeDeclaration").map(node => mapped(node, typeDeclarationLines(node, checkedType, mapped).join("\n"))),
       body,
       exported || "export {};"
     ].join("\n") + "\n";

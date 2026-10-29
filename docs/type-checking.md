@@ -1,10 +1,87 @@
-# Checking output: stage 1
+# Type checking
 
-`compile(source, { check: true })` produces TypeScript for checking. It never
-replaces the JavaScript that runs a Prose program. This stage supplies the
-checking output, typed helper declarations, and source maps; the public
-`prose check` command, friendly diagnostic wording, build gate, and editor
-diagnostics are later stages of the design.
+`prose check` checks Prose bodies with the project's installed TypeScript 5 or 6,
+using its `tsconfig.json`. Diagnostics point back to Prose files, lines, and
+columns. Checking does not run application code or write JavaScript,
+declarations, maps, or TypeScript build info.
+
+## Command
+
+From the Prose checkout:
+
+```powershell
+node bin/prose.js check
+node bin/prose.js check examples/arrays.prose
+node bin/prose.js check src --project tsconfig.json
+node bin/prose.js check --project D:/Datums/datums --json
+npm.cmd run check -- examples/arrays.prose
+```
+
+When the CLI is installed as `prose`, use `prose check` with the same arguments.
+Install TypeScript in the project being checked if needed:
+`npm.cmd install --save-dev typescript`. The command resolves that project's
+package, including a hoisted workspace dependency, rather than falling back to
+Prose's development dependency.
+
+- With no paths, check Prose files selected by the configuration's `files`,
+  `include`, and `exclude` settings. Project ambient `.d.ts` files are included.
+- Explicit files and folders select the roots regardless of `include`/`exclude`.
+  Folder scans skip hidden entries, symlinks, `node_modules`, `dist`, `build`, and
+  `coverage`.
+- Imported Prose modules are checked too, including imports outside the selected
+  roots and imports reached through TypeScript modules. TypeScript dependencies
+  are resolved using the project's normal module and path-alias settings.
+- `--project` (or `-p`) accepts a configuration file or a folder containing
+  `tsconfig.json`. Otherwise the nearest parent configuration is discovered
+  starting at the first input, or the current directory when no input is given.
+  Inputs from different projects require an explicit `--project`.
+- Without a configuration, scan the current directory or explicit inputs using
+  ES2023, ES modules, bundler resolution, and the standard TypeScript libraries.
+
+The checker forces TypeScript's strict family of checks even when the project
+turns them off, overrides `noCheck`, disables unused-name lint, and filters the draft's implicit-any
+and unknown-value diagnostics in generated Prose code. Fresh `.d.prose.ts`
+declarations exist only in memory and override stale on-disk copies. Imports
+use declared export contracts; unannotated exports can still be `any`.
+
+Text diagnostics go to standard error and a file/error count goes to standard
+output. `--json` sends one JSON object to standard output with `files`,
+`diagnostics`, `exitCode`, and, after successful setup, `project`, `projectRoot`,
+`typescriptVersion`, and `ignored`. File paths are absolute. Each diagnostic has
+`source`, `code`, `severity`, `file`, `line`, `column`, and `message`; lines and
+columns are one-based. Project-wide diagnostics have null locations. An error
+in synthetic checker code has `source: "checker"` and a null line/column rather
+than a misleading generated location. JSON retains TypeScript's full message;
+text output removes Prose's internal variable prefixes.
+
+Exit status is **0** for clean checks (including an empty selection), **1** for
+source errors, and **2** for setup/configuration errors. Syntax errors are Prose
+diagnostics; type errors carry TypeScript diagnostic numbers.
+
+## Programmatic checking
+
+```javascript
+import { checkProject, CheckSetupError } from "prose-lang/check";
+
+try {
+  const result = checkProject({ cwd: process.cwd(), targets: ["src"] });
+  console.log(result.diagnostics);
+  process.exitCode = result.exitCode;
+} catch (error) {
+  if (!(error instanceof CheckSetupError)) throw error;
+  console.error(error.message);
+  process.exitCode = 2;
+}
+```
+
+`project` selects a configuration file or folder; `cwd` defaults to the process
+directory and `targets` defaults to an empty list. Hosts may supply a compatible
+`typescript` compiler API instead of resolving the project's package.
+
+## Checking output
+
+`compile(source, { check: true })` produces the TypeScript used for checking.
+It never replaces the JavaScript that runs a Prose program.
 
 ```javascript
 const { code, map } = compile(source, {
@@ -21,8 +98,8 @@ It includes declared helpers instead of executable runtime helpers. Do not run
 it. `sourceMap: "inline"` embeds the map as well as returning it.
 
 The compiler needs no TypeScript package to generate this output. TypeScript is
-a development dependency for tests; the measurement harness loads the checked
-project's own installed TypeScript.
+a development dependency for tests; the command loads the checked project's
+own installed TypeScript only when checking is requested.
 
 ## Translation
 
@@ -66,13 +143,10 @@ node scripts/measure-check.mjs D:/Datums/datums
 node scripts/measure-check.mjs D:/Datums/datums --json
 ```
 
-The harness checks all `.prose` files under `src/`, using the project's
-`tsconfig.json` and TypeScript package. It forces the
-[strict family of checks](https://www.typescriptlang.org/tsconfig/strict.html),
-disables unused-name lint, and filters the draft's implicit-any and unknown-value
-diagnostics. Checking output and fresh `.d.prose.ts` declarations are virtual;
-existing files are not updated and application code is never executed. Remaining
-diagnostics produce exit status 1 and include mapped Prose lines and columns.
+The harness delegates to the public checker, explicitly selecting all `.prose`
+files under `src/` and preserving the audit's relative-path JSON format. Both
+commands reproduce 28 diagnostics across 46 Datums modules with TypeScript
+6.0.3, without modifying application files.
 
 See [the Datums results](type-checking-datums.md) for the remaining diagnostic
 groups and the annotation issue found during the handoff.
@@ -89,9 +163,11 @@ groups and the annotation issue found during the handoff.
   string replacements. Out-of-range reads return unset at runtime. Contextual
   helper reads currently use ordinary array element types and do not yet adapt
   to `noUncheckedIndexedAccess`.
-- This stage does not install diagnostics in VS Code or make checking a build
-  gate. Those follow the project-level command and diagnostic wording stages.
+- Checking does not install diagnostics in VS Code or run automatically during
+  builds. Project references are resolved by TypeScript but are not built.
 
-`test/check.test.js` runs the real checker, tests representative good and bad
-programs, and checks that diagnostics map back to Prose. The browser bundle and
-packaged formatter also carry the checking-output dependency.
+`test/check.test.js` runs the real checker on representative good and bad
+programs. `test/check-cli.test.js` covers project selection, imported modules,
+fresh declarations, mapped diagnostics, exit codes, and read-only behavior.
+The browser bundle and packaged formatter also carry the checking-output
+dependency without loading TypeScript.
