@@ -55,11 +55,11 @@ and requires a trusted workspace. Set `prose.check.enabled` to `false` to disabl
 it. Dirty buffers wait until save; highlighting and formatting remain available
 without TypeScript or Workspace Trust.
 
-Install `dist/prose-language-0.1.13.vsix` with **Extensions: Install from VSIX...**
+Install `dist/prose-language-0.1.14.vsix` with **Extensions: Install from VSIX...**
 or run:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.13.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.14.vsix --force
 ```
 
 Reload your VS Code window if an already-open file retains its old coloring.
@@ -69,6 +69,12 @@ declarations and built-in calls have distinct scopes.
 `npm.cmd install` installs the development dependencies needed for the grammar
 tests; running the compiler and examples directly still requires only Node.js.
 See [the extension README](editors/vscode/README.md) for development and packaging.
+
+Hover over variables, properties, or function names to inspect their inferred
+types and signatures. For example, `book.pages` shows `pages as number`, and
+`labels` shows `labels as list of text`. Hovers use current editor buffers,
+including unsaved changes, and need the project's TypeScript and Workspace Trust.
+Set `prose.hover.enabled` to `false` to disable them.
 
 ## Formatting
 

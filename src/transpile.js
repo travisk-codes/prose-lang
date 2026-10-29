@@ -1766,7 +1766,8 @@ export function compile(source, options = {}) {
         const signature = check
           ? `${generic(typeVariables([...node.types, node.returns]))}(${parameterList(node, variable, undefined, checkedParameter)})${node.returns ? `: ${mapped(node.returns, returnType(node))}` : ""}`
           : `(${node.params.map(variable).join(", ")})`;
-        return `${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}${signature} {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
+        const documentation = check && node.doc ? docComment(node.doc, indent).join("\n") + "\n" : "";
+        return `${documentation}${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}${signature} {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
       }
       if (node.type === "assign" && check) {
         const extra = !scope.types.has(node.name) && later.get(scope)?.get(node.name);

@@ -127,15 +127,20 @@ test("extension activation registers the document formatter and disposes it with
   } } };
   const exports = {};
   const diagnostics = { dispose() {} };
+  const hovers = { dispose() {} };
   const source = readFileSync(new URL("../editors/vscode/extension.cjs", import.meta.url), "utf8");
   runInNewContext(source, { exports, require: name => name === "vscode" ? vscode
-    : name === "./formatting.cjs" ? { createProvider } : { createDiagnostics: api => {
+    : name === "./formatting.cjs" ? { createProvider } : name === "./checking.cjs" ? { createDiagnostics: api => {
       assert.equal(api, vscode);
       return diagnostics;
+    } } : { createHovers: api => {
+      assert.equal(name, "./hovering.cjs");
+      assert.equal(api, vscode);
+      return hovers;
     } } });
   const context = { subscriptions: [] };
   exports.activate(context);
   assert.equal(registrations[0].language, "prose");
   assert.equal(typeof registrations[0].provider.provideDocumentFormattingEdits, "function");
-  assert.deepEqual(context.subscriptions, [disposable, diagnostics]);
+  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers]);
 });

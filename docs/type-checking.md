@@ -78,6 +78,18 @@ try {
 directory and `targets` defaults to an empty list. Hosts may supply a compatible
 `typescript` compiler API instead of resolving the project's package.
 
+Editor hosts can pass `overlays: [[absolutePath, sourceText], ...]` to check current
+buffers without saving them. Prose imports and TypeScript/JavaScript dependencies
+use these snapshots; configuration is still read from disk. This option is not
+used by the CLI's saved-file checks.
+
+`hoverTargets: [path, ...]` adds a `hovers` array to the result, for selected or
+imported Prose files. Each item has `file`, one-based `line`, `column`, and
+exclusive `endColumn` positions, plus Prose `code` and plain `documentation`.
+Columns count UTF-16 code units. The project checker supplies these from the same
+TypeScript program and source maps as diagnostics. Invalid Prose syntax returns
+an empty array. Without `hoverTargets`, the result shape is unchanged.
+
 ## Checking output
 
 `compile(source, { check: true })` produces the TypeScript used for checking.
@@ -180,7 +192,7 @@ groups and the annotation issue found during the handoff.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.13 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.14 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
@@ -212,5 +224,7 @@ programs. `test/check-cli.test.js` covers project selection, imported modules,
 fresh declarations, mapped diagnostics, exit codes, and read-only behavior.
 `test/checking-extension.test.js` covers background workers, saved-file
 diagnostics, cancellation, project isolation, trust, and disposal.
+`test/hover.test.js` and `test/hovering-extension.test.js` cover inferred hover
+types, original token ranges, live buffers, caching, cancellation, and trust.
 The browser bundle and packaged formatter also carry the checking-output
 dependency without loading TypeScript.

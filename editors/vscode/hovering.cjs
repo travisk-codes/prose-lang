@@ -1,0 +1,106 @@
+const { dirname, resolve } = require("node:path");
+const { findConfig, startCheck } = require("./checking.cjs");
+
+const canonical = file => process.platform === "win32" ? resolve(file).toLowerCase() : resolve(file);
+const relevant = document => document.uri.scheme === "file" && !document.isClosed && /\.(?:prose|[cm]?[jt]sx?|json)$/i.test(document.uri.fsPath);
+const prose = document => relevant(document) && document.languageId === "prose" && document.uri.fsPath.endsWith(".prose");
+
+// One snapshot per project, computed on demand off the extension host. Hovering
+// another word reuses it. Edits invalidate both the types and pending workers.
+function createHovers(vscode, { runCheck = startCheck } = {}) {
+  const { workspace } = vscode;
+  const states = new Map();
+  const output = vscode.window.createOutputChannel("Prose Hovers");
+  let disposed = false;
+  const enabled = document => workspace.isTrusted && prose(document) &&
+    workspace.getConfiguration("prose", document.uri).get("hover.enabled", true);
+  function invalidate() {
+    for (const state of states.values()) state.job?.cancel();
+    states.clear();
+  }
+  function group(document) {
+    const project = findConfig(document.uri.fsPath);
+    const folder = workspace.getWorkspaceFolder(document.uri)?.uri;
+    const cwd = project ? dirname(project) : folder?.scheme === "file" ? folder.fsPath : dirname(document.uri.fsPath);
+    return { key: canonical(project ?? cwd), cwd, project };
+  }
+  function snapshot(document) {
+    const documents = workspace.textDocuments.filter(relevant);
+    if (!documents.some(other => canonical(other.uri.fsPath) === canonical(document.uri.fsPath))) documents.push(document);
+    const stamp = JSON.stringify(documents.map(other => [canonical(other.uri.fsPath), other.version]).sort(([a], [b]) => a.localeCompare(b)));
+    return { documents, stamp };
+  }
+  async function provideHover(document, position, cancellation, retry = true) {
+    if (disposed || cancellation.isCancellationRequested || !enabled(document)) return;
+    const line = document.getText().split(/\r?\n/)[position.line] ?? "";
+    if (!/[A-Za-z_0-9]/.test(line[position.character] ?? "")) return;
+    const version = document.version;
+    const { key, cwd, project } = group(document);
+    const { documents, stamp } = snapshot(document);
+    let state = states.get(key);
+    if (state && state.stamp !== stamp) {
+      state.job?.cancel();
+      states.delete(key);
+      state = undefined;
+    }
+    if (!state) {
+      const targets = documents.filter(other => prose(other) && group(other).key === key).map(other => other.uri.fsPath);
+      if (!targets.includes(document.uri.fsPath)) targets.push(document.uri.fsPath);
+      const overlays = documents.map(other => [other.uri.fsPath, other.getText()]);
+      state = { stamp };
+      states.set(key, state);
+      try {
+        state.job = runCheck({ cwd, project, targets, hoverTargets: targets, overlays });
+        state.promise = state.job.promise.then(result => {
+          if (!disposed && states.get(key) === state && result.exitCode === 2) for (const item of result.diagnostics) output.appendLine(item.message);
+          return result.hovers ?? [];
+        }).catch(error => {
+          if (!disposed && states.get(key) === state) output.appendLine(error.stack ?? error.message);
+          return [];
+        }).finally(() => { state.job = undefined; });
+      } catch (error) {
+        output.appendLine(error.message);
+        state.promise = Promise.resolve([]);
+      }
+    }
+    let subscription;
+    try {
+      const canceled = new Promise(resolve => { subscription = cancellation.onCancellationRequested(() => resolve([])); });
+      const hovers = await Promise.race([state.promise, canceled]);
+      if (disposed || document.isClosed || document.version !== version || cancellation.isCancellationRequested || !enabled(document)) return;
+      // Saves and settings changes can deliver a second disk notification after
+      // the request starts. Retry a settled buffer once; edits still return early.
+      if (states.get(key) !== state || snapshot(document).stamp !== stamp) {
+        return retry ? provideHover(document, position, cancellation, false) : undefined;
+      }
+      const item = hovers.find(item => canonical(item.file) === canonical(document.uri.fsPath) && item.line === position.line + 1 &&
+        item.column - 1 <= position.character && position.character < item.endColumn - 1);
+      if (!item) return;
+      const markdown = new vscode.MarkdownString();
+      markdown.isTrusted = false;
+      markdown.supportHtml = false;
+      markdown.appendCodeblock(item.code, "prose");
+      if (item.documentation) markdown.appendText("\n\n" + item.documentation);
+      return new vscode.Hover(markdown, new vscode.Range(item.line - 1, item.column - 1, item.line - 1, item.endColumn - 1));
+    } finally { subscription?.dispose(); }
+  }
+  const subscriptions = [
+    output, vscode.languages.registerHoverProvider({ language: "prose", scheme: "file" }, { provideHover }),
+    workspace.onDidChangeTextDocument(({ document, contentChanges }) => { if (relevant(document) && contentChanges.length) invalidate(); }),
+    workspace.onDidOpenTextDocument(document => { if (relevant(document)) invalidate(); }),
+    workspace.onDidCloseTextDocument(invalidate), workspace.onDidSaveTextDocument(document => { if (relevant(document)) invalidate(); }),
+    workspace.onDidChangeConfiguration(event => { if (event.affectsConfiguration("prose.hover")) invalidate(); }),
+    workspace.onDidChangeWorkspaceFolders(invalidate), workspace.onDidGrantWorkspaceTrust(invalidate),
+    workspace.onDidDeleteFiles(invalidate), workspace.onDidRenameFiles(invalidate)
+  ];
+  const watcher = workspace.createFileSystemWatcher("**/*.{prose,ts,tsx,mts,cts,js,jsx,mjs,cjs,json}");
+  subscriptions.push(watcher, watcher.onDidChange(invalidate), watcher.onDidCreate(invalidate), watcher.onDidDelete(invalidate));
+  return { dispose() {
+    if (disposed) return;
+    disposed = true;
+    invalidate();
+    for (const subscription of subscriptions) subscription.dispose();
+  } };
+}
+
+module.exports = { createHovers };

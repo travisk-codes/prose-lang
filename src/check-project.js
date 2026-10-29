@@ -5,6 +5,7 @@ import { compile } from "./transpile.js";
 import { untypedError } from "./check.js";
 import { declarationPath } from "./declarations.js";
 import { sourceMapLookup } from "./source-map.js";
+import { collectHovers } from "./check-hover.js";
 
 export class CheckSetupError extends Error {
   constructor(message, diagnostics = []) {
@@ -34,12 +35,17 @@ function filesUnder(directory) {
 /** Check Prose and its imported Prose dependencies without writing or executing
  * anything. Resolve TypeScript from the selected project, never from this tool.
  */
-export function checkProject({ cwd = process.cwd(), project, targets = [], typescript } = {}) {
+export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], overlays = [] } = {}) {
   cwd = resolve(cwd);
+  const bufferKey = file => process.platform === "win32" ? resolve(file).toLowerCase() : resolve(file);
+  const buffers = new Map(overlays.map(([file, source]) => [bufferKey(file), source]));
+  const exists = file => buffers.has(bufferKey(file)) || existsSync(file);
+  const directory = file => existsSync(file) && statSync(file).isDirectory();
+  const sourceText = file => buffers.get(bufferKey(file)) ?? readFileSync(file, "utf8");
   const paths = targets.map(target => resolve(cwd, target));
   for (const path of paths) {
-    if (!existsSync(path)) throw new CheckSetupError(`Input does not exist: ${path}`);
-    if (!statSync(path).isDirectory() && !path.endsWith(".prose")) throw new CheckSetupError(`Expected a .prose file or folder: ${path}`);
+    if (!exists(path)) throw new CheckSetupError(`Input does not exist: ${path}`);
+    if (!directory(path) && !path.endsWith(".prose")) throw new CheckSetupError(`Expected a .prose file or folder: ${path}`);
   }
   let configFile;
   if (project) {
@@ -47,13 +53,13 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
     configFile = existsSync(selected) && statSync(selected).isDirectory() ? join(selected, "tsconfig.json") : selected;
     if (!existsSync(configFile) || !statSync(configFile).isFile()) throw new CheckSetupError(`Project configuration does not exist: ${configFile}`);
   } else {
-    const start = paths[0] ? (statSync(paths[0]).isDirectory() ? paths[0] : dirname(paths[0])) : cwd;
+    const start = paths[0] ? (directory(paths[0]) ? paths[0] : dirname(paths[0])) : cwd;
     configFile = findConfig(start);
-    if (paths.some(path => findConfig(statSync(path).isDirectory() ? path : dirname(path)) !== configFile)) {
+    if (paths.some(path => findConfig(directory(path) ? path : dirname(path)) !== configFile)) {
       throw new CheckSetupError("Inputs belong to different projects. Check each project separately or select one with --project.");
     }
   }
-  const projectRoot = configFile ? dirname(configFile) : (paths[0] ? (statSync(paths[0]).isDirectory() ? paths[0] : dirname(paths[0])) : cwd);
+  const projectRoot = configFile ? dirname(configFile) : (paths[0] ? (directory(paths[0]) ? paths[0] : dirname(paths[0])) : cwd);
   let ts = typescript;
   if (!ts) {
     const require = createRequire(join(projectRoot, "package.json"));
@@ -99,23 +105,24 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
     const normalized = resolve(name).replaceAll("\\", "/");
     return ts.sys.useCaseSensitiveFileNames ? normalized : normalized.toLowerCase();
   };
-  const selected = paths.length ? paths.flatMap(path => statSync(path).isDirectory() ? filesUnder(path) : [path])
+  const selected = paths.length ? paths.flatMap(path => directory(path) ? filesUnder(path) : [path])
     : parsed ? parsed.fileNames.filter(file => file.endsWith(".prose")) : filesUnder(cwd);
   const records = new Map(), virtual = new Map(), sourceErrors = [];
   const proseForDeclaration = name => {
     if (!name.endsWith(".d.prose.ts")) return null;
     const file = name.slice(0, -".d.prose.ts".length) + ".prose";
-    return ts.sys.fileExists(file) ? file : null;
+    return exists(file) ? file : null;
   };
   const resolutionHost = {
     ...ts.sys, getCurrentDirectory: () => projectRoot,
-    fileExists: name => virtual.has(canonical(name)) || ts.sys.fileExists(name) || Boolean(proseForDeclaration(name))
+    fileExists: name => buffers.has(bufferKey(name)) || virtual.has(canonical(name)) || ts.sys.fileExists(name) || Boolean(proseForDeclaration(name)),
+    readFile: name => buffers.get(bufferKey(name)) ?? ts.sys.readFile(name)
   };
   const cache = ts.createModuleResolutionCache(projectRoot, canonical, options);
   function importedSource(specifier, importer) {
     if (specifier.startsWith(".") || isAbsolute(specifier)) {
       const direct = resolve(dirname(importer), specifier);
-      if (ts.sys.fileExists(direct)) return direct;
+      if (exists(direct)) return direct;
     }
     const result = ts.resolveModuleName(specifier, importer, options, resolutionHost, cache).resolvedModule;
     const file = result && proseForDeclaration(result.resolvedFileName);
@@ -127,15 +134,16 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
     const key = canonical(file);
     if (records.has(key)) return records.get(key);
     let name = file + ".__prose_check__.ts";
-    while (existsSync(name) || virtual.has(canonical(name))) name += ".ts";
+    while (exists(name) || virtual.has(canonical(name))) name += ".ts";
     const record = { file, name, declaration: declarationPath(file), code: "export {};", declarations: "export {};" };
     records.set(key, record);
     virtual.set(canonical(name), { record, declaration: false });
     virtual.set(canonical(record.declaration), { record, declaration: true });
     try {
-      const result = compile(readFileSync(file, "utf8"), {
+      record.source = sourceText(file);
+      const result = compile(record.source, {
         check: true, sourceMap: true, filename: file,
-        readModule: specifier => readFileSync(importedSource(specifier, file), "utf8")
+        readModule: specifier => sourceText(importedSource(specifier, file))
       });
       record.code = result.code;
       record.declarations = result.declarations ?? "export {};";
@@ -160,11 +168,12 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
   host.fileExists = resolutionHost.fileExists;
   host.readFile = name => {
     const entry = virtualFile(name);
-    return entry ? entry.record[entry.declaration ? "declarations" : "code"] : readFile.call(host, name);
+    return entry ? entry.record[entry.declaration ? "declarations" : "code"] : buffers.get(bufferKey(name)) ?? readFile.call(host, name);
   };
   host.getSourceFile = (name, version, ...rest) => {
     const entry = virtualFile(name);
-    if (!entry) return getSourceFile.call(host, name, version, ...rest);
+    if (!entry) return buffers.has(bufferKey(name))
+      ? ts.createSourceFile(name, buffers.get(bufferKey(name)), version, true) : getSourceFile.call(host, name, version, ...rest);
     const source = ts.createSourceFile(name, entry.record[entry.declaration ? "declarations" : "code"], version, true, ts.ScriptKind.TS);
     if ([ts.ModuleKind.Node16, ts.ModuleKind.NodeNext].includes(options.module)) source.impliedNodeFormat = ts.ModuleKind.ESNext;
     return source;
@@ -191,7 +200,15 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
     project: configFile ?? null, projectRoot, typescriptVersion: ts.version,
     files: [...records.values()].map(record => record.file).sort(), diagnostics: [...sourceErrors], ignored: 0, exitCode: sourceErrors.length ? 1 : 0
   };
+  if (hoverTargets.length) result.hovers = [];
   if (sourceErrors.length) return result;
+  if (hoverTargets.length) {
+    const wanted = new Set(hoverTargets.map(file => canonical(resolve(cwd, file))));
+    const checker = program.getTypeChecker();
+    for (const record of records.values()) if (wanted.has(canonical(record.file))) {
+      result.hovers.push(...collectHovers(ts, checker, program.getSourceFile(record.name), record));
+    }
+  }
   const optionErrors = new Set(program?.getOptionsDiagnostics() ?? []);
   for (const diagnostic of diagnostics) {
     const entry = diagnostic.file && virtual.get(canonical(diagnostic.file.fileName));

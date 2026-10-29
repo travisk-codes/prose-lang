@@ -1,8 +1,8 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Syntax highlighting, formatting, and type checking for the Prose programming language.",
-  "version": "0.1.13",
+  "description": "Syntax highlighting, formatting, type checking, and hover types for the Prose programming language.",
+  "version": "0.1.14",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -26,11 +26,11 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Syntax highlighting and formatting work in Restricted Mode. Type checking loads the project's TypeScript and requires Workspace Trust."
+      "description": "Syntax highlighting and formatting work in Restricted Mode. Type checking and hover types load the project's TypeScript and require Workspace Trust."
     },
     "virtualWorkspaces": {
       "supported": "limited",
-      "description": "Syntax highlighting and formatting are available. Type checking requires files on disk."
+      "description": "Syntax highlighting and formatting are available. Type checking and hover types require a local project."
     }
   },
   "contributes": {
@@ -48,6 +48,12 @@
           "default": true,
           "scope": "resource",
           "description": "Check saved Prose files on open and save using the project's TypeScript. Diagnostics appear in the editor and Problems panel."
+        },
+        "prose.hover.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Show inferred types and function signatures on hover using the project's TypeScript and current editor buffers. Requires Workspace Trust."
         },
         "prose.format.width": {
           "type": "integer",
@@ -349,6 +355,7 @@
     "extension.cjs",
     "formatting.cjs",
     "checking.cjs",
+    "hovering.cjs",
     "check-worker.cjs",
     "dist/**",
     "package.json",
