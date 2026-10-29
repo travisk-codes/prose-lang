@@ -83,6 +83,14 @@ test("the palette spans the spectrum: each kind of code word has its own hue", (
   assert.ok(hues.size >= 16, `expected at least 16 distinct colors, got ${hues.size}`);
 });
 
+test("formatter updates retain dim dots and underscores while keeping the words bright", () => {
+  assert.equal(colorAt("print person.first_name", "."), "#6D7182");
+  assert.equal(colorAt("print person.first_name", "_"), "#6D7182");
+  assert.equal(colorAt("print person.first_name", "first"), "#64D6C7");
+  assert.equal(colorAt("first_name is 1", "_"), "#6D7182");
+  assert.equal(colorAt("first_name is 1", "first"), "#85B7F4");
+});
+
 test("palette defaults do not recolor another language or select a workbench theme", async () => {
   const javascript = await registry.loadGrammar("source.js");
   assert.equal(colorAt("if", "if", javascript), "#D4D4D4");

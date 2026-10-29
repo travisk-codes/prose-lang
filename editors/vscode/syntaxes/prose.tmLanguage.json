@@ -56,11 +56,29 @@
     },
     {
       "match": "\\b[A-Z][A-Za-z_0-9]*\\b",
-      "name": "support.class.prose"
+      "name": "support.class.prose",
+      "captures": {
+        "0": {
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
+        }
+      }
     },
     {
       "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b",
-      "name": "variable.other.readwrite.prose"
+      "name": "variable.other.readwrite.prose",
+      "captures": {
+        "0": {
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
+        }
+      }
     }
   ],
   "repository": {
@@ -127,7 +145,12 @@
           "name": "storage.type.function.prose"
         },
         "2": {
-          "name": "entity.name.function.prose"
+          "name": "entity.name.function.prose",
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
         }
       }
     },
@@ -146,7 +169,16 @@
         },
         {
           "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b",
-          "name": "variable.parameter.prose"
+          "name": "variable.parameter.prose",
+          "captures": {
+            "0": {
+              "patterns": [
+                {
+                  "include": "#name-separators"
+                }
+              ]
+            }
+          }
         },
         {
           "match": ",",
@@ -179,7 +211,12 @@
           "name": "storage.type.prose"
         },
         "3": {
-          "name": "entity.name.type.prose"
+          "name": "entity.name.type.prose",
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
         },
         "4": {
           "name": "keyword.other.prose"
@@ -209,11 +246,29 @@
         },
         {
           "match": "\\b[A-Z][A-Za-z_0-9]*\\b",
-          "name": "entity.name.type.prose"
+          "name": "entity.name.type.prose",
+          "captures": {
+            "0": {
+              "patterns": [
+                {
+                  "include": "#name-separators"
+                }
+              ]
+            }
+          }
         },
         {
           "match": "\\b[a-z_][A-Za-z_0-9]*\\b",
-          "name": "entity.name.type.parameter.prose"
+          "name": "entity.name.type.parameter.prose",
+          "captures": {
+            "0": {
+              "patterns": [
+                {
+                  "include": "#name-separators"
+                }
+              ]
+            }
+          }
         },
         {
           "include": "#punctuation"
@@ -301,15 +356,40 @@
       ]
     },
     "properties": {
-      "match": "(:)\\s*([A-Za-z_][A-Za-z_0-9]*)",
-      "captures": {
-        "1": {
-          "name": "punctuation.accessor.object.prose"
+      "patterns": [
+        {
+          "match": "(\\.)\\s*([A-Za-z_][A-Za-z_0-9]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.accessor.prose"
+            },
+            "2": {
+              "name": "variable.other.property.prose",
+              "patterns": [
+                {
+                  "include": "#name-separators"
+                }
+              ]
+            }
+          }
         },
-        "2": {
-          "name": "variable.other.property.prose"
+        {
+          "match": "(:)\\s*([A-Za-z_][A-Za-z_0-9]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.accessor.object.prose"
+            },
+            "2": {
+              "name": "variable.other.property.prose",
+              "patterns": [
+                {
+                  "include": "#name-separators"
+                }
+              ]
+            }
+          }
         }
-      }
+      ]
     },
     "loop-iterators": {
       "patterns": [
@@ -332,7 +412,16 @@
           "patterns": [
             {
               "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b",
-              "name": "variable.other.iterator.prose"
+              "name": "variable.other.iterator.prose",
+              "captures": {
+                "0": {
+                  "patterns": [
+                    {
+                      "include": "#name-separators"
+                    }
+                  ]
+                }
+              }
             },
             {
               "match": ",",
@@ -347,7 +436,12 @@
               "name": "keyword.control.prose"
             },
             "2": {
-              "name": "variable.other.iterator.prose"
+              "name": "variable.other.iterator.prose",
+              "patterns": [
+                {
+                  "include": "#name-separators"
+                }
+              ]
             }
           }
         }
@@ -360,9 +454,18 @@
           "name": "keyword.other.prose"
         },
         "2": {
-          "name": "variable.other.binding.prose"
+          "name": "variable.other.binding.prose",
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
         }
       }
+    },
+    "name-separators": {
+      "match": "_",
+      "name": "punctuation.separator.name.prose"
     }
   }
 }

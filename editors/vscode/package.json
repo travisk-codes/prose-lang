@@ -1,15 +1,22 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Syntax highlighting for the Prose concept programming language.",
-  "version": "0.1.5",
+  "description": "Syntax highlighting and formatting for the Prose programming language.",
+  "version": "0.1.7",
+  "main": "./extension.cjs",
+  "extensionKind": ["workspace"],
+  "activationEvents": ["onLanguage:prose"],
+  "scripts": {
+    "vscode:prepublish": "node build.mjs"
+  },
   "publisher": "travisk-codes",
   "license": "MIT",
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Formatters"
   ],
   "repository": {
     "type": "git",
@@ -23,6 +30,17 @@
     "virtualWorkspaces": true
   },
   "contributes": {
+    "configuration": {
+      "title": "Prose",
+      "properties": {
+        "prose.format.width": {
+          "type": "integer",
+          "minimum": 20,
+          "default": 80,
+          "description": "Preferred line width when formatting Prose. Strings and expressions without a safe break can exceed it."
+        }
+      }
+    },
     "languages": [
       {
         "id": "prose",
@@ -44,6 +62,9 @@
       }
     ],
     "configurationDefaults": {
+      "[prose]": {
+        "editor.defaultFormatter": "travisk-codes.prose-language"
+      },
       "editor.tokenColorCustomizations": {
         "textMateRules": [
           {
@@ -258,7 +279,15 @@
               "source.prose punctuation.accessor.object.prose"
             ],
             "settings": {
-              "foreground": "#89E5D7",
+              "foreground": "#6D7182",
+              "fontStyle": ""
+            }
+          },
+          {
+            "name": "Prose: Name separators",
+            "scope": ["source.prose punctuation.separator.name.prose"],
+            "settings": {
+              "foreground": "#6D7182",
               "fontStyle": ""
             }
           },
@@ -301,6 +330,9 @@
     }
   },
   "files": [
+    "extension.cjs",
+    "formatting.cjs",
+    "dist/**",
     "package.json",
     "language-configuration.json",
     "syntaxes/**",

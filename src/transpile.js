@@ -74,13 +74,14 @@ const builtinTypes = {
   nothing: "void", unset: "undefined", null: "null", true: "true", false: "false"
 };
 
-function tokenize(text, line) {
+function tokenize(text, line, locations = false) {
   const tokens = [];
   let pos = 0;
   while (pos < text.length) {
     if (/\s/.test(text[pos])) { pos++; continue; }
     // Spacing only matters to tell `f -1` (a negative argument) from `f - 1`.
     const spaced = pos > 0 && /\s/.test(text[pos - 1]);
+    const tokenStart = pos;
     const rest = text.slice(pos);
     const number = /^(?:\d+(?:\.\d+)?)/.exec(rest);
     const word = /^[A-Za-z_][A-Za-z_0-9]*/.exec(rest);
@@ -102,7 +103,9 @@ function tokenize(text, line) {
       if (!closed) fail(line, "Unterminated string.");
       if (isWord(tokens.at(-1), "pattern")) {
         // After `pattern` the text is a regular expression, kept as typed except that \" is a quote.
+        const pattern = tokens.at(-1);
         tokens[tokens.length - 1] = { type: "pattern", value: text.slice(start + 1, pos - 1).replace(/\\(.)/g, (all, char) => char === '"' ? '"' : all) };
+        if (locations) tokens.at(-1).source = { raw: `pattern ${text.slice(start, pos)}`, line, start: pattern.source.start };
         continue;
       }
       try {
@@ -117,6 +120,7 @@ function tokenize(text, line) {
       pos += operator[0].length;
     }
     tokens.at(-1).spaced = spaced;
+    if (locations) tokens.at(-1).source = { raw: text.slice(tokenStart, pos), line, start: tokenStart };
   }
   return tokens;
 }
@@ -691,7 +695,7 @@ function useStatement(tokens, line) {
 const continuingSymbols = new Set([",", "+", "-", "*", "/", "%", "=", "!=", "<", ">", "<=", ">="]);
 const continuingWords = new Set(["and", "or", "otherwise", "mod", "xor", "is", "are", "with", "giving", "of", "by", "return", "takes"]);
 
-function continues(tokens) {
+export function continues(tokens) {
   let depth = 0;
   for (const token of tokens) {
     if (token.type === "symbol" && token.value === "(") depth++;
@@ -706,14 +710,14 @@ function continues(tokens) {
 
 // The source's lines with their indentation. A line with a parenthesis still open, or that ends in
 // a comma or an operator, continues on the lines after it that are indented more.
-function sourceLines(source) {
+export function sourceLines(source, { locations = false } = {}) {
   const lines = [];
   let open = null;
   source.replace(/^﻿/, "").split(/\r?\n/).forEach((text, index) => {
     if (!text.trim()) return;
     const prefix = /^\s*/.exec(text)[0];
     const indent = prefix.replace(/\t/g, "    ").length;
-    const tokens = tokenize(text.slice(prefix.length), index + 1);
+    const tokens = tokenize(text.slice(prefix.length), index + 1, locations);
     // A header's parameters can each take a line, with its giving line back at the header's
     // indentation, like a closing bracket.
     const closes = indent === open?.indent && isWord(tokens[0], "giving");
@@ -1292,12 +1296,17 @@ function declarationsFor(program) {
   return lines.join("\n") + "\n";
 }
 
+/** Parse a program, also used to verify that formatting preserves its meaning. */
+export function parse(source, options = {}) {
+  return new Parser(source, options).block();
+}
+
 /**
  * Compile Prose to JavaScript: a script, or an ES module if it uses modules or imports its runtime.
  * `declarations` is a TypeScript declaration file for the module's exports, or null.
  */
 export function compile(source, options = {}) {
-  const program = new Parser(source, options).block();
+  const program = parse(source, options);
   const imports = program.filter(node => node.type === "use" && !node.typeOnly);
   const programScope = createScope([], program, null);
   for (const node of imports) {

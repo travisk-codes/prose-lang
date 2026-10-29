@@ -36,7 +36,8 @@ const names = {
   "#F58C8F": "red", "#F5AA6C": "orange", "#F3C962": "amber", "#F5E07B": "yellow", "#B7E16E": "lime",
   "#7CDA9E": "green", "#6AD5AB": "emerald", "#64D6C7": "teal", "#89E5D7": "teal2", "#66D6E9": "cyan",
   "#85B7F4": "blue", "#C5D9F5": "pale", "#9CA3F0": "indigo", "#C79EF4": "purple", "#EC93C4": "pink",
-  "#F392A2": "rose", "#E799F3": "magenta", "#979FB8": "comment", "#ADB5CC": "punct", "#F37086": "invalid", "#D4D4D4": "plain"
+  "#F392A2": "rose", "#E799F3": "magenta", "#979FB8": "comment", "#ADB5CC": "punct", "#F37086": "invalid", "#D4D4D4": "plain",
+  "#6D7182": "separator"
 };
 const escape = text => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

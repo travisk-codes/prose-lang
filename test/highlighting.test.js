@@ -48,7 +48,8 @@ test("the extension registers .prose and a resolvable grammar and configuration"
   assert.ok(manifest.contributes.languages.some(language =>
     language.id === "prose" && language.extensions.includes(".prose")));
   assert.equal(manifest.contributes.grammars[0].scopeName, "source.prose");
-  assert.equal(manifest.main, undefined);
+  assert.equal(manifest.main, "./extension.cjs");
+  assert.ok(readFileSync(new URL(manifest.main, extension), "utf8").length > 0);
   const config = JSON.parse(readFileSync(new URL("language-configuration.json", extension), "utf8"));
   assert.deepEqual(config.brackets, [["(", ")"]]);
 });

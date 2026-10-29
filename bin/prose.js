@@ -6,13 +6,18 @@ import { pathToFileURL } from "node:url";
 import { declarationPath, declarationsCurrent, proseFiles, writeDeclarations } from "../src/declarations.js";
 import { moduleReader } from "../src/node-hooks.js";
 import { compile } from "../src/transpile.js";
+import { formatCommand } from "../src/format-cli.js";
 
 const usage = `Usage: node bin/prose.js <file.prose> [--run]
        node bin/prose.js types <files or folders...> [--check]
+       node bin/prose.js format <files or folders...> [--width 80] [--check]
+       node bin/prose.js format - [--width 80] [--stdin-filepath file.prose]
 
 Outputs JavaScript, or executes it with --run. The types command writes a
 TypeScript declaration file (name.d.prose.ts) for each .prose file that
-exports something; --check only reports the ones that are out of date.`;
+exports something; --check only reports the ones that are out of date.
+Format updates Prose files in place; --check reports changes without writing.
+Use '-' to format standard input and print the result.`;
 
 const args = process.argv.slice(2);
 if (!args.length || args.includes("--help")) {
@@ -29,7 +34,9 @@ function compileFile(file) {
 }
 
 try {
-  if (args[0] === "types") {
+  if (args[0] === "format") {
+    formatCommand(args.slice(1));
+  } else if (args[0] === "types") {
     const check = args.includes("--check");
     const targets = args.slice(1).filter(arg => arg !== "--check");
     if (!targets.length || targets.some(arg => arg.startsWith("--"))) {

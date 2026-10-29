@@ -39,7 +39,7 @@ load. Run programs you trust; execution has ordinary Node.js permissions.
 `examples/tour.prose` uses every feature below in one program, and
 `examples/habits.prose` shows the newest ones across two files.
 
-## Syntax highlighting in VS Code
+## Syntax highlighting and formatting in VS Code
 
 The language extension in `editors/vscode` registers `.prose` files as **Prose**
 and colors keywords, function declarations, parameters, loop variables,
@@ -47,11 +47,11 @@ standard-library calls, strings, numbers, operators, and indexing with a
 Prose-only palette for dark backgrounds. Standalone quoted comments receive
 comment coloring.
 
-Install `dist/prose-language-0.1.3.vsix` with **Extensions: Install from VSIX...**
+Install `dist/prose-language-0.1.7.vsix` with **Extensions: Install from VSIX...**
 or run:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.3.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.7.vsix --force
 ```
 
 Reload your VS Code window if an already-open file retains its old coloring.
@@ -61,6 +61,47 @@ declarations and built-in calls have distinct scopes.
 `npm.cmd install` installs the development dependencies needed for the grammar
 tests; running the compiler and examples directly still requires only Node.js.
 See [the extension README](editors/vscode/README.md) for development and packaging.
+
+## Formatting
+
+The formatter standardizes indentation and spacing and wraps long expressions
+at safe continuation points. Its default width is 80 columns:
+
+```powershell
+node bin/prose.js format examples/reading_list_simplified.prose --width 80
+node bin/prose.js format src --check
+npm.cmd run format -- examples/fizzbuzz.prose
+```
+
+Files and folders are accepted; folders are searched recursively, skipping
+hidden entries and `node_modules`. Formatting updates files in place. `--check`
+reports files that would change and exits with status 1 without writing them.
+Already formatted files are left alone. A syntax error stops the batch before
+any files are written; unfinished design sketches need valid syntax first.
+
+The formatter keeps strings, patterns, parentheses, and the choice of `.` or `:`.
+It reparses the result and checks that the program's structure and documentation
+are unchanged. Strings, long names, and expressions without a safe break may
+exceed the requested width. Existing LF or CRLF line endings are retained.
+
+For a preview, use standard input; `--stdin-filepath` resolves Prose imports
+relative to the named file:
+
+```powershell
+Get-Content -Raw examples/reading_list_simplified.prose |
+    node bin/prose.js format - --stdin-filepath examples/reading_list_simplified.prose
+```
+
+In VS Code, use **Format Document** (`Shift+Alt+F` on Windows). The extension
+uses the same formatter, follows the editor's indentation settings, and accepts
+`"prose.format.width": 80`. Formatting does not enable format-on-save; that
+remains an editor preference. The formatter reads imported Prose signatures
+without running any program code.
+
+From JavaScript, import `format` from `prose-lang/format` (or `./src/format.js`
+inside this repository) and call `format(source, { width: 80, readModule })`.
+As with the compiler, `readModule(path)` supplies the text of imported Prose
+files when their function signatures are needed.
 
 ## Landing page
 
