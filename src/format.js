@@ -57,10 +57,67 @@ function argumentDepths(program, lines) {
   return depths;
 }
 
-function wrap(tokens, prefix, options, argumentDepth = new Map()) {
+// Use syntax to identify actual operators and conditional clauses. Keyword-like
+// property names and conditions inside callbacks must not become header breaks.
+function preferredBreaks(program, lines) {
+  const previous = new Map(), owners = new Map();
+  for (const line of lines) line.tokens.forEach((token, i) => {
+    previous.set(position(token), line.tokens[i - 1]);
+    owners.set(position(token), line);
+  });
+  const before = (node, value) => {
+    const token = node?.location && previous.get(position({ source: node.location }));
+    return word(token, value) ? position(token) : undefined;
+  };
+  const logical = new Map(), conditionals = [], valueLines = new Set();
+  const owner = node => node?.location && owners.get(position({ source: node.location }));
+  const markCondition = (node, level, parenthesesOnly) => {
+    if (!node || typeof node !== "object" || ["function", "lambda", "conditional"].includes(node.type)) return;
+    if (Array.isArray(node)) { node.forEach(child => markCondition(child, level, parenthesesOnly)); return; }
+    if (node.type === "binary" && ["and", "or"].includes(node.op)) {
+      const key = before(node.right, node.op);
+      if (key) logical.set(key, { level, parenthesesOnly, priority: node.op === "or" ? 0 : 1 });
+    }
+    for (const child of Object.values(node)) markCondition(child, level, parenthesesOnly);
+  };
+  const valueOwners = new Set(["assign", "assignTarget", "return", "print", "fail", "expression", "lambda"]);
+  const visit = (node, valueRoot = false) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) { node.forEach(child => visit(child)); return; }
+    const line = owner(node), valueLine = owner(node.value);
+    const first = line?.tokens[word(line.tokens[0], "export") ? 1 : 0];
+    const field = !node.type && node.name && valueLine?.tokens[0].value === node.name && word(valueLine.tokens[1], "is");
+    // An inline body belongs to its block header's logical line. Only standalone
+    // value statements (and property definitions) may start indented if/else.
+    if (line && valueOwners.has(node.type) && position(first) === position({ source: node.location })) valueLines.add(line);
+    if (field) valueLines.add(valueLine);
+    const conditional = node.type === "conditional", canContinue = valueLines.has(owner(node.condition));
+    if (node.condition) markCondition(node.condition, conditional ? 1 : 0, conditional && !canContinue);
+    if (valueRoot && conditional && node.postfix && canContinue) {
+      const then = node.then;
+      // A bare object or a lambda with an indented body must keep its header.
+      const block = then.type === "object" && !then.inline && !then.grouped || then.type === "lambda" && then.body;
+      const first = before(node.condition, "if"), second = before(node.otherwise, "else");
+      if (!block && first && second) conditionals.push({ first, second });
+    }
+    for (const [key, child] of Object.entries(node)) visit(child, key === "value" && (valueOwners.has(node.type) || field));
+  };
+  visit(program);
+  return { logical, conditionals };
+}
+
+function wrap(tokens, prefix, options, argumentDepth = new Map(), preferred = {}) {
   const { width } = options;
   const continuation = prefix + indentation(1, options);
   const parts = tokens.map((token, i) => spaceBefore(tokens, i) + token.source.raw);
+  const indices = new Map(tokens.map((token, i) => [position(token), i]));
+  const clauses = new Set();
+  if (columns(prefix + text(tokens), options) > width) for (const group of preferred.conditionals ?? []) {
+    if (indices.has(group.first) && indices.has(group.second)) {
+      clauses.add(indices.get(group.first));
+      clauses.add(indices.get(group.second));
+    }
+  }
   const breaks = [];
   let depthInParentheses = 0;
   const lambdaHeaders = [];
@@ -75,7 +132,11 @@ function wrap(tokens, prefix, options, argumentDepth = new Map()) {
     // between subtraction and a negative call argument. Keep its operand with it.
     if (symbol(tokens[i - 1], "-") || symbol(tokens[i], "-") || symbol(tokens[i], ",") || symbol(tokens[i], ")") ||
         accessor(tokens[i]) || accessor(tokens[i - 1])) continue;
-    if (depthInParentheses <= 0 && !continues(tokens.slice(Math.max(0, i - 2), i))) continue;
+    const allowed = entry => entry && (!entry.parenthesesOnly || depthInParentheses > 0);
+    const candidate = clauses.has(i) ? { level: 1, priority: 0 } : preferred.logical?.get(position(tokens[i]));
+    const leading = allowed(candidate) && candidate;
+    const legacy = depthInParentheses > 0 || continues(tokens.slice(Math.max(0, i - 2), i));
+    if (!legacy && !leading) continue;
     let priority = 7;
     if (word(previous, "or") || word(previous, "otherwise")) priority = 0;
     else if (word(previous, "and")) priority = 1;
@@ -84,9 +145,15 @@ function wrap(tokens, prefix, options, argumentDepth = new Map()) {
     else if (previous.type === "symbol" && !symbol(previous, "(")) priority = 4;
     else if (["mod", "xor", "by"].some(value => word(previous, value))) priority = 4;
     else if (continues(tokens.slice(Math.max(0, i - 2), i))) priority = 5;
-    breaks.push({ point: i, priority: depthInParentheses * 8 + priority });
+    // Keep a break after a logical operator as a last resort for narrow widths.
+    // Conditions normally put the operator at the start of the next line.
+    if (allowed(preferred.logical?.get(position(previous)))) priority += 2;
+    const useLeading = leading && (!legacy || leading.priority <= priority);
+    breaks.push({ point: i, priority: depthInParentheses * 8 + (useLeading ? leading.priority : priority),
+      prefix: useLeading && !leading.level && !depthInParentheses ? prefix : continuation });
   }
-  const points = [{ point: 0 }, ...breaks, { point: tokens.length }];
+  const points = [{ point: 0, prefix }, ...breaks, { point: tokens.length }];
+  const required = [...clauses];
   const worst = Math.max(0, ...breaks.map(entry => entry.priority));
   const lengths = [0];
   parts.forEach(part => lengths.push(lengths.at(-1) + part.length));
@@ -103,7 +170,10 @@ function wrap(tokens, prefix, options, argumentDepth = new Map()) {
     const from = points[start].point;
     for (let end = points.length - 1; end > start; end--) {
       const to = points[end].point;
-      const length = columns(from ? continuation : prefix, options) + lengths[to] - lengths[from] - (parts[from].length - parts[from].trimStart().length);
+      // A reflowed conditional keeps both clause boundaries, rather than putting
+      // its else back on the if line or splitting only one of the two clauses.
+      if (required.some(point => point > from && point < to)) continue;
+      const length = columns(points[start].prefix, options) + lengths[to] - lengths[from] - (parts[from].length - parts[from].trimStart().length);
       // Only an indivisible piece may exceed the width (e.g. a string).
       if (length > width && end > start + 1) continue;
       const cost = best[end].cost.slice();
@@ -115,7 +185,7 @@ function wrap(tokens, prefix, options, argumentDepth = new Map()) {
   const output = [];
   for (let start = 0; start < points.length - 1;) {
     const end = best[start].end, from = points[start].point;
-    output.push((from ? continuation : prefix) + parts.slice(from, points[end].point).join("").trimStart());
+    output.push(points[start].prefix + parts.slice(from, points[end].point).join("").trimStart());
     start = end;
   }
   return output;
@@ -215,6 +285,7 @@ export function format(source, options = {}) {
   const physical = source.replace(/^\uFEFF/, "").split(/\r?\n/);
   const settings = { width, tabWidth, insertSpaces };
   const argumentDepth = argumentDepths(program, lines);
+  const preferred = preferredBreaks(program, lines);
   const headers = new Map(program.filter(node => node.type === "function").map(node => [node.line, node]));
   const prefixes = statementPrefixes(lines, physical, settings);
   const output = [];
@@ -225,7 +296,7 @@ export function format(source, options = {}) {
     const fits = line.tokens.every(token => columns(physical[token.source.line - 1], settings) <= width);
     output.push(...(fits ? keepLines(line, physical, prefix, settings) : headers.has(line.line)
       ? wrapHeader(line.tokens, headers.get(line.line), prefix, settings)
-      : wrap(line.tokens, prefix, settings, argumentDepth)));
+      : wrap(line.tokens, prefix, settings, argumentDepth, preferred)));
     previousEnd = line.tokens.at(-1).source.line;
   }
   const eol = options.endOfLine ?? (source.includes("\r\n") ? "\r\n" : "\n");

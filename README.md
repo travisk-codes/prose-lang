@@ -55,11 +55,11 @@ and requires a trusted workspace. Set `prose.check.enabled` to `false` to disabl
 it. Dirty buffers wait until save; highlighting and formatting remain available
 without TypeScript or Workspace Trust.
 
-Install `dist/prose-language-0.1.11.vsix` with **Extensions: Install from VSIX...**
+Install `dist/prose-language-0.1.12.vsix` with **Extensions: Install from VSIX...**
 or run:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.11.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.12.vsix --force
 ```
 
 Reload your VS Code window if an already-open file retains its old coloring.
@@ -101,11 +101,12 @@ giving list of DatumTag
 ```
 
 A header that fits on one line stays there. Without `giving`, the last parameter
-has no trailing comma, so the function body starts separately. Other long lines
+has no trailing comma, so the function body starts separately. Long conditions
+and conditional values use the layouts below. Other long lines
 prefer breaks after `or` / `otherwise`, then `and`, then a lambda's `return`, then
 commas between outer call arguments or object entries. Nested calls and opening
-parentheses stay together when a looser break works. Every new continuation line
-uses one extra indentation level from the statement's first line.
+parentheses stay together when a looser break works. These continuation lines
+use one extra indentation level from the statement's first line.
 
 Conditions in `if`, `else if`, and `while` may also continue with leading `and`
 or `or`, aligned with the header or indented farther. The body remains deeper
@@ -117,10 +118,27 @@ or number >= 10
     print "Outside the range"
 ```
 
-These breaks keep the usual precedence and short-circuit behavior. Fitting
-leading-operator lines are preserved; reflowing an overlong condition still
-uses the formatter's usual breaks after operators. A leading operator cannot
-continue a condition after its body has started.
+These breaks keep the usual precedence and short-circuit behavior. When a condition
+needs reflowing, the formatter prefers leading `and` / `or`, aligned with its header.
+Operators inside parentheses use continuation indentation. A very narrow width may
+require a break after an operator instead. Fitting layouts retain their breaks.
+A leading operator cannot continue a condition after its body has started.
+
+When a trailing conditional value needs reflowing, its `if` and `else` clauses each
+start a new line, one indentation level deeper than the statement:
+
+```text
+labels is books.map function takes book
+    return book.title + " (long)"
+        if book.pages > 500
+        else book.title
+```
+
+Long conditions within these clauses also prefer leading `and` / `or`, aligned
+with the `if`. This layout works for returns, assignments, `print`, and object
+property values. Parentheses and function bodies keep their existing boundaries.
+Conditional values inside inline `then` bodies keep continuation breaks compatible
+with the enclosing header.
 
 The formatter keeps strings, patterns, parentheses, and the choice of `.` or `:`.
 It reparses the result and checks that the program's structure and documentation

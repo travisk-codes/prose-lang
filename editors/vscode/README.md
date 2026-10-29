@@ -29,19 +29,25 @@ lines of a statement or header fit the width. Only logical lines with an overlon
 physical line are reflowed. Long function headers put each parameter on its own
 indented line, with a trailing comma before an aligned `giving` line. Without
 `giving`, the final parameter has no trailing comma. Short headers stay on one line.
-Other long lines prefer breaks after `or` / `otherwise`, `and`, a lambda's `return`,
+Long conditions and conditional values use the layouts below. Other long lines
+prefer breaks after `or` / `otherwise`, `and`, a lambda's `return`,
 and outer argument or object-entry commas, ahead of breaks inside nested calls.
-New continuation lines all use one extra indentation level from the statement.
+These continuation lines use one extra indentation level from the statement.
 
 `if`, `else if`, and `while` conditions also accept a leading `and` or `or` on
 the next line, aligned with the header or indented farther. The body starts
-deeper than the first header line. Existing leading-operator layouts stay as
-written when they fit; overlong conditions use the usual reflow rules.
+deeper than the first header line. Automatic reflow prefers leading `and` / `or`
+aligned with the header, using continuation indentation inside parentheses.
+A narrow width can still require a break after an operator. Fitting layouts keep
+their existing breaks.
 
 Conditional values can also put `if` and `else` on separate lines, indented more
-than the `return`, assignment, or other expression they continue. The formatter
-preserves fitting layouts, and ordinary function bodies and block conditions
-retain their existing meaning.
+than the `return`, assignment, or other expression they continue. Automatic reflow
+puts both clauses on their own lines for trailing conditional values. Long clause
+conditions also prefer leading `and` / `or`, aligned with the `if`. The formatter
+preserves fitting layouts and keeps ordinary function bodies and block conditions
+intact. Conditional values inside inline `then` bodies keep breaks compatible with
+the enclosing header.
 
 The formatter preserves parentheses, strings, patterns, accessors, documentation,
 and program structure. It wraps only where Prose allows a continuation and
@@ -111,13 +117,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.11.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.12.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.11.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.12.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -142,7 +148,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.11.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.12.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.
