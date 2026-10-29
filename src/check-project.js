@@ -6,6 +6,7 @@ import { untypedError } from "./check.js";
 import { declarationPath } from "./declarations.js";
 import { sourceMapLookup } from "./source-map.js";
 import { collectSourceInfo } from "./check-hover.js";
+import { createAnyExplainer } from "./check-any.js";
 import { definitionResolver } from "./check-definition.js";
 
 export class CheckSetupError extends Error {
@@ -208,9 +209,10 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
     const hoverFiles = new Set(hoverTargets.map(file => canonical(resolve(cwd, file))));
     const definitionFiles = new Set(definitionTargets.map(file => canonical(resolve(cwd, file))));
     const checker = program.getTypeChecker();
+    const explainAny = hoverTargets.length ? createAnyExplainer(ts, checker, program, records.values()) : undefined;
     const information = new Map();
     for (const record of records.values()) if (hoverFiles.has(canonical(record.file)) || definitionTargets.length) {
-      const items = collectSourceInfo(ts, checker, program.getSourceFile(record.name), record, { hover: hoverFiles.has(canonical(record.file)) });
+      const items = collectSourceInfo(ts, checker, program.getSourceFile(record.name), record, { hover: hoverFiles.has(canonical(record.file)), explainAny });
       information.set(record, items);
       if (hoverFiles.has(canonical(record.file))) result.hovers.push(...items.map(({ node, symbol, priority, ...item }) => item));
     }

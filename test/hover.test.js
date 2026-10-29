@@ -220,7 +220,7 @@ test("custom fields and unknown receivers do not receive native-method claims", 
     const result = f.check(f.write('main.prose', source));
     assert.deepEqual(result.diagnostics, []);
     for (const [needle, word] of [['custom.length', 'length'], ['custom.slice', 'slice'], ['value.length', 'length'], ['value.slice', 'slice']]) {
-      assert.equal(at(result, source, needle, word).notes, undefined, needle);
+      assert.doesNotMatch((at(result, source, needle, word).notes ?? []).join('\n'), /zero-based|UTF-16|JavaScript slice/, needle);
     }
     assert.match(at(result, source, 'values.i', 'i').notes.join('\n'), /numeric i.*otherwise.*property "i"/);
   } finally { f.close(); }

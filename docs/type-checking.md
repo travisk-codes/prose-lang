@@ -98,6 +98,52 @@ exports point to the original source rather than the virtual declaration. Hosts
 can request hovers and definitions together to share analysis and token mapping.
 All symbol and compiler objects stay internal; results are serializable.
 
+## Understanding unchecked hover types
+
+When a displayed type contains `any`, its hover explains that this part of the
+value is unchecked. This includes function parameters and return types, list
+elements, and fields shown in an object hover. Where the source can be traced,
+the note distinguishes:
+
+- A parameter with no annotation or inferred contextual type.
+- A callback whose contextual function type already supplies `any`.
+- An explicit `any` annotation, including unchecked parts of a container type.
+- A library declaration such as `JSON.parse` that returns `any`.
+- An imported Prose function without a `giving` return contract, or an imported
+  value without a declared export type. The importing module sees that contract
+  even when the exporting file's body infers something more specific.
+- Empty-list, empty-object, unset, and null placeholders kept open for later use.
+
+For example, hovering over `copy` or `result` traces back to `raw_input`:
+
+```text
+function forward takes raw_input
+    copy is raw_input
+    return copy
+result is forward 3
+```
+
+Adding `as number` to `raw_input` lets these local values infer `number`, so
+their unchecked-type notes disappear. For an imported function, add a `giving`
+return contract to expose its checked result type to callers. An annotation
+describes a contract for checking; it does not validate external JSON at runtime.
+
+The explanation follows symbols and simple value flows, including aliases and
+local returns. Tracing is bounded, shows at most three unchecked parts, and
+does not guess a unique cause for a binding with several assignments or an
+unsupported flow. In those cases it says the source could not be established.
+Named types can hide additional unchecked fields that are not expanded in the
+hover. This is a reminder about the displayed type, not a complete safety audit.
+
+`unknown` stays distinct from `any`. An operation on an unknown receiver can
+produce an unchecked result; its note explains that the receiver needs checking
+or narrowing. An unresolved annotation points to type diagnostics rather than
+being described as intentionally untyped.
+
+Notes use current editor buffers, including unsaved imported files, and share
+`prose.hover.enabled` with hover types. This feature adds no diagnostics, changes
+no checking rules, and does not run or write application code.
+
 ## Checking output
 
 `compile(source, { check: true })` produces the TypeScript used for checking.
@@ -182,7 +228,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.17 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.18 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
