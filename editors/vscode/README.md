@@ -1,6 +1,6 @@
 # Prose Language for Visual Studio Code
 
-Syntax highlighting and formatting for `.prose` files, with a softened rainbow
+Syntax highlighting, formatting, and type checking for `.prose` files, with a softened rainbow
 palette for dark backgrounds matching the Prose website.
 
 Highlights keywords, function declarations and parameters, standard-library
@@ -13,7 +13,7 @@ The grammar distinguishes function declarations and standard-library calls.
 User-defined calls currently receive identifier coloring; resolving those
 symbols across a document is a future semantic-highlighting feature.
 
-The extension includes the Prose formatter and parser. Formatting reads source
+The extension includes the Prose formatter, parser, and checker. Formatting reads source
 text and imported signatures; it never executes the program or its imports.
 
 ## Formatting
@@ -38,6 +38,33 @@ and program structure. It wraps only where Prose allows a continuation and
 checks the parsed result before returning an edit. A long string or expression
 with no safe break may exceed the width. Invalid syntax leaves the document
 unchanged and reports an error. The editor formatter and CLI share their code.
+
+## Type checking
+
+Saved `.prose` files are checked when opened and saved. Errors have squiggles and
+appear in VS Code's **Problems** panel with source **Prose** and the same diagnostic
+codes and locations as `prose check`. Use **Prose: Check Saved Files** from the
+Command Palette to recheck immediately. Set `prose.check.enabled` to `false` to
+disable checking for a workspace or folder.
+
+The open, saved Prose files are the roots; imported Prose dependencies are also
+checked, including closed files. The nearest `tsconfig.json` selects each project,
+so nested projects get separate checks. Saving Prose, TypeScript, JavaScript, or
+JSON configuration refreshes checks. Checking runs in a background worker;
+superseded checks are canceled. Editing clears affected markers until the next
+save, and disk diagnostics are never applied to dirty buffers.
+
+Install TypeScript 5 or 6 in the project (`npm.cmd install --save-dev typescript`).
+The checker loads that package and the project's configuration, keeps fresh import
+declarations in memory, and never runs application code or writes output files.
+It shares the CLI's strict checking and untyped-value policy; see
+[type checking](../../docs/type-checking.md) for current limits.
+
+Type checking requires **Workspace Trust** because it loads the project's
+TypeScript package. Highlighting and formatting still work in Restricted Mode
+and virtual workspaces. Diagnostics require saved files on disk. Setup problems
+appear on the configuration's first line, or the selected file when no config
+exists, and are recorded in the **Prose** output channel without popup messages.
 
 ## Prose colors
 
@@ -69,13 +96,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.7.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.8.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.7.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.8.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -100,7 +127,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.7.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.8.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

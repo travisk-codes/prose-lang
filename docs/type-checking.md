@@ -151,7 +151,21 @@ commands reproduce 28 diagnostics across 46 Datums modules with TypeScript
 See [the Datums results](type-checking-datums.md) for the remaining diagnostic
 groups and the annotation issue found during the handoff.
 
-## Limits for the next stages
+## VS Code diagnostics
+
+Prose Language 0.1.8 checks open, saved Prose files and their imported Prose
+dependencies on open and save. Diagnostics appear as squiggles and in Problems.
+Use **Prose: Check Saved Files** to run immediately or disable checking with
+`prose.check.enabled`. Nested projects use separate configurations and workers.
+Dirty buffers wait until save; newer edits invalidate earlier results.
+
+The extension packages this same checker, loading the project's TypeScript in a
+background worker only in trusted workspaces with files on disk. Project-wide
+setup errors appear at the start of the config (or selected file if no config
+exists) and in the Prose output channel. Highlighting and formatting do not
+require TypeScript or Workspace Trust.
+
+## Current limits
 
 - TypeScript still widens unannotated object fields and branch assignments.
   Literal unions can need `as` or `giving` annotations.
@@ -163,11 +177,13 @@ groups and the annotation issue found during the handoff.
   string replacements. Out-of-range reads return unset at runtime. Contextual
   helper reads currently use ordinary array element types and do not yet adapt
   to `noUncheckedIndexedAccess`.
-- Checking does not install diagnostics in VS Code or run automatically during
-  builds. Project references are resolved by TypeScript but are not built.
+- Checking does not run automatically during builds. Project references are
+  resolved by TypeScript but are not built.
 
 `test/check.test.js` runs the real checker on representative good and bad
 programs. `test/check-cli.test.js` covers project selection, imported modules,
 fresh declarations, mapped diagnostics, exit codes, and read-only behavior.
+`test/checking-extension.test.js` covers background workers, saved-file
+diagnostics, cancellation, project isolation, trust, and disposal.
 The browser bundle and packaged formatter also carry the checking-output
 dependency without loading TypeScript.

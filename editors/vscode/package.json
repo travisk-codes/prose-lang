@@ -1,8 +1,8 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Syntax highlighting and formatting for the Prose programming language.",
-  "version": "0.1.7",
+  "description": "Syntax highlighting, formatting, and type checking for the Prose programming language.",
+  "version": "0.1.8",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -25,14 +25,30 @@
   },
   "capabilities": {
     "untrustedWorkspaces": {
-      "supported": true
+      "supported": "limited",
+      "description": "Syntax highlighting and formatting work in Restricted Mode. Type checking loads the project's TypeScript and requires Workspace Trust."
     },
-    "virtualWorkspaces": true
+    "virtualWorkspaces": {
+      "supported": "limited",
+      "description": "Syntax highlighting and formatting are available. Type checking requires files on disk."
+    }
   },
   "contributes": {
+    "commands": [{
+      "command": "prose.check",
+      "title": "Check Saved Files",
+      "category": "Prose",
+      "enablement": "isWorkspaceTrusted"
+    }],
     "configuration": {
       "title": "Prose",
       "properties": {
+        "prose.check.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Check saved Prose files on open and save using the project's TypeScript. Diagnostics appear in the editor and Problems panel."
+        },
         "prose.format.width": {
           "type": "integer",
           "minimum": 20,
@@ -332,6 +348,8 @@
   "files": [
     "extension.cjs",
     "formatting.cjs",
+    "checking.cjs",
+    "check-worker.cjs",
     "dist/**",
     "package.json",
     "language-configuration.json",

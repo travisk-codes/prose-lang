@@ -5,7 +5,9 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { format } from "../src/format.js";
 import { sourceLines } from "../src/transpile.js";
-import "../editors/vscode/build.mjs";
+import { build } from "../editors/vscode/build.mjs";
+
+build();
 
 const require = createRequire(import.meta.url);
 const { changedRange, createProvider } = require("../editors/vscode/formatting.cjs");
@@ -124,11 +126,16 @@ test("extension activation registers the document formatter and disposes it with
     return disposable;
   } } };
   const exports = {};
+  const diagnostics = { dispose() {} };
   const source = readFileSync(new URL("../editors/vscode/extension.cjs", import.meta.url), "utf8");
-  runInNewContext(source, { exports, require: name => name === "vscode" ? vscode : { createProvider } });
+  runInNewContext(source, { exports, require: name => name === "vscode" ? vscode
+    : name === "./formatting.cjs" ? { createProvider } : { createDiagnostics: api => {
+      assert.equal(api, vscode);
+      return diagnostics;
+    } } });
   const context = { subscriptions: [] };
   exports.activate(context);
   assert.equal(registrations[0].language, "prose");
   assert.equal(typeof registrations[0].provider.provideDocumentFormattingEdits, "function");
-  assert.deepEqual(context.subscriptions, [disposable]);
+  assert.deepEqual(context.subscriptions, [disposable, diagnostics]);
 });

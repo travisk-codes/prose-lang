@@ -41,7 +41,7 @@ files; see [Type checking](docs/type-checking.md).
 `examples/tour.prose` uses every feature below in one program, and
 `examples/habits.prose` shows the newest ones across two files.
 
-## Syntax highlighting and formatting in VS Code
+## VS Code support
 
 The language extension in `editors/vscode` registers `.prose` files as **Prose**
 and colors keywords, function declarations, parameters, loop variables,
@@ -49,11 +49,17 @@ standard-library calls, strings, numbers, operators, and indexing with a
 Prose-only palette for dark backgrounds. Standalone quoted comments receive
 comment coloring.
 
-Install `dist/prose-language-0.1.7.vsix` with **Extensions: Install from VSIX...**
+Saved Prose files are checked on open and save, with error squiggles and Problems
+entries from the same checker as the CLI. Checking uses the project's TypeScript
+and requires a trusted workspace. Set `prose.check.enabled` to `false` to disable
+it. Dirty buffers wait until save; highlighting and formatting remain available
+without TypeScript or Workspace Trust.
+
+Install `dist/prose-language-0.1.8.vsix` with **Extensions: Install from VSIX...**
 or run:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.7.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.8.vsix --force
 ```
 
 Reload your VS Code window if an already-open file retains its old coloring.
@@ -866,8 +872,8 @@ fresh import declarations in memory and never runs the application or writes
 files. Exit status is 0 for a clean check, 1 for source errors, and 2 for setup
 errors. If TypeScript is missing, install it in the project with
 `npm.cmd install --save-dev typescript`. See [Type checking](docs/type-checking.md)
-for selection rules, JSON output, and current limits. Editor diagnostics and
-automatic build checks are still to come.
+for selection rules, JSON output, and current limits. The VS Code extension uses
+the same checker on open and save; automatic build checks are still to come.
 
 ```text
 use type Datum from "../types"

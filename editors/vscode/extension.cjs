@@ -1,5 +1,6 @@
 const vscode = require("vscode");
 const { createProvider } = require("./formatting.cjs");
+const { createDiagnostics } = require("./checking.cjs");
 
 exports.activate = context => {
   let formatter;
@@ -10,4 +11,5 @@ exports.activate = context => {
       return formatter;
     })
   ));
+  context.subscriptions.push(createDiagnostics(vscode));
 };
