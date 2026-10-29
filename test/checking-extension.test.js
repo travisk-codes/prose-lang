@@ -301,7 +301,7 @@ test("packaged worker matches the CLI checker, uses project TypeScript, and neve
       '    present is points.filter function takes point return point.value != null',
       '    return present.map function takes point return point.value',
       'function side takes ready as boolean, giving "a" or "b"',
-      '    if ready then name is "a"', '    else name is "b"', '    return name'
+      '    if ready', '    or false', '        name is "a"', '    else name is "b"', '    return name'
     ].join('\n'));
     f.write("src/child.prose", 'export function value giving number\n    return "wrong"');
     f.write("src/child.d.prose.ts", 'export function value(): string;');

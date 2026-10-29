@@ -55,11 +55,11 @@ and requires a trusted workspace. Set `prose.check.enabled` to `false` to disabl
 it. Dirty buffers wait until save; highlighting and formatting remain available
 without TypeScript or Workspace Trust.
 
-Install `dist/prose-language-0.1.9.vsix` with **Extensions: Install from VSIX...**
+Install `dist/prose-language-0.1.10.vsix` with **Extensions: Install from VSIX...**
 or run:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.9.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.10.vsix --force
 ```
 
 Reload your VS Code window if an already-open file retains its old coloring.
@@ -106,6 +106,21 @@ prefer breaks after `or` / `otherwise`, then `and`, then a lambda's `return`, th
 commas between outer call arguments or object entries. Nested calls and opening
 parentheses stay together when a looser break works. Every new continuation line
 uses one extra indentation level from the statement's first line.
+
+Conditions in `if`, `else if`, and `while` may also continue with leading `and`
+or `or`, aligned with the header or indented farther. The body remains deeper
+than the first header line:
+
+```text
+if number < 0
+or number >= 10
+    print "Outside the range"
+```
+
+These breaks keep the usual precedence and short-circuit behavior. Fitting
+leading-operator lines are preserved; reflowing an overlong condition still
+uses the formatter's usual breaks after operators. A leading operator cannot
+continue a condition after its body has started.
 
 The formatter keeps strings, patterns, parentheses, and the choice of `.` or `:`.
 It reparses the result and checks that the program's structure and documentation

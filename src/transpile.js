@@ -721,8 +721,25 @@ export function continues(tokens) {
     (last.type === "word" && continuingWords.has(last.value)) || conditionalEnd;
 }
 
+// Exclude object/type fields named `if` or `while` from conditional headers.
+function conditionStart(tokens) {
+  const start = isWord(tokens[0], "if") || isWord(tokens[0], "while") ? 1
+    : isWord(tokens[0], "else") && isWord(tokens[1], "if") ? 2 : 0;
+  return !start || ["is", "as"].some(word => isWord(tokens[start], word)) ? 0 : start;
+}
+
+// Once function argument counts are known, make sure no inline body has started.
+function conditionOnly(line, functions) {
+  const start = conditionStart(line.tokens);
+  if (!start) return false;
+  const expr = new Expression(line.tokens.slice(start), line.line, functions);
+  expr.parse();
+  return !expr.peek() && !expr.blockFunctions.length;
+}
+
 // The source's lines with their indentation. A line with a parenthesis still open, or that ends in
 // a comma or an operator, continues on the lines after it that are indented more.
+// Conditions also accept leading and/or at the header's indentation or deeper.
 export function sourceLines(source, { locations = false } = {}) {
   const lines = [];
   let open = null;
@@ -735,7 +752,15 @@ export function sourceLines(source, { locations = false } = {}) {
     // A header's parameters can each take a line, with its giving line back at the header's
     // indentation, like a closing bracket.
     const closes = indent === open?.indent && isWord(tokens[0], "giving");
-    if (open && (indent > open.indent || closes)) {
+    const previous = lines.at(-1);
+    const leading = previous && indent >= previous.indent &&
+      (isWord(tokens[0], "and") || isWord(tokens[0], "or")) && conditionStart(previous.tokens);
+    if (leading) {
+      open = previous;
+      if (!open.leading) Object.defineProperty(open, "leading", { value: [] });
+      open.leading.push({ at: open.tokens.length, line: index + 1 });
+      open.tokens.push(...tokens);
+    } else if (open && (indent > open.indent || closes)) {
       open.tokens.push(...tokens);
     } else {
       open = { line: index + 1, indent, tokens };
@@ -846,6 +871,13 @@ class Parser {
       for (const param of header.params) this.checkVariable(param, header.line);
     }
     for (const [name, line] of values) this.checkVariable(name, line);
+    // Recheck with declared/imported argument counts: a string after the last
+    // argument can already be an inline body, rather than part of a call.
+    for (const line of this.lines) for (const continuation of line.leading ?? []) {
+      if (!conditionOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions)) {
+        fail(continuation.line, "A leading 'and' or 'or' can only continue a condition before its body starts.");
+      }
+    }
   }
   expression(line, tokens = line.tokens) {
     return new Expression(tokens, line.line, this.functions);

@@ -170,7 +170,7 @@ groups and the annotation issue found during the handoff.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.9 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.10 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
