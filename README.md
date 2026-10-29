@@ -55,11 +55,11 @@ and requires a trusted workspace. Set `prose.check.enabled` to `false` to disabl
 it. Dirty buffers wait until save; highlighting and formatting remain available
 without TypeScript or Workspace Trust.
 
-Install `dist/prose-language-0.1.8.vsix` with **Extensions: Install from VSIX...**
+Install `dist/prose-language-0.1.9.vsix` with **Extensions: Install from VSIX...**
 or run:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.8.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.9.vsix --force
 ```
 
 Reload your VS Code window if an already-open file retains its old coloring.

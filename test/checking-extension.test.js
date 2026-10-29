@@ -294,7 +294,15 @@ test("packaged worker matches the CLI checker, uses project TypeScript, and neve
     const startCheck = packagedChecker(f);
     f.write("node_modules/typescript/package.json", '{"main":"index.cjs"}');
     f.write("node_modules/typescript/index.cjs", `module.exports = { ...require(${JSON.stringify(require.resolve("typescript"))}), version: "workspace-test" };`);
-    const main = f.write("src/main.prose", 'use value from "./child.prose"\nfail "must never run"\nprint value run');
+    const main = f.write("src/main.prose", [
+      'use value from "./child.prose"', 'fail "must never run"', 'print value run',
+      'type Point is object', '    value as number or null',
+      'function values takes points as list of Point, giving list of number',
+      '    present is points.filter function takes point return point.value != null',
+      '    return present.map function takes point return point.value',
+      'function side takes ready as boolean, giving "a" or "b"',
+      '    if ready then name is "a"', '    else name is "b"', '    return name'
+    ].join('\n'));
     f.write("src/child.prose", 'export function value giving number\n    return "wrong"');
     f.write("src/child.d.prose.ts", 'export function value(): string;');
     const before = snapshot(f.root);
@@ -303,6 +311,7 @@ test("packaged worker matches the CLI checker, uses project TypeScript, and neve
     assert.deepEqual(checked, checkProject(options));
     assert.equal(checked.typescriptVersion, "workspace-test");
     assert.equal(checked.files.length, 2);
+    assert.equal(checked.diagnostics.length, 1);
     assert.equal(checked.diagnostics[0].line, 2);
     assert.deepEqual(snapshot(f.root), before);
     const manifest = JSON.parse(readFileSync(new URL("../editors/vscode/package.json", import.meta.url), "utf8"));

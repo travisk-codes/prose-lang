@@ -1,19 +1,21 @@
-# Datums checking-output measurement
+# Datums type-checking measurement
 
 Measured 2026-10-29 against the local prose-pilot checkout at D:/Datums/datums.
 Application files and generated declarations were not modified.
 
 - 46 Prose modules, using the project's TypeScript 6.0.3.
-- 28 remaining diagnostics, all mapped back to Prose locations.
+- 24 remaining diagnostics, all mapped back to Prose locations.
 - 167 implicit-any/unknown diagnostics excluded under the draft's untyped policy.
-- The handoff initially reported 34; allowing fields on returned unannotated
-  objects removed two false positives, with further untyped-placeholder fixes
-  reflected in this final count.
+- The public CLI baseline had 28 diagnostics. Preserving scalar literal choices
+  in branch assignments resolved the numeric_side mismatch in compare.prose.
+  Carrying a null-field filter's proof into later projections and reductions
+  resolved all three peak_month diagnostics in trend.prose. No new diagnostics
+  appeared, and no Datums files were changed.
 
 | Group | Diagnostics | Interpretation |
 | --- | ---: | --- |
-| Literal/union widening | 11 | Inferred text is broader than a declared literal union; return/local annotations or stronger narrowing are needed. |
-| Nullable values and narrowing | 11 | Optional results or projected nullable fields need a guard, fallback, or a type predicate the checker can see. |
+| Literal/union widening | 10 | Object fields and collection values can widen beyond a declared union; computed numeric ranges are also not proven. |
+| Nullable values and narrowing | 8 | Optional lookups need a guard, fallback, or a relationship the checker can establish. |
 | Readonly/mutable contracts | 5 | A readonly parameter is returned as a mutable list, or a ReadonlyMap is stored in a mutable Map slot. |
 | Generic annotation mismatch | 1 | sort_events_by_time declares a free type variable event but passes it to a CalendarEvent comparator. |
 
@@ -38,13 +40,9 @@ JSON output of the measurement script contains the complete diagnostic.
 | Location | Code | Message |
 | --- | --- | --- |
 | `src/lib/analysis/compare.prose:196` | TS2322 | Type '{ kind: string; reason: string; side: any; days: any; total: any; }' is not assignable to type 'Comparison'. |
-| `src/lib/analysis/compare.prose:197` | TS2322 | Type 'string' is not assignable to type '"a" &#124; "b"'. |
 | `src/lib/analysis/compare.prose:204` | TS2322 | Type '{ kind: string; reason: string; side: any; days: any; total: any; }' is not assignable to type 'Comparison'. |
 | `src/lib/analysis/series.prose:164` | TS2345 | Argument of type '{ month: string; year: any; }' is not assignable to parameter of type 'DateTimeFormatOptions'. |
 | `src/lib/analysis/series.prose:339` | TS2532 | Object is possibly 'undefined'. |
-| `src/lib/analysis/trend.prose:69` | TS2322 | Type '{ label: string; value: number &#124; null; }' is not assignable to type 'MonthFigure'. |
-| `src/lib/analysis/trend.prose:70` | TS18047 | '_prose_month.value' is possibly 'null'. |
-| `src/lib/analysis/trend.prose:70` | TS18047 | '_prose_best.value' is possibly 'null'. |
 | `src/lib/calendar.prose:80` | TS2345 | Argument of type 'event' is not assignable to parameter of type 'CalendarEvent'. |
 | `src/lib/calendar.prose:137` | TS2322 | Type 'number' is not assignable to type '0 &#124; 3 &#124; 1 &#124; 2 &#124; 4'. |
 | `src/lib/period.prose:134` | TS2345 | Argument of type 'string' is not assignable to parameter of type 'Flow'. |
@@ -73,5 +71,5 @@ node scripts/measure-check.mjs D:/Datums/datums --json
 node bin/prose.js check --project D:/Datums/datums --json
 ```
 
-The public command reproduces the same 28 diagnostics across 46 modules. The
+The public command reproduces the same 24 diagnostics across 46 modules. The
 measurement script now uses that checker while keeping the audit's JSON format.

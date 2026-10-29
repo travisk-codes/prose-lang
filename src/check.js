@@ -67,5 +67,16 @@ declare function __prose_is_object(value: unknown): value is { [key: string]: an
 type __ProseOpen<T, K extends PropertyKey> = __ProseUntyped<T> extends true ? any
   : T extends object ? T & { [P in Exclude<K, keyof T>]?: any } : T;
 declare function __prose_open<T, K extends PropertyKey>(value: T, ...keys: K[]): __ProseOpen<T, K>;
+// A pure field comparison in a filter callback carries its proof to later uses.
+// Preserve readonly fields, and require optional fields only when excluding unset.
+type __ProseWithoutValues<T, V> = { [P in keyof T]: Exclude<T[P], V> };
+type __ProseRequiredWithoutValues<T, V> = { [P in keyof T]-?: Exclude<T[P], V> };
+type __ProseWithoutField<T, K extends PropertyKey, V> = T & (K extends keyof T
+  ? undefined extends V ? __ProseRequiredWithoutValues<Pick<T, K>, V> : __ProseWithoutValues<Pick<T, K>, V>
+  : unknown);
+// A contextual dot remains a literal property on objects. For sequences it may
+// mean a numeric position, so a field predicate must not add a property proof.
+type __ProseWithoutObjectField<T, K extends PropertyKey, V> = T &
+  (T extends string | readonly unknown[] ? unknown : __ProseWithoutField<T, K, V>);
 declare function __prose_error(reason: unknown): Error;
 `;

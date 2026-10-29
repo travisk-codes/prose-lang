@@ -155,7 +155,8 @@ const withTypeScript = { skip: !ts && "typescript is not installed" };
 
 const typesFile = [
   "export interface DatumTag { name: string; value: string }",
-  "export interface Datum { id: string; time: number; tags: DatumTag[] }"
+  "export interface Datum { id: string; time: number; tags: DatumTag[] }",
+  "export interface FrozenPoint { readonly value: number | null }"
 ].join("\n");
 const tagsModule = [
   'use type Datum, DatumTag from "./types"',
@@ -408,6 +409,121 @@ test("checking output supports inline maps without changing the runtime output",
   const encoded = result.code.match(/sourceMappingURL=data:[^,]+,([^\n]+)/)[1];
   assert.deepEqual(JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')), result.map);
   assert.doesNotMatch(compile(source).code, /declare function|__prose_open|_prose_n: number/);
+});
+
+test("branch assignments preserve scalar literal unions while later assignments and object fields remain mutable", withTypeScript, () => {
+  assert.deepEqual(typeCheck([
+    'type Side is "a" or "b"',
+    'function selected takes ready as boolean, giving Side',
+    '    if ready',
+    '        side is if ready then "a" else "b"',
+    '        return side',
+    '    return "a"',
+    'function branches takes ready as boolean, giving Side',
+    '    if ready then side is "a"', '    else side is "b"',
+    '    return side',
+    'function reassigned giving number',
+    '    value is "ready"', '    value is 3', '    return value',
+    'function mutable giving text',
+    '    record is object state is "ready"', '    record.state is "done"', '    return record.state'
+  ].join('\n')), []);
+  const mistakes = typeCheck([
+    'type Side is "a" or "b"',
+    'function wrong takes ready as boolean, giving Side',
+    '    if ready then side is "a"', '    else side is "wrong"',
+    '    return side',
+    'typed as Side is "wrong"'
+  ].join('\n'));
+  assert.deepEqual(mistakes.map(({ line, code }) => [line, code]), [[5, 2322], [6, 2322]]);
+});
+
+test("filtering a null object field narrows later projections and reductions", withTypeScript, () => {
+  assert.deepEqual(typeCheck([
+    'value is 1',
+    'type Point is object', '    label as text', '    value as number or null',
+    'function values takes points as list of Point, giving list of number',
+    '    with_value is points.filter function takes point return point.value != null',
+    '    return with_value.map function takes point return point.value',
+    'function peak takes points as list of Point, giving number',
+    '    with_value is points.filter function takes point', '        return null != point.value',
+    '    return with_value.reduce function takes best, point return',
+    '        if point.value > best then point.value else best, 0'
+  ].join('\n')), []);
+});
+
+test("null-field narrowing distinguishes null from unset and preserves readonly properties", withTypeScript, () => {
+  const source = [
+    'use type FrozenPoint from "./types"',
+    'type Point is object', '    value as maybe (number or null)',
+    'function values takes points as list of Point, giving list of number',
+    '    present is points.filter function takes point return point.value != null',
+    '    defined is present.filter function takes point return point.value != unset',
+    '    return defined.map function takes point return point.value',
+    'function frozen takes points as list of FrozenPoint',
+    '    present is points.filter function takes point return point.value != null',
+    '    present.for_each function takes point', '        point.value is 3'
+  ].join('\n');
+  assert.deepEqual(typeCheck(source).map(({ line, code }) => [line, code]), [[11, 2540]]);
+  for (const excluded of ['null', 'unset']) {
+    const diagnostics = typeCheck([
+      'type Point is object', '    value as maybe (number or null)',
+      'function values takes points as list of Point, giving list of number',
+      `    present is points.filter function takes point return point.value != ${excluded}`,
+      '    return present.map function takes point return point.value'
+    ].join('\n'));
+    assert.deepEqual(diagnostics.map(({ line, code }) => [line, code]), [[5, 2322]]);
+    assert.match(diagnostics[0].message, excluded === 'null' ? /undefined/ : /null/);
+  }
+});
+
+test("filter inference does not invent guards for truthiness, compound tests, or contextual positions", withTypeScript, () => {
+  assert.deepEqual(typeCheck([
+    'type Point is object', '    value as number or null',
+    'function selected takes points as list of Point, callbacks as (function taking Point giving boolean, unknown), giving list of Point',
+    '    return points.filter each of callbacks'
+  ].join('\n')).map(({ line, code }) => [line, code]), [[4, 2556]]);
+  for (const condition of ['point.value', 'point.value != 0', 'point.value != null or true']) {
+    const source = [
+      'type Point is object', '    value as number or null',
+      'function values takes points as list of Point, giving list of number',
+      `    selected is points.filter function takes point return ${condition}`,
+      '    return selected.map function takes point return point.value'
+    ].join('\n');
+    assert.deepEqual(typeCheck(source).map(({ line, code }) => [line, code]), [[5, 2322]]);
+  }
+  const contextual = [
+    'function first takes rows as list of (list of maybe number), giving list of number',
+    '    value is 1',
+    '    present is rows.filter function takes row return row.value != unset',
+    '    return present.map function takes row return row.value'
+  ].join('\n');
+  assert.deepEqual(typeCheck(contextual).map(({ line, code }) => [line, code]), [[4, 2322]]);
+  assert.deepEqual(typeCheck([
+    'type Point is object', '    value as number or null',
+    'function invalid takes points as list of Point',
+    '    return points.filter function takes point return point.missing != null'
+  ].join('\n')).map(({ line, code }) => [line, code]), [[4, 2339]]);
+  for (const callback of [
+    'function takes point giving boolean return point.value != null',
+    'function takes point as any return point.value != null',
+    'function takes point\n        print point.value\n        return point.value != null'
+  ]) {
+    const diagnostics = typeCheck([
+      'type Point is object', '    value as number or null',
+      'function values takes points as list of Point, giving list of number',
+      `    selected is points.filter ${callback}`,
+      '    return selected.map function takes point return point.value'
+    ].join('\n'));
+    assert.equal(diagnostics.length, 1);
+    assert.equal(diagnostics[0].code, 2322);
+  }
+  assert.deepEqual(typeCheck([
+    'type Point is object', '    value as number or null',
+    'predicate is function takes point return point.value != null',
+    'function values takes points as list of Point',
+    '    selected is points.filter predicate',
+    '    return selected.map function takes point return point.missing'
+  ].join('\n')).map(({ line, code }) => [line, code]), [[6, 2339]]);
 });
 
 test("measurement uses fresh declarations, strict checks, and leaves project files alone", withTypeScript, () => {

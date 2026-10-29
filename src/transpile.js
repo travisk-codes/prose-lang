@@ -1444,8 +1444,8 @@ export function compile(source, options = {}) {
   }
   const later = check ? laterProperties(program, programScope, innerScope) : new Map();
 
-  function expression(node, scope, depth) {
-    return mapped(node, (check && checkValue(node, scope, depth)) || expressionValue(node, scope, depth));
+  function expression(node, scope, depth, filterPredicate = false) {
+    return mapped(node, (check && checkValue(node, scope, depth, filterPredicate)) || expressionValue(node, scope, depth));
   }
 
   function visible(name, scope) {
@@ -1453,11 +1453,39 @@ export function compile(source, options = {}) {
     return false;
   }
 
+  // A single comparison proves exactly which nullish value a parameter's field
+  // cannot contain. Do not infer from truthiness, compound tests, or dot positions.
+  function checkedPredicate(node, scope, filterPredicate) {
+    // Use the receiver's contextual element type. A standalone or explicitly
+    // untyped callback could otherwise turn a typed collection into any[].
+    if (!filterPredicate || node.returns || !node.params.length || node.types?.[0]) return "";
+    const value = node.value ?? (node.body?.length === 1 && node.body[0].type === "return" ? node.body[0].value : null);
+    if (value?.type !== "binary" || value.op !== "!=") return "";
+    const excluded = child => child.type === "unset" ? "undefined" : child.type === "literal" && child.value === null ? "null" : null;
+    const type = excluded(value.right) ?? excluded(value.left);
+    const property = excluded(value.right) ? value.left : value.right;
+    if (!type || property?.type !== "property" || property.key || property.maybe ||
+      property.object.type !== "name" || property.object.value !== node.params[0]) return "";
+    const parameter = variable(node.params[0]);
+    const helper = property.contextual && visible(property.name, scope) ? "__ProseWithoutObjectField" : "__ProseWithoutField";
+    return `${parameter} is ${helper}<typeof ${parameter}, ${JSON.stringify(camel(property.name))}, ${type}>`;
+  }
+
+  // Bare hoisted bindings evolve as they are assigned. Preserve scalar literals
+  // in each assignment's flow type without freezing objects or restricting later writes.
+  function checkedAssignment(node, scope, depth) {
+    if (node.type === "literal" && node.value !== null) return mapped(node, `(${expressionValue(node, scope, depth)} as const)`);
+    if (node.type === "conditional") return mapped(node,
+      `(${expression(node.condition, scope, depth)} ? ${checkedAssignment(node.then, scope, depth)} : ${checkedAssignment(node.otherwise, scope, depth)})`);
+    return expression(node, scope, depth);
+  }
+
   // An expression as the checking output writes it, or undefined where both outputs agree.
-  function checkValue(node, scope, depth) {
+  function checkValue(node, scope, depth, filterPredicate) {
     const emit = child => expression(child, scope, depth);
     const element = child => child.type === "spread" ? spread(child, scope, depth) : emit(child);
-    const args = nodes => nodes.map(element).join(", ");
+    const args = (nodes, filter = false) => nodes.map((child, index) => filter && index === 0 && child.type === "lambda"
+      ? expression(child, scope, depth, true) : element(child)).join(", ");
     if (node.type === "object") return checkObject(node, scope, depth);
     // An empty list can be added to later, so it isn't a list of nothing.
     if (node.type === "array" && !node.elements.length) return "([] as any[])";
@@ -1468,7 +1496,8 @@ export function compile(source, options = {}) {
     }
     if (node.type === "invoke") {
       const callee = node.callee.type === "property" ? checkAccess(node.callee, scope, depth, node.maybe) : emit(node.callee);
-      return `${callee}${node.maybe ? "?." : ""}(${args(node.args)})`;
+      const filter = node.callee.type === "property" && !node.callee.key && camel(node.callee.name) === "filter";
+      return `${callee}${node.maybe ? "?." : ""}(${args(node.args, filter)})`;
     }
     if (node.type === "new") return `new (${emit(node.callee)})(${args(node.args)})`;
     if (node.type === "lambda") {
@@ -1476,7 +1505,8 @@ export function compile(source, options = {}) {
       // Untyped parameters take their types from where the function is passed.
       const params = node.params.map((name, index) => node.types?.[index]
         ? `${variable(name)}: ${mapped(node.types[index], parameterType(node.types[index]))}` : variable(name)).join(", ");
-      const returns = node.returns ? `: ${mapped(node.returns, returnType(node))}` : "";
+      const predicate = checkedPredicate(node, inner, filterPredicate);
+      const returns = node.returns ? `: ${mapped(node.returns, returnType(node))}` : predicate ? `: ${unmapped(predicate)}` : "";
       const async = awaits(node.body ?? node.value) ? "async " : "";
       const variables = generic([...inner.ownTypeVariables]);
       if (node.body) return `(${async}${variables}(${params})${returns} => {\n${emitScope(node.body, inner, depth + 1)}\n${pad(depth)}})`;
@@ -1639,7 +1669,7 @@ export function compile(source, options = {}) {
         let value = node.value.type === "unset" && !scope.types.has(node.name) ? "(undefined as any)"
           : node.value.type === "array" && !node.value.elements.length ? "[]"
           : node.value.type === "object" ? mapped(node.value, checkObject(node.value, scope, depth, extra || undefined))
-          : emit(node.value);
+          : !scope.types.has(node.name) && !scope.constants.has(node.name) ? checkedAssignment(node.value, scope, depth) : emit(node.value);
         if (extra?.size && node.value.type !== "object") {
           value = `__prose_open(${value}, ${[...extra].map(name => JSON.stringify(camel(name))).join(", ")})`;
         }

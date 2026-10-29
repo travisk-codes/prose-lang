@@ -109,6 +109,8 @@ own installed TypeScript only when checking is requested.
 | Untyped callbacks | Bare parameters, preserving TypeScript contextual inference |
 | A direct variable assigned once | `const` at its assignment |
 | Reassigned or branch/loop variables | Function-scoped `let` declarations with flow inference |
+| Scalar literals assigned in branches | Literal flow types retained without restricting later assignments |
+| A pure callback comparing a field with `null` or `unset` | An inferred field predicate, preserving that proof through `filter` and later operations |
 | An untyped empty variable | An unchecked placeholder that can later become text or a callback |
 | An empty list | An evolving array; nested empty lists stay untyped |
 | Objects, `like`, and later fields | Object literals and spreads; later fields belong to the actual lexical binding |
@@ -134,6 +136,20 @@ explicitly annotated shapes, and readonly positions retain their constraints.
 An empty variable and unset/null object fields are unchecked placeholders.
 Generic function values introduce free type variables and capture outer ones.
 
+Branch assignments preserve literal choices, so a value assigned `"a"` or `"b"`
+can satisfy that union without an extra annotation. Subsequent assignments still
+update its inferred flow type; ordinary object fields keep their mutable types.
+
+A callback consisting of `point.value != null` tells the checker that retained
+points have a non-null value. `point.value != unset` excludes only unset; either
+comparison can also put the nullish value on the left. The proof survives a later
+`map` or `reduce`. This applies to an inline `filter` callback with an inferred
+first parameter type and a single returned comparison on its direct property.
+Readonly modifiers remain intact. Optional fields stay optional when excluding
+only null, and become required when excluding unset. Standalone callbacks, explicit annotations,
+compound tests, truthiness tests, nested properties, and contextual sequence positions
+retain their existing behavior.
+
 ## Reproduce the Datums measurement
 
 From this checkout:
@@ -145,15 +161,16 @@ node scripts/measure-check.mjs D:/Datums/datums --json
 
 The harness delegates to the public checker, explicitly selecting all `.prose`
 files under `src/` and preserving the audit's relative-path JSON format. Both
-commands reproduce 28 diagnostics across 46 Datums modules with TypeScript
-6.0.3, without modifying application files.
+commands now reproduce 24 diagnostics across 46 Datums modules with TypeScript
+6.0.3, down from 28 before the literal-flow and null-field inference fixes,
+without modifying application files.
 
 See [the Datums results](type-checking-datums.md) for the remaining diagnostic
 groups and the annotation issue found during the handoff.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.8 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.9 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
@@ -167,10 +184,10 @@ require TypeScript or Workspace Trust.
 
 ## Current limits
 
-- TypeScript still widens unannotated object fields and branch assignments.
+- TypeScript still widens unannotated object fields and some collection elements.
   Literal unions can need `as` or `giving` annotations.
-- Some JavaScript idioms need stronger narrowing to satisfy TypeScript, such as
-  filtering nullable object fields and then projecting them in another callback.
+- More complex guards and relationships between separate lookups still need
+  explicit narrowing. A successful lookup does not prove a repeated lookup safe.
 - `any` and `unknown` remain unchecked under the draft's policy. New dynamic
   fields and empty placeholders also make deliberate holes in checking.
 - Position helpers do not prove bounds, valid write gaps, or one-code-point

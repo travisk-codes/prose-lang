@@ -60,6 +60,11 @@ declarations in memory, and never runs application code or writes output files.
 It shares the CLI's strict checking and untyped-value policy; see
 [type checking](../../docs/type-checking.md) for current limits.
 
+Version 0.1.9 preserves scalar literal choices assigned in branches and infers
+non-null or defined fields after a simple inline `filter` callback. Later `map`
+and `reduce` calls retain that knowledge. These changes affect checking only;
+the executable JavaScript and exported declarations stay the same.
+
 Type checking requires **Workspace Trust** because it loads the project's
 TypeScript package. Highlighting and formatting still work in Restricted Mode
 and virtual workspaces. Diagnostics require saved files on disk. Setup problems
@@ -96,13 +101,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.8.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.9.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.8.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.9.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -127,7 +132,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.8.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.9.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.
