@@ -34,7 +34,7 @@ test("annotated functions declare their parameter and result types, with docs fr
     "/** 1 entry, 3 entries. */",
     "export function pluralize(count: number, singular: string, plural?: string): string;",
     "export function words(items: readonly string[]): string;",
-    "export function nothing_back(): void;",
+    "export function nothingBack(): void;",
     ""
   ].join("\n"));
 });
@@ -127,7 +127,7 @@ test("untyped and maybe trailing parameters are optional; earlier maybe paramete
   ].join("\n")).split("\n").slice(1, -1), [
     "export function loose(a?: any, b?: any): any;",
     "export function mixed(a: string | undefined, b: number, c?: any): any;",
-    "export function reserved_names(class_?: any, default_?: any): any;"
+    "export function reservedNames(class_?: any, default_?: any): any;"
   ]);
 });
 

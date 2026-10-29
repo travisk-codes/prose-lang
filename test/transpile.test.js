@@ -119,8 +119,13 @@ test("multiple arguments, nested calls, and forward declarations", () => {
     "print add (double 3), (double 4)",
     "function add takes left, right", "    return left + right",
     "function double takes value", "    return value * 2",
-    "print add 2, 3 * 4", "print add 2, (3 * 4)"
+    "print (add 2, 3) * 4", "print add 2, (3 * 4)"
   ].join("\n")), [14, 20, 14]);
+});
+
+test("arithmetic right after several arguments is ambiguous, but not after one", () => {
+  assert.throws(() => transpile("function add takes left, right\n    return left + right\nprint add 2, 3 * 4"), /'\*' right after a call's arguments is ambiguous/);
+  assert.deepEqual(run("function double takes value\n    return value * 2\nprint double 3 + 1"), [7]);
 });
 
 test("mutual recursion and inline conditionals", () => {

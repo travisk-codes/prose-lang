@@ -9,22 +9,22 @@ async function fetch_new_access_token
 		print e.name e.message
 
 function use_interval takes callback, delay
-	saved_callback is React.useRef run
+	saved_callback is React.use_ref run
 
 	(remember the latest callback)
 	function first_effect
 		saved_callback.current is callback
 	dependency_array_1.1 is callback
-	useEffect first_effect, dependency_array_1
+	use_effect first_effect, dependency_array_1
 
 	(set up the interval)
 	function second_effect
 		function tick
 			saved_callback.current run
 		if delay != null
-			id is setInterval tick, delay
+			id is set_interval tick, delay
 			function cleanup
-				clearInterval id
+				clear_interval id
 			return cleanup
 	dependency_array_2
-	useEffect second_effect, dependency_array_2
+	use_effect second_effect, dependency_array_2

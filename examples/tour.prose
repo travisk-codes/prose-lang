@@ -1,4 +1,5 @@
-"A tour of everything Prose supports. Run it with: node bin/prose.js examples/tour.prose --run"
+"A tour of everything Prose supports. Run it with: node bin/prose.js"
+"examples/tour.prose --run"
 
 use greet, greeting from "./tour_helpers.prose"
 use type Greeting from "./tour_helpers.prose"
@@ -17,7 +18,8 @@ print answer
 print quote
 print nothing = null and missing = unset and also_missing = unset
 
-"--- Arithmetic: precedence, grouping, unary minus, %, prefix remainder, and mod."
+"--- Arithmetic: precedence, grouping, unary minus, %, prefix remainder, and"
+"mod."
 print 2 + 3 * 4 - 10 / 5
 print (2 + 3) * -2
 print 17 % 5
@@ -25,7 +27,8 @@ print remainder 17 5
 print -1 % 26
 print -1 mod 26
 
-"--- Comparison and logic. otherwise replaces only unset and null; or replaces any false value."
+"--- Comparison and logic. otherwise replaces only unset and null; or replaces"
+"any false value."
 print 3 >= 3 and 2 != 3 and not (1 > 2) and 1 < 2 and 2 <= 2
 print no or "or fallback"
 print nothing otherwise "otherwise fallback"
@@ -48,7 +51,8 @@ else if yes print "inline else if"
 else print "not printed either"
 print if ratio > 2 then "big ratio" else "small ratio"
 
-"--- Loops: counting with for, while, and for each over lists, strings, and pairs."
+"--- Loops: counting with for, while, and for each over lists, strings, and"
+"pairs."
 total is 0
 for i is 1 to 4
     total is total + i
@@ -62,7 +66,8 @@ for each letter in "a😀"
 for each word, position in ("first", 1), ("second", 2)
     print word + " " + position
 
-"--- Functions: recursion, calling ahead, no arguments, bare return, and the call-first rule."
+"--- Functions: recursion, calling ahead, no arguments, bare return, and the"
+"call-first rule."
 function factorial takes n
     if n <= 1 return 1
     return n * factorial (n - 1)
@@ -76,7 +81,8 @@ function announce
     return
 announce run
 
-"--- Modules: an imported Prose function (with leaves out its optional argument), an imported variable, and JavaScript."
+"--- Modules: an imported Prose function (with leaves out its optional"
+"argument), an imported variable, and JavaScript."
 print greet with "Ada"
 print greet "Grace", "?"
 print greeting
@@ -96,7 +102,8 @@ built.1 is "o"
 built.2 is "k"
 print built
 
-"--- Objects: nested literals, colon access, changes, function values, and returning objects."
+"--- Objects: nested literals, colon access, changes, function values, and"
+"returning objects."
 person is object
     name is "Ada"
     address is object
@@ -117,7 +124,8 @@ function make_point takes x, y
 point is make_point 3, 4
 print point:x + point:y
 
-"--- Arrays: commas, one item, empty, nesting, positions, appending, sharing, and copies."
+"--- Arrays: commas, one item, empty, nesting, positions, appending, sharing,"
+"and copies."
 numbers is 3, 1, 2
 single is ("only",)
 empty_list is array
@@ -136,8 +144,9 @@ copy.1 is 300
 print numbers
 print copy.1
 
-"--- Function values: inline and indented bodies, passed to methods and to Prose functions."
-sorted is numbers:toSorted function takes a, b return a - b
+"--- Function values: inline and indented bodies, passed to methods and to"
+"Prose functions."
+sorted is numbers:to_sorted function takes a, b return a - b
 print sorted
 evens is sorted:filter function takes n return n mod 2 = 0
 print evens
@@ -157,16 +166,18 @@ function after takes action, delay
 print after function, 5
     return "ran"
 
-"--- JavaScript: globals, methods called with the values after them, run for none, and new."
+"--- JavaScript: globals, methods called with the values after them, run for"
+"none, and new."
 print Math:max 4, 9, 2
-print (Math:round (10 / 3)):toFixed 1
-print "Prose":toUpperCase run
+print (Math:round (10 / 3)):to_fixed 1
+print "Prose":to_upper_case run
 print JSON:stringify point
 seen is new Set ("a", "b", "a")
 print seen:size
 lookup is new Map
 lookup:set "key", ("val" + "ue")
-"Parentheses say what a call's result does next, and which call gets each argument."
+"Parentheses say what a call's result does next, and which call gets each"
+"argument."
 print (lookup:get "key") + "!"
 print Math:max (Math:min 5, 8), 6
 "with is optional, and needed before a negative first argument."
@@ -183,14 +194,15 @@ profile is object
     nickname is
 print maybe profile:address:city
 print maybe profile:address:city otherwise "no city"
-print maybe profile:name:toUpperCase run
+print maybe profile:name:to_upper_case run
 print maybe profile:nickname:length otherwise 0
 print maybe profile:tags.1 otherwise "no tags"
 callback is unset
 maybe callback run
 print (maybe callback run) otherwise "no callback"
 
-"--- Objects on one line, spreading with each of, and taking lists apart with are."
+"--- Objects on one line, spreading with each of, and taking lists apart with"
+"are."
 title is "Dr."
 greeting_card is object title, name is "Ada", lines is 2
 updated_card is object like greeting_card, lines is 3
@@ -216,7 +228,8 @@ print year + "/" + month
 print "a  b   c":replace (pattern "\s+" everywhere), " "
 print "Prose":match pattern "^prose$" ignoring case != null
 
-"--- Types: optional annotations that describe exports to TypeScript. They don't change what runs."
+"--- Types: optional annotations that describe exports to TypeScript. They"
+"don't change what runs."
 "A point on a grid."
 export type Point is object
     x as number
@@ -233,7 +246,8 @@ print welcome "Lin"
 double is function takes n as number giving number return n * 2
 print double 21
 
-"--- Exports: other modules could use these. A comment on the line just above an export documents it."
+"--- Exports: other modules could use these. A comment on the line just above"
+"an export documents it."
 
 "How many sections the tour has."
 export function stop_count giving number

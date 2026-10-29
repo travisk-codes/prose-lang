@@ -100,6 +100,10 @@ builds it to `site/dist/index.html`.
 - JavaScript globals, methods, and `new`: a value followed by arguments is a
   call (`items:join ", "`), and `run` calls with none.
 - `maybe`, which reads through values that might be unset or `null`.
+- Type tests (`value is a text`, `reason is an Error`), `try` with `on error`,
+  `fail` to raise an error, and `wait for` a promise.
+- Bit operators `xor`, `shifted left by`, and `shifted right by`.
+- Computed property names: `settings:(name)`.
 - Modules: `use name from "path"` and `export`, plus a Vite plugin. Functions
   imported from other `.prose` files keep their argument counts.
 - Compile-time errors for names that are never assigned, imported, or provided
@@ -116,8 +120,9 @@ else
     print total
 ```
 
-Multiplication, division, remainder, and `mod` bind tighter than addition and
-subtraction, followed by comparisons, `not`, `and`, then `or`.
+Multiplication, division, remainder, `mod`, and the bit operators bind tighter
+than addition and subtraction, followed by comparisons (and `is a` tests),
+`not`, `and`, then `or`.
 Operators at the same precedence associate left to right. Strings and numbers
 use JavaScript arithmetic behavior; division can produce fractions.
 
@@ -169,12 +174,14 @@ commas. Compound arguments need parentheses:
 function multiply takes left, right
     return left * right
 
-print multiply 2, 3 + 4
 print multiply 2, (3 + 4)
+print (multiply 2, 3) + 4
 ```
 
-These print `10` and `14`, respectively. A call consumes the declared number of
-arguments. Nested calls follow the same rule; parentheses make grouping explicit.
+These print `14` and `10`, respectively. With several arguments, arithmetic
+right after the last one could belong to it or to the call's result, so
+`multiply 2, 3 + 4` is a syntax error, as it is for JavaScript calls. A call
+consumes the declared number of arguments. Nested calls follow the same rule; parentheses make grouping explicit.
 Missing arguments produce a syntax error. A comma after a complete call starts
 another array element, as described below.
 
@@ -456,6 +463,60 @@ maybe on_close run
 `a:b`. A call's arguments are evaluated only if there is something to call.
 Calling a value that exists but is not a function is still an error.
 
+## Type tests, errors, and waiting
+
+`is a` (or `is an`) tests what kind of value something is, and `is not a`
+tests the opposite. Values read from storage or a file are usually checked
+this way before they're used:
+
+```text
+function parseGoal takes stored
+    if stored is not an object return unset
+    if stored:value is not a number return unset
+    return object direction is stored:direction, value is stored:value
+```
+
+The kinds are `text`, `number`, `boolean`, `function`, `list`, and `object`
+(something with properties: not `null`, a list, or a function). A capitalized
+name tests for a class instead, as JavaScript's `instanceof` does:
+`reason is an Error`, `day is a Date`. At the start of a line, `name is a ...`
+is still an assignment; type tests go where a value is expected, such as an
+`if` line or the right side of `is`.
+
+`fail` stops with an error. A message becomes an `Error` with that message,
+and an `Error` (such as one caught below) is raised as it is. `try` runs its
+indented lines, and if anything in them fails, the `on error` block after it
+runs instead of the rest. A name after `on error` holds what failed:
+
+```text
+function checked takes amount
+    if amount < 0 fail "Amounts can't be negative."
+    return amount
+
+try
+    stored is JSON:parse text
+on error problem
+    print problem:message
+    stored is unset
+```
+
+Variables assigned in either block belong to the surrounding function, and
+`skip` and `stop` still work in a loop around the `try`.
+
+`wait for` waits for a promise and gives its result. A function or function
+value that waits for something becomes asynchronous: calling it gives a
+promise, and its generated declaration gives `Promise of` its result type.
+
+```text
+function loadNotes takes url as text, giving list of text
+    response is wait for fetch url
+    return wait for response:json run
+```
+
+The bit operators work on 32-bit integers as JavaScript's do: `a xor b` is
+`a ^ b`, `a shifted left by n` is `a << n`, and `a shifted right by n` is
+`a >>> n`, which fills with zeros, so its result is never negative.
+
 ## Functions as values
 
 `function` without a name makes a function value. With `return` on the same
@@ -545,6 +606,52 @@ in an enclosing one, imported, or a JavaScript global. Anything else, such as
 a misspelling, is a syntax error at compile time with its line number. A Prose
 variable takes precedence over a JavaScript global with the same name
 throughout its function or script.
+
+Prose names are snake_case, and JavaScript's are camelCase. A name made of
+lowercase words joined by underscores becomes camelCase wherever JavaScript
+sees it: a property or method (`tag:name:to_locale_lower_case run` calls
+`toLocaleLowerCase`), an object entry (`object is_today is true` has the
+property `isToday`), a JavaScript global (`local_storage`), an import or
+export (`export function same_tag_name` is `sameTagName` to JavaScript and
+TypeScript), and the names in generated declarations. JavaScript's own names
+that capitalize an acronym, such as `randomUUID` and `toISOString`, are
+written `random_uuid` and `to_iso_string`. Other names, such as `Math`,
+`NaN`, or `__proto__`, are used as they are. To use a property whose name
+really has underscores, as in data from another program, write it as a
+computed property: `record:("user_id")`.
+
+## Long lines
+
+A line continues on the lines after it that are indented more when it ends
+with a comma, an operator (such as `+`, `and`, `or`, `otherwise`, or `is`),
+`return`, or `takes`, or while a parenthesis is still open:
+
+```text
+ready is title and priority != "" and
+    not (has_tag tags, "done")
+total is (first_amount + second_amount +
+    third_amount)
+newest is entries:sort function takes left, right return
+    right:time - left:time
+```
+
+A function header that doesn't fit on one line gives each parameter a line of
+its own, with the `giving` line back at the header's indentation:
+
+```text
+export function create_note_tags takes
+    body as text,
+    title as maybe text,
+    labels as maybe list of text,
+giving list of DatumTag
+    tags is array
+```
+
+The joined lines are read as one line. A block's body still starts on the
+first line after its header that doesn't continue it, so indenting the rest
+of an `if` line further than the body keeps them apart.
+Comment lines in a row are one comment, so a long description above a
+declaration can take several quoted lines.
 
 ## Modules and Vite
 
@@ -715,8 +822,17 @@ existing Unicode indexing and append rules.
 
 Object literals can be assigned to a variable or property, or returned from
 a function with `return object` followed by indented property definitions.
-A property's value can be a function value. Computed property names are not
-implemented yet.
+A property's value can be a function value.
+
+To use a property whose name is in a variable or worked out, put it in
+parentheses after the colon. It reads and writes like any other property:
+
+```text
+counts is object
+for each word in words
+    counts:(word) is (counts:(word) otherwise 0) + 1
+print counts:("the")
+```
 
 An object can also be written on one line, after `object`. Each entry is
 `name is value`, a bare name (a property with that variable's name and value),

@@ -201,7 +201,7 @@ test("the runtime option imports the helpers instead of embedding them", async (
     const runtime = new URL("../src/runtime.js", import.meta.url).href;
     const code = transpile('export function initial takes word\n    return word.1', { runtime });
     assert.doesNotMatch(code, /function __prose_get/);
-    assert.match(code, /import \{ __prose_chars, .*__prose_each \} from "file:/);
+    assert.match(code, /import \{ __prose_chars, .*__prose_each\b.* \} from "file:/);
     writeFileSync(join(folder, "initial.mjs"), code);
     const loaded = await import(pathToFileURL(join(folder, "initial.mjs")).href);
     assert.equal(loaded.initial("😀a"), "😀");

@@ -137,12 +137,22 @@ export function __prose_each(value, line) {
   return value;
 }
 
+// `is an object`: something with properties, not null, a list, or a function.
+export function __prose_is_object(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// `fail`: a message becomes an Error; an Error (such as one caught by on error) is raised as it is.
+export function __prose_error(reason) {
+  return reason instanceof Error ? reason : new Error(String(reason));
+}
+
 const helpers = [
   __prose_chars, __prose_length, __prose_get, __prose_set,
   __prose_char_to_number, __prose_number_to_char, __prose_mod,
   __prose_property, __prose_property_ref, __prose_index_ref,
   __prose_call, __prose_method, __prose_new, __prose_maybe_property, __prose_maybe_get,
-  __prose_maybe_call, __prose_maybe_method, __prose_each
+  __prose_maybe_call, __prose_maybe_method, __prose_each, __prose_is_object, __prose_error
 ];
 
 export const runtimeHelpers = helpers.map(helper => helper.name);

@@ -239,11 +239,15 @@
           "name": "storage.type.function.prose"
         },
         {
-          "match": "\\b(?:if|then|else|for|each|in|while|return|skip|stop)\\b|(?<=\\beach\\s)of\\b",
+          "match": "\\bwait\\s+for\\b|\\bon\\s+error\\b|\\b(?:if|then|else|for|each|in|while|return|skip|stop|try|fail)\\b|(?<=\\beach\\s)of\\b",
           "name": "keyword.control.prose"
         },
         {
-          "match": "\\b(?:is|are|to|print|run|with|new|use|export|as|giving|like)\\b|\\bfrom(?=\\s*\")",
+          "match": "(?<=\\ba\\s|\\ban\\s)(?:text|number|boolean|function|list|object)\\b",
+          "name": "support.type.prose"
+        },
+        {
+          "match": "\\bis\\s+(?:not\\s+)?an?\\b(?=\\s+[A-Za-z])|\\b(?:is|are|to|print|run|with|new|use|export|as|giving|like)\\b|\\bfrom(?=\\s*\")",
           "name": "keyword.other.prose"
         },
         {
@@ -267,7 +271,7 @@
     "operators": {
       "patterns": [
         {
-          "match": "\\b(?:and|or|not|mod|otherwise|maybe)\\b",
+          "match": "\\bshifted\\s+(?:left|right)\\s+by\\b|\\b(?:and|or|not|mod|xor|otherwise|maybe)\\b",
           "name": "keyword.operator.word.prose"
         },
         {

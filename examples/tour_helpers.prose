@@ -1,4 +1,5 @@
-"A module for tour.prose: an exported type, an exported variable, and an exported function with an optional argument."
+"A module for tour.prose: an exported type, an exported variable, and an"
+"exported function with an optional argument."
 
 "Greetings are text."
 export type Greeting is text

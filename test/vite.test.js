@@ -16,7 +16,7 @@ test("the plugin serves the runtime as one virtual module", () => {
   assert.equal(plugin.resolveId("./other.js"), null);
   const runtime = plugin.load(id);
   for (const helper of runtimeHelpers) assert.match(runtime, new RegExp(`function ${helper}\\(`));
-  assert.match(runtime, /export \{ __prose_chars, .*__prose_each \};/);
+  assert.match(runtime, /export \{ __prose_chars, .*__prose_each\b.* \};/);
   assert.equal(plugin.load("/src/other.js"), null);
 });
 

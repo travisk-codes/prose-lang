@@ -5,7 +5,7 @@ const reserved = new Set([
   "true", "false", "null", "remainder", "function", "return", "while",
   "async", "await", "takes", "run", "mod", "object", "array",
   "with", "new", "each", "in", "then", "use", "export", "unset", "otherwise", "maybe",
-  "as", "giving", "are", "skip", "stop"
+  "as", "giving", "are", "skip", "stop", "try", "fail", "xor"
 ]);
 
 // JavaScript's own values, which a name refers to when no Prose variable has that name.
@@ -23,8 +23,42 @@ const javascriptGlobals = new Set([
   "ResizeObserver", "Response", "TextDecoder", "TextEncoder", "URL", "URLSearchParams",
   "alert", "cancelAnimationFrame", "confirm", "crypto", "document", "fetch", "getComputedStyle",
   "history", "indexedDB", "localStorage", "location", "matchMedia", "navigator", "performance",
-  "requestAnimationFrame", "sessionStorage", "window", "Buffer", "process"
+  "requestAnimationFrame", "sessionStorage", "window", "Buffer", "process",
+  "AggregateError", "DOMException", "Element", "HTMLButtonElement", "HTMLCanvasElement", "HTMLElement",
+  "HTMLImageElement", "HTMLInputElement", "HTMLSelectElement", "HTMLTextAreaElement", "KeyboardEvent",
+  "MouseEvent", "Node", "PointerEvent"
 ]);
+
+// Prose names are snake_case and JavaScript's are camelCase, so a name of lowercase words joined
+// by underscores (same_tag_name, to_locale_lower_case) is camelCase wherever JavaScript sees it.
+const snakeName = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
+const plainCamel = name => name.replace(/_([a-z0-9])/g, (all, letter) => letter.toUpperCase());
+// JavaScript's own names that capitalize a whole acronym, by how their words would otherwise join.
+const acronymNames = new Map([
+  "randomUUID", "toISOString", "toUTCString", "getUTCFullYear", "getUTCMonth", "getUTCDate",
+  "getUTCDay", "getUTCHours", "getUTCMinutes", "getUTCSeconds", "getUTCMilliseconds",
+  "setUTCFullYear", "setUTCMonth", "setUTCDate", "setUTCHours", "setUTCMinutes", "setUTCSeconds",
+  "setUTCMilliseconds", "innerHTML", "outerHTML", "insertAdjacentHTML", "createObjectURL",
+  "revokeObjectURL", "readAsDataURL", "toDataURL", "encodeURI", "decodeURI", "encodeURIComponent",
+  "decodeURIComponent", "toJSON", "baseURI", "documentURI", "responseURL", "responseXML", "indexedDB"
+].map(name => [plainCamel(name.replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+  .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").toLowerCase()), name]));
+
+export function camel(name) {
+  if (!snakeName.test(name)) return name;
+  const plain = plainCamel(name);
+  return acronymNames.get(plain) ?? plain;
+}
+
+// The kinds of value `is a` can test for, besides classes such as Error.
+const typeTests = {
+  text: value => `typeof ${value} === "string"`,
+  number: value => `typeof ${value} === "number"`,
+  boolean: value => `typeof ${value} === "boolean"`,
+  function: value => `typeof ${value} === "function"`,
+  list: value => `Array.isArray(${value})`,
+  object: value => `__prose_is_object(${value})`
+};
 
 function fail(line, message) {
   const error = new SyntaxError(`Line ${line}: ${message}`);
@@ -90,7 +124,7 @@ function tokenize(text, line) {
 const precedence = {
   or: 10, otherwise: 10, and: 20,
   "=": 30, "!=": 30, "<": 30, ">": 30, "<=": 30, ">=": 30,
-  "+": 40, "-": 40, "*": 50, "/": 50, "%": 50, mod: 50
+  "+": 40, "-": 40, "*": 50, "/": 50, "%": 50, mod: 50, xor: 50
 };
 
 class Expression {
@@ -119,6 +153,7 @@ class Expression {
   // A name, property, position, or parenthesized value directly followed by a value is called with it.
   callsByAdjacency(left) {
     if (this.adjacentValues || !(left.grouped || ["name", "property", "index"].includes(left.type))) return false;
+    if (this.shiftAt()) return false;
     const next = this.peek();
     if (next.type === "symbol" && next.value === "-" && next.spaced && this.tokens[this.pos + 1] && !this.tokens[this.pos + 1].spaced) {
       fail(this.line, "'-' here could start a negative argument or subtract. Write with before a negative argument (items:at with -1), or put spaces around a minus that subtracts.");
@@ -239,12 +274,15 @@ class Expression {
     if (nested && args.length > 1) {
       fail(this.line, "Inside another call's arguments, a call with several arguments needs parentheses: (f a, b).");
     }
-    // Readers split `f a, b + 1` both ways, so neither reading is chosen silently.
+    this.noArithmeticAfterArguments();
+    return args;
+  }
+  // Readers split `f a, b + 1` both ways, so neither reading is chosen silently.
+  noArithmeticAfterArguments() {
     const next = this.peek();
-    if ((next?.type === "symbol" && "+-*/%".includes(next.value)) || isWord(next, "mod")) {
+    if ((next?.type === "symbol" && "+-*/%".includes(next.value)) || isWord(next, "mod") || isWord(next, "xor") || this.shiftAt()) {
       fail(this.line, `'${next.value}' right after a call's arguments is ambiguous. Put the last argument in parentheses to include it, or the whole call to use its result.`);
     }
-    return args;
   }
   call(name) {
     const { params, builtin } = this.functions.get(name);
@@ -266,6 +304,8 @@ class Expression {
       }
       this.adjacentValues--;
       this.argumentDepth--;
+      // One argument reads naturally (length items + 1); after several, `f a, b + 1` is split both ways.
+      if (params.length > 1) this.noArithmeticAfterArguments();
     }
     if (args.some(arg => arg.type === "spread")) {
       fail(this.line, `'${name}' takes a fixed number of arguments, so 'each of' can't spread a list into it.`);
@@ -401,6 +441,38 @@ class Expression {
     }
     return node;
   }
+  // `shifted left by` and `shifted right by`, as the JavaScript operator each one is.
+  shiftAt() {
+    if (!this.at("shifted") || !isWord(this.tokens[this.pos + 2], "by")) return null;
+    const direction = this.tokens[this.pos + 1];
+    return isWord(direction, "left") ? "<<" : isWord(direction, "right") ? ">>>" : null;
+  }
+  // `value is a text`, `value is not a list`, `reason is an Error`.
+  startsTypeTest() {
+    if (!this.at("is")) return false;
+    const next = this.tokens[this.pos + 1];
+    const article = isWord(next, "not") ? this.tokens[this.pos + 2] : next;
+    return isWord(article, "a") || isWord(article, "an");
+  }
+  typeTest(value) {
+    this.take("is");
+    const negated = this.at("not");
+    if (negated) this.take("not");
+    const article = this.tokens[this.pos++].value;
+    const token = this.tokens[this.pos++];
+    if (token?.type === "word" && Object.hasOwn(typeTests, token.value)) {
+      return { type: "typeTest", value, kind: token.value, negated, line: this.line };
+    }
+    if (token?.type !== "word" || !/^[A-Z]/.test(token.value)) {
+      fail(this.line, `Expected a kind of value after '${article}': text, number, boolean, function, list, object, or a class such as Error.`);
+    }
+    let kind = { type: "name", value: token.value, line: this.line };
+    while (this.at(":")) {
+      this.take(":");
+      kind = { type: "property", object: kind, name: this.propertyName(), line: this.line };
+    }
+    return { type: "typeTest", value, kind, negated, line: this.line };
+  }
   parse(min = 0) {
     const token = this.tokens[this.pos++];
     if (!token) fail(this.line, "Expected an expression.");
@@ -459,6 +531,10 @@ class Expression {
       this.adjacentValues--;
     } else if (["true", "false", "null"].includes(token.value)) {
       left = { type: "literal", value: { true: true, false: false, null: null }[token.value] };
+    } else if (isWord(token, "wait") && this.at("for")) {
+      // `wait for` waits for a promise; the function it's in becomes asynchronous.
+      this.take("for");
+      left = { type: "await", value: this.parse(60), line: this.line };
     } else if (token.type === "word" && !reserved.has(token.value)) {
       left = this.functions.has(token.value)
         ? this.call(token.value)
@@ -469,7 +545,15 @@ class Expression {
     while (this.peek()) {
       if (this.at(":") && min <= 70) {
         this.take(":");
-        left = { type: "property", object: left, name: this.propertyName(), line: this.line };
+        if (this.at("(")) {
+          // A computed property: settings:(name) is the property named by name's value.
+          this.take("(");
+          const key = this.inParentheses(() => this.parse());
+          this.take(")");
+          left = { type: "property", object: left, key, line: this.line };
+        } else {
+          left = { type: "property", object: left, name: this.propertyName(), line: this.line };
+        }
         continue;
       }
       if (this.at(".") && min <= 70) {
@@ -490,6 +574,17 @@ class Expression {
       if (min <= 70 && this.callsByAdjacency(left)) {
         this.adjacentCall = true;
         left = { type: "invoke", callee: left, args: this.arguments(), line: this.line };
+        continue;
+      }
+      // Type tests rank with comparisons, and shifts with multiplication.
+      if (min <= 30 && this.startsTypeTest()) {
+        left = this.typeTest(left);
+        continue;
+      }
+      const shift = this.shiftAt();
+      if (shift && min <= 50) {
+        this.pos += 3;
+        left = { type: "binary", op: shift, left, right: this.parse(51), line: this.line };
         continue;
       }
       const next = this.peek();
@@ -543,20 +638,58 @@ function useStatement(tokens, line) {
   return { type: "use", names, source: source.value, typeOnly, line };
 }
 
+// Endings that carry a line on to the next, more indented one: a comma or an operator.
+const continuingSymbols = new Set([",", "+", "-", "*", "/", "%", "=", "!=", "<", ">", "<=", ">="]);
+const continuingWords = new Set(["and", "or", "otherwise", "mod", "xor", "is", "are", "with", "giving", "of", "by", "return", "takes"]);
+
+function continues(tokens) {
+  let depth = 0;
+  for (const token of tokens) {
+    if (token.type === "symbol" && token.value === "(") depth++;
+    else if (token.type === "symbol" && token.value === ")") depth--;
+  }
+  const last = tokens.at(-1);
+  return depth > 0 || (last.type === "symbol" && continuingSymbols.has(last.value)) ||
+    (last.type === "word" && continuingWords.has(last.value));
+}
+
+// The source's lines with their indentation. A line with a parenthesis still open, or that ends in
+// a comma or an operator, continues on the lines after it that are indented more.
+function sourceLines(source) {
+  const lines = [];
+  let open = null;
+  source.replace(/^﻿/, "").split(/\r?\n/).forEach((text, index) => {
+    if (!text.trim()) return;
+    const prefix = /^\s*/.exec(text)[0];
+    const indent = prefix.replace(/\t/g, "    ").length;
+    const tokens = tokenize(text.slice(prefix.length), index + 1);
+    // A header's parameters can each take a line, with its giving line back at the header's
+    // indentation, like a closing bracket.
+    const closes = indent === open?.indent && isWord(tokens[0], "giving");
+    if (open && (indent > open.indent || closes)) {
+      open.tokens.push(...tokens);
+    } else {
+      open = { line: index + 1, indent, tokens };
+      lines.push(open);
+    }
+    if (!continues(open.tokens)) open = null;
+  });
+  return lines;
+}
+
 // The functions (with their parameters) and variables a Prose module exports, from its export lines.
 function exportsOf(source) {
   const functions = new Map();
   const values = new Set();
-  source.replace(/^﻿/, "").split(/\r?\n/).forEach((text, index) => {
-    if (!/^export\b/.test(text)) return;
-    const tokens = tokenize(text, index + 1);
+  for (const { line, indent, tokens } of sourceLines(source)) {
+    if (indent || !isWord(tokens[0], "export")) continue;
     if (isWord(tokens[1], "function")) {
-      const header = functionHeader(tokens, index + 1);
+      const header = functionHeader(tokens, line);
       functions.set(header.name, header);
     } else if (tokens[1]?.type === "word" && (isWord(tokens[2], "is") || isWord(tokens[2], "as"))) {
       values.add(tokens[1].value);
     }
-  });
+  }
   return { functions, values };
 }
 
@@ -611,15 +744,7 @@ class Parser {
     this.pos = 0;
     // How many loops enclose the line being parsed, within the current function.
     this.loopDepth = 0;
-    this.lines = source.replace(/^﻿/, "").split(/\r?\n/).flatMap((text, index) => {
-      if (!text.trim()) return [];
-      const prefix = /^\s*/.exec(text)[0];
-      return [{
-        line: index + 1,
-        indent: prefix.replace(/\t/g, "    ").length,
-        tokens: tokenize(text.slice(prefix.length), index + 1)
-      }];
-    });
+    this.lines = sourceLines(source);
     // Discover top-level signatures before parsing calls, supporting forward recursion.
     this.functions = new Map(["length", "char_to_number", "number_to_char"].map(name =>
       [name, { name, params: ["value"], builtin: true }]
@@ -732,7 +857,7 @@ class Parser {
       if (line.indent > next.indent) fail(line.line, "Unexpected indentation in a type.");
       this.pos++;
       if (line.tokens.length === 1 && line.tokens[0].type === "string") {
-        doc = line.tokens[0].value;
+        doc = doc === undefined ? line.tokens[0].value : `${doc} ${line.tokens[0].value}`;
         continue;
       }
       const expr = this.expression(line);
@@ -786,6 +911,10 @@ class Parser {
       if (expr.peek()) fail(expr.line, `'${word}' is a word for loops, so it can't be used as a name.`);
       if (!this.loopDepth) fail(expr.line, `'${word}' only works inside a loop.`);
       node = { type: word };
+    } else if (expr.at("fail")) {
+      expr.take("fail");
+      if (!expr.peek()) fail(expr.line, "Expected a message after 'fail': fail \"Choose a date.\"");
+      node = { type: "fail", value: expr.parse() };
     } else if (destructuresAt(expr.tokens, expr.pos)) {
       const names = expr.names("variable");
       expr.take("are");
@@ -798,7 +927,14 @@ class Parser {
       while (!declaredType && (expr.at(":") || expr.at("."))) {
         if (expr.at(":")) {
           expr.take(":");
-          target = { type: "property", object: target, name: expr.propertyName(), line: expr.line };
+          if (expr.at("(")) {
+            expr.take("(");
+            const key = expr.inParentheses(() => expr.parse());
+            expr.take(")");
+            target = { type: "property", object: target, key, line: expr.line };
+          } else {
+            target = { type: "property", object: target, name: expr.propertyName(), line: expr.line };
+          }
         } else {
           expr.take(".");
           target = { type: "index", object: target, index: expr.index(), line: expr.line };
@@ -818,7 +954,7 @@ class Parser {
       const startsCall = first?.value === "(" || isWord(first, "new") || isWord(first, "maybe") ||
         (first?.type === "word" && !reserved.has(first.value));
       const value = startsCall ? expr.parse() : null;
-      if (!["call", "invoke", "new"].includes(value?.type)) {
+      if (!["call", "invoke", "new", "await"].includes(value?.type)) {
         fail(expr.line, "Expected assignment, print, return, a string expression, or a function call; this syntax is not supported yet.");
       }
       node = { type: "expression", value };
@@ -848,10 +984,8 @@ class Parser {
         if (!topLevel) fail(line.line, "Only top-level functions, variables, and types can be exported.");
         expr.take("export");
       }
-      // A quoted comment on the line just above a declaration documents it in generated declarations.
-      const previous = result.at(-1);
-      const doc = previous?.type === "expression" && previous.line === line.line - 1 &&
-        previous.value.type === "literal" && typeof previous.value.value === "string" ? previous.value.value : undefined;
+      // Quoted comment lines just above a declaration document it in generated declarations.
+      const doc = docAbove(result, line.line);
       const declaresType = isWord(expr.peek(), "type") && expr.tokens[expr.pos + 1]?.type === "word" &&
         !isWord(expr.tokens[expr.pos + 1], "is");
       if (expr.at("function")) {
@@ -889,6 +1023,22 @@ class Parser {
           }
         }
         result.push({ type: "if", branches, otherwise });
+      } else if (expr.at("try")) {
+        expr.take("try");
+        expr.end();
+        const body = this.body(line, inFunction);
+        const next = this.lines[this.pos];
+        if (next?.indent !== indent || !isWord(next.tokens[0], "on") || !isWord(next.tokens[1], "error")) {
+          fail(line.line, "A try block needs an on error block after it, for when something in it fails.");
+        }
+        this.pos++;
+        const handler = this.expression(next);
+        handler.take("on");
+        handler.take("error");
+        // `on error problem` names what failed, usually an Error with a message.
+        const name = handler.peek() ? handler.variableName() : null;
+        handler.end();
+        result.push({ type: "try", body, name, handler: this.body(next, inFunction), line: next.line });
       } else if (expr.at("while")) {
         expr.take("while");
         const condition = this.condition(expr);
@@ -920,6 +1070,18 @@ class Parser {
   }
 }
 
+// The comment lines in a row that end on the line before a declaration, joined as one paragraph.
+function docAbove(nodes, line) {
+  const parts = [];
+  for (let index = nodes.length - 1; index >= 0; index--) {
+    const node = nodes[index];
+    const comment = node.type === "expression" && node.value.type === "literal" && typeof node.value.value === "string";
+    if (!comment || node.line !== line - parts.length - 1) break;
+    parts.unshift(node.value.value);
+  }
+  return parts.length ? parts.join(" ") : undefined;
+}
+
 const variable = name => `_prose_${name}`;
 const pad = depth => "  ".repeat(depth);
 
@@ -927,8 +1089,10 @@ const pad = depth => "  ".repeat(depth);
 function assignedNames(nodes, names = new Map()) {
   for (const node of nodes) {
     const assigned = node.type === "assign" || node.type === "for" ? [node.name]
-      : node.type === "foreach" || node.type === "destructure" ? node.names : [];
+      : node.type === "foreach" || node.type === "destructure" ? node.names
+      : node.type === "try" && node.name ? [node.name] : [];
     for (const name of assigned) if (!names.has(name)) names.set(name, node.line);
+    if (node.type === "try") assignedNames(node.handler, names);
     if (node.type === "if") {
       for (const branch of node.branches) assignedNames(branch.body, names);
       assignedNames(node.otherwise, names);
@@ -937,6 +1101,13 @@ function assignedNames(nodes, names = new Map()) {
     }
   }
   return names;
+}
+
+// Whether a body waits for something itself (not just in functions inside it), which makes it asynchronous.
+function awaits(node) {
+  if (Array.isArray(node)) return node.some(awaits);
+  if (!node || typeof node !== "object" || node.type === "lambda" || node.type === "function") return false;
+  return node.type === "await" || Object.values(node).some(awaits);
 }
 
 function createScope(params, body, parent) {
@@ -949,7 +1120,7 @@ function resolve(node, scope) {
   for (let current = scope; current; current = current.parent) {
     if (current.names.has(node.value)) return variable(node.value);
   }
-  if (javascriptGlobals.has(node.value)) return node.value;
+  if (javascriptGlobals.has(camel(node.value))) return camel(node.value);
   fail(node.line, `Unknown name '${node.value}'. Assign it before using it, or check the spelling.`);
 }
 
@@ -1028,22 +1199,25 @@ function declarationsFor(program) {
       while (optionalFrom > 0 && (!node.types[optionalFrom - 1] || node.types[optionalFrom - 1].kind === "maybe")) optionalFrom--;
       const params = node.params.map((name, index) => {
         const type = node.types[index];
-        if (index < optionalFrom) return `${parameterName(name)}: ${parameterType(type)}`;
-        return `${parameterName(name)}?: ${parameterType(type?.kind === "maybe" ? type.of : type)}`;
+        if (index < optionalFrom) return `${parameterName(camel(name))}: ${parameterType(type)}`;
+        return `${parameterName(camel(name))}?: ${parameterType(type?.kind === "maybe" ? type.of : type)}`;
       });
       const variables = typeVariables([...node.types, node.returns]);
+      // A function that waits for something gives a promise of its result.
+      const promised = node.returns?.kind === "named" && node.returns.name === "Promise";
+      const returns = awaits(node.body) && !promised ? `Promise<${typeText(node.returns)}>` : typeText(node.returns);
       lines.push(...docComment(node.doc),
-        `export function ${node.name}${generic(variables)}(${params.join(", ")}): ${typeText(node.returns)};`);
+        `export function ${camel(node.name)}${generic(variables)}(${params.join(", ")}): ${returns};`);
     } else if (node.type === "assign" && node.exported) {
       lines.push(...docComment(node.doc),
-        `export let ${node.name}: ${node.declaredType ? typeText(node.declaredType) : literalType(node.value)};`);
+        `export let ${camel(node.name)}: ${node.declaredType ? typeText(node.declaredType) : literalType(node.value)};`);
     } else if (node.type === "typeDeclaration") {
       const prefix = node.exported ? "export " : "";
       if (node.fields) {
         lines.push(...docComment(node.doc), `${prefix}interface ${node.name}${generic(typeVariables(node.fields.map(field => field.type)))} {`);
         for (const field of node.fields) {
           const optional = field.type.kind === "maybe";
-          lines.push(...docComment(field.doc, "  "), `  ${field.name}${optional ? "?" : ""}: ${typeText(optional ? field.type.of : field.type)};`);
+          lines.push(...docComment(field.doc, "  "), `  ${camel(field.name)}${optional ? "?" : ""}: ${typeText(optional ? field.type.of : field.type)};`);
         }
         lines.push("}");
       } else {
@@ -1072,8 +1246,8 @@ export function compile(source, options = {}) {
   }
   const exports = new Map();
   for (const node of program.filter(node => node.exported && node.type !== "typeDeclaration")) {
-    if (exports.has(node.name)) fail(node.line, `'${node.name}' is already exported.`);
-    exports.set(node.name, variable(node.name));
+    if (exports.has(camel(node.name))) fail(node.line, `'${node.name}' is already exported.`);
+    exports.set(camel(node.name), variable(node.name));
   }
   let loopId = 0;
 
@@ -1091,12 +1265,19 @@ export function compile(source, options = {}) {
     if (node.type === "object") {
       return `({${node.properties.map(property => property.spread
         ? `...${emit(property.value)}`
-        : `[${JSON.stringify(property.name)}]: ${emit(property.value)}`).join(", ")}})`;
+        : `[${JSON.stringify(camel(property.name))}]: ${emit(property.value)}`).join(", ")}})`;
     }
     if (node.type === "property") {
-      if (node.maybe) return `__prose_maybe_property(${emit(node.object)}, ${JSON.stringify(node.name)})`;
-      return `__prose_property(${emit(node.object)}, ${JSON.stringify(node.name)}, ${node.line})`;
+      const name = node.key ? emit(node.key) : JSON.stringify(camel(node.name));
+      if (node.maybe) return `__prose_maybe_property(${emit(node.object)}, ${name})`;
+      return `__prose_property(${emit(node.object)}, ${name}, ${node.line})`;
     }
+    if (node.type === "typeTest") {
+      const value = `(${emit(node.value)})`;
+      const test = typeof node.kind === "string" ? typeTests[node.kind](value) : `${value} instanceof ${emit(node.kind)}`;
+      return node.negated ? `(!(${test}))` : `(${test})`;
+    }
+    if (node.type === "await") return `(await ${emit(node.value)})`;
     if (node.type === "index") {
       if (node.maybe) return `__prose_maybe_get(${emit(node.object)}, () => ${emit(node.index)}, ${node.line})`;
       return `__prose_get(${emit(node.object)}, ${emit(node.index)}, ${node.line})`;
@@ -1110,7 +1291,7 @@ export function compile(source, options = {}) {
       const args = node.maybe ? `() => ${list(node.args)}` : list(node.args);
       const helper = node.maybe ? "__prose_maybe_" : "__prose_";
       if (node.callee.type === "property") {
-        return `${helper}method(${emit(node.callee.object)}, ${JSON.stringify(node.callee.name)}, ${args}, ${node.line})`;
+        return `${helper}method(${emit(node.callee.object)}, ${node.callee.key ? emit(node.callee.key) : JSON.stringify(camel(node.callee.name))}, ${args}, ${node.line})`;
       }
       return `${helper}call(${emit(node.callee)}, ${args}, ${node.line})`;
     }
@@ -1119,14 +1300,15 @@ export function compile(source, options = {}) {
     if (node.type === "lambda") {
       const inner = createScope(node.params, node.body ?? [], scope);
       const params = node.params.map(variable).join(", ");
-      if (node.body) return `((${params}) => {\n${emitScope(node.body, inner, depth + 1)}\n${pad(depth)}})`;
-      return `((${params}) => ${expression(node.value, inner, depth)})`;
+      const async = awaits(node.body ?? node.value) ? "async " : "";
+      if (node.body) return `(${async}(${params}) => {\n${emitScope(node.body, inner, depth + 1)}\n${pad(depth)}})`;
+      return `(${async}(${params}) => ${expression(node.value, inner, depth)})`;
     }
     if (node.type === "unary") {
       return `(${node.op === "not" ? "!" : "-"}${emit(node.operand)})`;
     }
     if (node.op === "mod") return `__prose_mod(${emit(node.left)}, ${emit(node.right)}, ${node.line})`;
-    const op = { "=": "===", "!=": "!==", and: "&&", or: "||", otherwise: "??" }[node.op] ?? node.op;
+    const op = { "=": "===", "!=": "!==", and: "&&", or: "||", otherwise: "??", xor: "^" }[node.op] ?? node.op;
     return `(${emit(node.left)} ${op} ${emit(node.right)})`;
   }
 
@@ -1140,7 +1322,8 @@ export function compile(source, options = {}) {
       return `({get: () => ${name}, set: __value => { ${name} = __value; }})`;
     }
     if (target.type === "property") {
-      return `__prose_property_ref(${expression(target.object, scope, depth)}, ${JSON.stringify(target.name)}, ${target.line})`;
+      const name = target.key ? expression(target.key, scope, depth) : JSON.stringify(camel(target.name));
+      return `__prose_property_ref(${expression(target.object, scope, depth)}, ${name}, ${target.line})`;
     }
     return `__prose_index_ref(${reference(target.object, scope, depth)}, () => ${expression(target.index, scope, depth)}, ${target.line})`;
   }
@@ -1151,7 +1334,7 @@ export function compile(source, options = {}) {
     return nodes.filter(node => node.type !== "use" && node.type !== "typeDeclaration").map(node => {
       if (node.type === "function") {
         const inner = createScope(node.params, node.body, scope);
-        return `${indent}function ${variable(node.name)}(${node.params.map(variable).join(", ")}) {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
+        return `${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}(${node.params.map(variable).join(", ")}) {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
       }
       if (node.type === "assign") return `${indent}${variable(node.name)} = ${emit(node.value)};`;
       // Rebuilding a string assigns its binding; mutating an object property does not.
@@ -1166,6 +1349,11 @@ export function compile(source, options = {}) {
       }
       if (node.type === "skip") return `${indent}continue;`;
       if (node.type === "stop") return `${indent}break;`;
+      if (node.type === "fail") return `${indent}throw __prose_error(${emit(node.value)});`;
+      if (node.type === "try") {
+        const caught = node.name ? `${indent}  ${variable(node.name)} = __error;\n` : "";
+        return `${indent}try {\n${emitBlock(node.body, scope, depth + 1)}\n${indent}} catch (__error) {\n${caught}${emitBlock(node.handler, scope, depth + 1)}\n${indent}}`;
+      }
       if (node.type === "if") {
         const branches = node.branches.map((branch, index) =>
           `${indent}${index ? "else if" : "if"} (${emit(branch.condition)}) {\n${emitBlock(branch.body, scope, depth + 1)}\n${indent}}`
@@ -1200,7 +1388,7 @@ export function compile(source, options = {}) {
     module ? "" : '"use strict";',
     options.runtime ? `import { ${runtimeHelpers.join(", ")} } from ${JSON.stringify(options.runtime)};` : "",
     ...imports.map(node =>
-      `import { ${node.names.map(name => `${name} as ${variable(name)}`).join(", ")} } from ${JSON.stringify(node.source)};`),
+      `import { ${node.names.map(name => `${camel(name)} as ${variable(name)}`).join(", ")} } from ${JSON.stringify(node.source)};`),
     options.runtime ? "" : runtimeSource,
     body,
     exports.size ? `export { ${[...exports].map(([name, local]) => `${local} as ${name}`).join(", ")} };` : ""

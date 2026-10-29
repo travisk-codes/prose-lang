@@ -217,6 +217,21 @@ test("patterns, inline objects, spreads, destructuring, and loop control have sc
   hasScope("print offset", "of", "variable.other.readwrite.prose");
 });
 
+test("type tests, errors, waiting, and bit operators have keyword scopes", () => {
+  hasScope("if value is a text", "is a", "keyword.other.prose");
+  hasScope("if value is a text", "text", "support.type.prose");
+  hasScope("if value is not an object", "is not an", "keyword.other.prose");
+  hasScope("if reason is an Error", "Error", "support.class.prose");
+  hasScope("print a", "a", "variable.other.readwrite.prose");
+  hasScope("try", "try", "keyword.control.prose");
+  hasScope("on error problem", "on error", "keyword.control.prose");
+  hasScope('    fail "Choose a date."', "fail", "keyword.control.prose");
+  hasScope("result is wait for response:json run", "wait for", "keyword.control.prose");
+  hasScope("hash is hash xor 5", "xor", "keyword.operator.word.prose");
+  hasScope("high is hash shifted right by 16", "shifted right by", "keyword.operator.word.prose");
+  hasScope("print left", "left", "variable.other.readwrite.prose");
+});
+
 test("array keywords and comma lists have syntax scopes without turning literals into comments", () => {
   hasScope("items is array", "array", "storage.type.array.prose");
   hasScope('names is "Ada", "Grace"', "Ada", "string.quoted.double.prose");

@@ -1,4 +1,5 @@
-"Arrays and objects are shared, not copied. Use slice when you need a separate array."
+"Arrays and objects are shared, not copied. Use slice when you need a separate"
+"array."
 
 function markdown takes prices, reduction
     for i is 1 to length prices

@@ -1,4 +1,5 @@
-"Rotate lowercase letters, preserving punctuation, uppercase letters, and emoji."
+"Rotate lowercase letters, preserving punctuation, uppercase letters, and"
+"emoji."
 
 function show_banner
     print "Postcard station"
