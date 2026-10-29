@@ -8,4 +8,4 @@ for each title, pages, done in shelf
 total is 0
 for each book in shelf
     total is total + book.2
-print "Average: " + (Math:round (total / length shelf)) + " pages"
+print "Average: " + (Math.round (total / length shelf)) + " pages"
