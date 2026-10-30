@@ -3,6 +3,10 @@
 Run these from the repository root with Node.js; no package installation is
 needed to run the compiler.
 
+For editor and CLI type checking, run `npm.cmd install` once. The examples'
+`tsconfig.json` enables the included Node type definitions, including
+`process.stdin` and imports such as `node:readline/promises`.
+
 ```powershell
 node bin/prose.js examples/camp_budget.prose --run
 node bin/prose.js examples/postcard_station.prose --run
