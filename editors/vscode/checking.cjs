@@ -82,6 +82,12 @@ function createDiagnostics(vscode, { runCheck = startCheck, delay = 250 } = {}) 
       );
       diagnostic.source = "Prose";
       diagnostic.code = typeof item.code === "number" ? `TS${item.code}` : item.code;
+      if (item.relatedInformation?.length) diagnostic.relatedInformation = item.relatedInformation.flatMap(related => {
+        try {
+          const source = workspace.textDocuments.find(document => canonical(document.uri.fsPath) === canonical(related.file))?.getText() ?? readFileSync(related.file, "utf8");
+          return [new vscode.DiagnosticRelatedInformation(new vscode.Location(vscode.Uri.file(related.file), diagnosticRange(vscode, source, related)), related.message)];
+        } catch { return []; }
+      });
       if (!entries.has(key)) entries.set(key, [uri, []]);
       const diagnostics = entries.get(key)[1];
       if (!diagnostics.some(other => other.code === diagnostic.code && other.message === diagnostic.message &&

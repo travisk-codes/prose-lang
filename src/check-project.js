@@ -153,8 +153,9 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
       record.lookup = sourceMapLookup(result.map);
     } catch (error) {
       sourceErrors.push({ source: "prose", code: "PROSE", severity: "error", file,
-        line: error.line ?? null, column: error.line ? 1 : null,
-        message: String(error.message).replace(/^Line \d+:\s*/, "") });
+        line: error.line ?? null, column: error.column ?? (error.line ? 1 : null),
+        message: String(error.message).replace(/^Line \d+:\s*/, ""),
+        ...(error.relatedInformation ? { relatedInformation: error.relatedInformation.map(item => ({ file, ...item })) } : {}) });
     }
     return record;
   }

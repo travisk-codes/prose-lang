@@ -45,6 +45,9 @@ The build keeps the page truthful:
 
 The playground runs automatically by default. Turn off **Auto-run** to edit first, then use **Run** or Ctrl/Cmd+Enter. **Reset** restores the selected example. Tab inserts four spaces in the editor; Shift+Tab moves focus out.
 
+Compiler layout errors include explanatory examples. Error status text preserves
+their line breaks and indentation using the code font.
+
 The textarea owns scrolling. Its highlighted layer shares the same system monospace font, padding, and line height, follows its scroll offsets, and resizes with it. Keep token styles from changing font weight or italics inside this overlay: different glyph widths can move the visible text away from the caret.
 
 Identifier underscores and access dots use `c-separator` at 55% opacity so the words stand out, in Prose and in the compiled JavaScript and TypeScript. The editor extension uses the equivalent solid color on the site's dark code background.

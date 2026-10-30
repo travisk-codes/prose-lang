@@ -72,6 +72,28 @@ test("check reports mapped Prose type errors as text and JSON, using the project
   } finally { f.close(); }
 });
 
+test("layout errors retain examples and related source locations in CLI JSON and text", () => {
+  const f = fixture();
+  try {
+    f.write('src/main.prose', 'total is 1\n    + 2');
+    const before = snapshot(f.root), checked = f.run('src/main.prose', '--json');
+    assert.equal(checked.status, 1);
+    const report = JSON.parse(checked.stdout), diagnostic = report.diagnostics[0];
+    assert.equal(diagnostic.code, 'PROSE');
+    assert.deepEqual([diagnostic.line, diagnostic.column], [2, 5]);
+    assert.match(diagnostic.message, /Example layout:\ntotal is 1 \+\n    2/);
+    assert.equal(diagnostic.relatedInformation[0].file, join(f.root, 'src/main.prose'));
+    assert.deepEqual([diagnostic.relatedInformation[0].line, diagnostic.relatedInformation[0].column], [1, 1]);
+    const text = f.run('src/main.prose');
+    assert.match(text.stderr, /main\.prose:2:5 - PROSE:/);
+    assert.match(text.stderr, /Example layout:/);
+    const formatting = spawnSync(process.execPath, [cli, 'format', 'src/main.prose'], { cwd: f.root, encoding: 'utf8' });
+    assert.equal(formatting.status, 1);
+    assert.match(formatting.stderr, /Example layout:/);
+    assert.deepEqual(snapshot(f.root), before);
+  } finally { f.close(); }
+});
+
 test("--strict reports unchecked boundaries in text and JSON without changing default checks", () => {
   const f = fixture();
   try {

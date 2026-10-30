@@ -55,6 +55,11 @@ in synthetic checker code has `source: "checker"` and a null line/column rather
 than a misleading generated location. JSON retains TypeScript's full message;
 text output removes Prose's internal variable prefixes.
 
+Common layout errors include a supported example in `message` and optional
+`relatedInformation` entries with original `file`, `line`, `column`, and
+`message` fields. VS Code exposes these as links to the statement or header
+that explains the error. See [line-wrapping guidance](line-wrapping.md).
+
 Exit status is **0** for clean checks (including an empty selection), **1** for
 source errors, and **2** for setup/configuration errors. Syntax errors are Prose
 diagnostics; type errors carry TypeScript diagnostic numbers.
@@ -292,7 +297,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.19 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.20 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.

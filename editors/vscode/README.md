@@ -55,6 +55,11 @@ checks the parsed result before returning an edit. A long string or expression
 with no safe break may exceed the width. Invalid syntax leaves the document
 unchanged and reports an error. The editor formatter and CLI share their code.
 
+Common indentation and wrapping errors explain the expected layout and show an
+example. In Problems, related information links back to the relevant statement,
+header, opening parenthesis, or misplaced clause. See
+[line-wrapping guidance](../../docs/line-wrapping.md).
+
 ## Type checking
 
 Saved `.prose` files are checked when opened and saved. Errors have squiggles and
@@ -173,13 +178,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.19.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.20.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.19.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.20.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -204,7 +209,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.19.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.20.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

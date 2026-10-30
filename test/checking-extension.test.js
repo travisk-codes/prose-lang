@@ -42,6 +42,8 @@ function editor(f, { trusted = true, enabled = true, strict = false } = {}) {
     } },
     Diagnostic: class { constructor(range, message, severity) { Object.assign(this, { range, message, severity }); } },
     DiagnosticSeverity: { Error: 0, Warning: 1 },
+    Location: class { constructor(uri, range) { Object.assign(this, { uri, range }); } },
+    DiagnosticRelatedInformation: class { constructor(location, message) { Object.assign(this, { location, message }); } },
     Uri: { file: uri },
     languages: { createDiagnosticCollection: name => { assert.equal(name, "prose"); return collection; } },
     window: { createOutputChannel: name => { assert.equal(name, "Prose"); return output; } },
@@ -101,6 +103,22 @@ test("editor publishes mapped diagnostics for a saved file and its closed Prose 
     assert.equal(diagnostic.source, "Prose");
     assert.equal(diagnostic.code, "TS2322");
     assert.equal(diagnostic.message, "Type of 'count' is wrong.");
+  } finally { service.dispose(); f.close(); }
+});
+
+test("layout diagnostics expose the originating statement as related information", async () => {
+  const f = fixture(), e = editor(f), document = e.add('src/main.prose', 'total is 1\n    + 2');
+  const service = e.start();
+  try {
+    await pause();
+    e.jobs[0].resolve(result([document.uri.fsPath], [{ file: document.uri.fsPath, code: 'PROSE', severity: 'error', source: 'prose', line: 2, column: 5,
+      message: 'Unexpected indentation. Example layout:\ntotal is 1 +\n    2', relatedInformation: [{ file: document.uri.fsPath, line: 1, column: 1, message: 'The preceding statement is complete.' }] }]));
+    await pause();
+    const diagnostic = e.entries.get(document.uri.fsPath)[0];
+    assert.deepEqual(diagnostic.range.start, { line: 1, character: 4 });
+    assert.equal(diagnostic.relatedInformation[0].location.uri.fsPath, document.uri.fsPath);
+    assert.deepEqual(diagnostic.relatedInformation[0].location.range.start, { line: 0, character: 0 });
+    assert.match(diagnostic.message, /Example layout:/);
   } finally { service.dispose(); f.close(); }
 });
 

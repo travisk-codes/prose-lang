@@ -95,6 +95,8 @@ hidden entries and `node_modules`. Formatting updates files in place. `--check`
 reports files that would change and exits with status 1 without writing them.
 Already formatted files are left alone. A syntax error stops the batch before
 any files are written; unfinished design sketches need valid syntax first.
+Layout errors include an explanation and example; see
+[wrapping lines and reading layout errors](docs/line-wrapping.md).
 
 When a function header needs reflowing, each parameter gets its own indented line,
 with a trailing comma, and `giving` returns to the header's indentation:

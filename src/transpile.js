@@ -2,6 +2,7 @@ import { runtimeHelpers, runtimeSource } from "./runtime.js";
 import { checkPrelude } from "./check.js";
 import { inlineSourceMap, sourceMapBuilder } from "./source-map.js";
 import { callScopeKey, inferCallArities } from "./call-arity.js";
+import { explainLayoutError } from "./layout-diagnostics.js";
 
 const reserved = new Set([
   "if", "else", "for", "is", "to", "print", "and", "or", "not",
@@ -987,12 +988,12 @@ class Parser {
     // argument can already be an inline body, rather than part of a call.
     for (const line of this.lines) for (const continuation of line.leading ?? []) {
       if (!conditionOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions, this.callAnalysis, this.lineScopes.get(line), this.loose)) {
-        fail(continuation.line, "A leading 'and' or 'or' can only continue a condition before its body starts.");
+        fail(continuation.line, "A leading 'and' or 'or' can only continue a condition before its body starts.", { layout: { kind: "leading-condition", start: line.line } });
       }
     }
     for (const line of this.lines) for (const continuation of line.conditionalValues ?? []) {
       if (!valueOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions, this.callAnalysis, this.lineScopes.get(line), this.loose)) {
-        fail(continuation.line, "An indented trailing 'if' must follow a complete value, not a block header.");
+        fail(continuation.line, "An indented trailing 'if' must follow a complete value, not a block header.", { layout: { kind: "conditional-value", start: line.line } });
       }
     }
   }
@@ -1014,7 +1015,7 @@ class Parser {
   }
   body(parent, inFunction) {
     const next = this.lines[this.pos];
-    if (!next || next.indent <= parent.indent) fail(parent.line, "Expected an indented body.");
+    if (!next || next.indent <= parent.indent) fail(parent.line, "Expected an indented body.", { layout: { kind: "body", start: parent.line } });
     return this.block(next.indent, inFunction);
   }
   condition(expr, allowList = false) {
@@ -1083,7 +1084,7 @@ class Parser {
     while (this.pos < this.lines.length) {
       const line = this.lines[this.pos];
       if (line.indent < next.indent) break;
-      if (line.indent > next.indent) fail(line.line, "Unexpected indentation in a type.");
+      if (line.indent > next.indent) fail(line.line, "Unexpected indentation in a type.", { layout: { kind: "type", start: parent.line } });
       this.pos++;
       if (line.tokens.length === 1 && line.tokens[0].type === "string") {
         doc = doc === undefined ? line.tokens[0].value : `${doc} ${line.tokens[0].value}`;
@@ -1106,7 +1107,7 @@ class Parser {
     while (this.pos < this.lines.length) {
       const line = this.lines[this.pos];
       if (line.indent < indent) break;
-      if (line.indent > indent) fail(line.line, "Unexpected indentation in object body.");
+      if (line.indent > indent) fail(line.line, "Unexpected indentation in object body.", { layout: { kind: "object", start: parent.line } });
       this.pos++;
       if (line.tokens.length === 1 && line.tokens[0].type === "string") continue;
       const expr = this.expression(line);
@@ -1204,7 +1205,7 @@ class Parser {
     while (this.pos < this.lines.length) {
       const line = this.lines[this.pos];
       if (line.indent < indent) break;
-      if (line.indent > indent) fail(line.line, "Unexpected indentation.");
+      if (line.indent > indent) fail(line.line, "Unexpected indentation.", { layout: { kind: "indent" } });
       this.pos++;
       const expr = this.expression(line);
       const topLevel = indent === 0 && !inFunction;
@@ -1554,11 +1555,15 @@ export function parse(source, options = {}) {
     if (!modules.has(specifier)) modules.set(specifier, options.readModule(specifier));
     return modules.get(specifier);
   }) };
-  const { analysis } = discoverCallArities(source, settings);
-  const final = new Parser(source, settings, analysis, false);
-  const result = final.program();
-  final.validateContinuations();
-  return result;
+  try {
+    const { analysis } = discoverCallArities(source, settings);
+    const final = new Parser(source, settings, analysis, false);
+    const result = final.program();
+    final.validateContinuations();
+    return result;
+  } catch (error) {
+    throw explainLayoutError(error, source, () => sourceLines(source, { locations: true }), continues);
+  }
 }
 
 function discoverCallArities(source, settings, readImports = true) {
