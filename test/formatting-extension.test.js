@@ -59,6 +59,18 @@ test("VS Code formatter reads imported signatures without executing modules", as
   assert.deepEqual(errors, []);
 });
 
+test("VS Code formatter preserves imported object method boundaries from unsaved buffers", async () => {
+  const source = 'use calculator from "./tools.prose"\nprint  calculator.add 1, 2, 3';
+  const { document, provider, reads, errors } = editor(source, {
+    open: [{ uri: new URL('file:///project/tools.prose'), getText: () =>
+      'export calculator is object\n    add is function takes a, b return a + b\nfail "Never execute"' }]
+  });
+  const edits = await provider.provideDocumentFormattingEdits(document, settings, cancellation);
+  assert.equal(apply(source, edits), source.replace('print  ', 'print ') + '\n');
+  assert.deepEqual(reads, []);
+  assert.deepEqual(errors, []);
+});
+
 test("VS Code formatter uses unsaved imported documents and skips type-only imports", async () => {
   const source = 'use type Thing from "./missing-types.prose"\nuse double from "./math.prose"\nprint  double 2';
   const { document, provider, reads, errors } = editor(source, {

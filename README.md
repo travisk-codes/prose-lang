@@ -802,6 +802,19 @@ counts, unknown receiver values, and dynamic property writes require an explicit
 boundary. Literal computed keys such as `calculator.("add")` work too.
 See [object_methods.prose](examples/object_methods.prose) for a runnable example.
 
+Objects exported from a `.prose` module preserve these signatures in importers:
+
+```text
+use calculator from "./object_method_tools.prose"
+print calculator.add 2, 3
+```
+
+Nested methods, exported aliases of the same object, and declared object result
+types retain their signatures too. Import analysis reads source text; it does
+not execute the module. Methods supplied by opaque values or another unresolved
+import still need explicit boundaries. See
+[imported_object_methods.prose](examples/imported_object_methods.prose).
+
 An unknown-count call can take one argument or use `run`. A comma requires an
 explicit boundary: `action with 1, 2` passes two arguments, while `(action 1), 2`
 is an array containing a one-argument call and `2`. For a two-argument call

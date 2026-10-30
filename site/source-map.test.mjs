@@ -21,6 +21,16 @@ test('object methods have the same argument boundaries in the playground and CLI
   assert.deepEqual(output, [[5, 4]]);
 });
 
+test('browser imports preserve exported object method signatures without Node or TypeScript', () => {
+  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const source = 'use calculator from "./tools.prose"\nprint calculator.add 2, 3, 4';
+  const options = { sourceMap: true, filename: 'playground.prose', readModule: () =>
+    'export calculator is object\n    add is function takes a, b return a + b' };
+  const actual = browser.compile(source, options), expected = compile(source, options);
+  assert.equal(actual.code, expected.code);
+  assert.equal(JSON.stringify(actual.map), JSON.stringify(expected.map));
+});
+
 test('the browser bundle compiles React markup with the same text and mappings', () => {
   const browser = runInNewContext(browserCompiler, { TextEncoder });
   const source = 'export function View takes props\n    return <p>\n        Hello {props.name}\n        again\n    </p>';

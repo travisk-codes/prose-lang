@@ -1,0 +1,15 @@
+use calculator, arithmetic, tools from "./object_method_tools.prose"
+
+print calculator.add 2, 3
+print arithmetic.multiply 4, 5
+print tools.calculator.add 6, 7
+
+"The call finishes after two arguments, before the final array element."
+results is calculator.add 2, 3, 9
+print results
+
+"A local alias and a like copy keep their method signatures."
+alias is calculator
+copy is object like calculator
+print alias.add 3, 4
+print copy.multiply 5, 6

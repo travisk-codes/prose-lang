@@ -110,6 +110,20 @@ test('Prose object methods show arguments without with and stop at the declared 
   } finally { f.close(); }
 });
 
+test('imported object signatures track unsaved module changes and declared call boundaries', () => {
+  const f = fixture();
+  try {
+    const source = 'export calculator is object\n    add is function takes left as number, right as number giving number return left + right';
+    const file = f.write('tools.prose', source);
+    const prefix = 'use calculator from "./tools.prose"\n';
+    assert.equal(active(f.help(prefix + 'calculator.add 1, |')), 'right as number');
+    assert.equal(f.help(prefix + 'calculator.add 1, 2, |'), undefined);
+    const changed = source.replace('right as number giving', 'right as number, bonus as number giving');
+    assert.equal(active(f.help(prefix + 'calculator.add 1, 2, |', { overlays: [[file, changed]] })), 'bonus as number');
+    assert.equal(readFileSync(file, 'utf8'), source);
+  } finally { f.close(); }
+});
+
 test('overloads and generic inference use the receiver and already-entered arguments', () => {
   const f = fixture();
   try {

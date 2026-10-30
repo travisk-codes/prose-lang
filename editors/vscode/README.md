@@ -1,5 +1,9 @@
 # Prose Language for Visual Studio Code
 
+Version 0.2.2 preserves object method signatures across `.prose` imports,
+including nested methods and shared exported aliases. Formatting, checking,
+and parameter hints use current imported buffers without executing them.
+
 Version 0.2.1 infers argument counts for methods defined on Prose objects,
 including aliases, `like` copies, and local object type fields. Calls such as
 `calculator.add 2, 3` work in formatting, checking, and parameter hints.

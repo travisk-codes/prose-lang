@@ -1,0 +1,10 @@
+"Exporting an object preserves its methods' parameter counts."
+export calculator is object
+    add is function takes left as number, right as number giving number
+        return left + right
+    multiply is function takes left as number, right as number giving number
+        return left * right
+
+"These exports refer to the same calculator."
+export arithmetic is calculator
+export tools is object calculator
