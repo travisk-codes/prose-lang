@@ -1,6 +1,6 @@
 // The extension ships the same formatter, parser, and checker as the CLI.
 // Editor analysis loads the workspace's TypeScript inside a background worker.
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -10,6 +10,14 @@ export function build(output = new URL("./dist/formatter/", import.meta.url)) {
     copyFileSync(new URL(`../../src/${name}`, import.meta.url), new URL(name, output));
   }
   writeFileSync(new URL("package.json", output), '{"type":"module"}\n');
+  const runtime = new URL('../runtime/', output);
+  mkdirSync(new URL('bin/', runtime), { recursive: true });
+  mkdirSync(new URL('src/', runtime), { recursive: true });
+  copyFileSync(new URL('../../bin/prose.js', import.meta.url), new URL('bin/prose.js', runtime));
+  for (const name of readdirSync(new URL('../../src/', import.meta.url)).filter(name => name.endsWith('.js'))) {
+    copyFileSync(new URL(`../../src/${name}`, import.meta.url), new URL(`src/${name}`, runtime));
+  }
+  writeFileSync(new URL('package.json', runtime), '{"type":"module"}\n');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) build();

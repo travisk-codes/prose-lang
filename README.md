@@ -43,6 +43,10 @@ files; see [Type checking](docs/type-checking.md).
 
 ## VS Code support
 
+Click the editor's play button or use **Prose: Run Current File** to save and run
+the selected file in a terminal. It uses the project or bundled CLI and requires
+Node 20.6 or newer; see [running files](editors/vscode/README.md#running-files).
+
 [Quick fixes](editors/vscode/README.md#quick-fixes) (`Ctrl+.`) offer explicit
 argument-list and array readings for ambiguous calls, so you can choose their
 meaning directly in the editor.

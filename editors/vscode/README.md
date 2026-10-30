@@ -1,6 +1,6 @@
 # Prose Language for Visual Studio Code
 
-Semantic and syntax highlighting, formatting, type checking, autocomplete, parameter hints,
+Semantic and syntax highlighting, formatting, Run Current File, type checking, autocomplete, parameter hints,
 references, and rename
 for `.prose` files, with a softened rainbow
 palette for dark backgrounds matching the Prose website.
@@ -18,6 +18,31 @@ follow their index variable's role.
 
 The extension includes the Prose formatter, parser, and checker. Formatting reads source
 text and imported signatures; it never executes the program or its imports.
+
+## Running files
+
+Open the file's folder in VS Code, then open a `.prose` file and click the
+**play button** in the editor title, or
+choose **Prose: Run Current File** from the Command Palette. The command saves
+the active file first, then runs it with the existing `--run` CLI in a VS Code
+task terminal. Output stays visible after the program ends. Use **Tasks:
+Terminate Task** to stop a running program; repeated clicks do not start duplicate
+copies of the same file.
+
+The command uses the nearest Prose development checkout or installed
+`node_modules/prose-lang` CLI, falling back to the CLI bundled with the extension.
+The working directory is the nearest package directory, then the file's workspace
+folder. Relative module imports remain relative to the source
+file, as with the CLI. Programs can import Prose and JavaScript files.
+
+Running requires Workspace Trust and **Node 20.6 or newer** on PATH. Set
+`prose.run.nodePath` to a Node executable path if needed; supply the executable
+only, without arguments. No TypeScript installation is required to run a file.
+
+Imports use their saved contents. Save imported files to run their latest changes;
+the command saves only the selected file. A canceled or failed save stops the run.
+Untitled and virtual documents cannot run. Execution starts only when you invoke
+Run Current File. Opening a file, formatting, and editor analysis never run it.
 
 ## Semantic highlighting
 

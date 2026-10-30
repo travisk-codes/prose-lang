@@ -1,8 +1,8 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Semantic and syntax highlighting, formatting, type checking, quick fixes, autocomplete, parameter hints, navigation, references, and rename for Prose.",
-  "version": "0.1.28",
+  "description": "Highlighting, formatting, live type checking, autocomplete, navigation, and Run Current File for Prose.",
+  "version": "0.1.29",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -39,10 +39,35 @@
       "title": "Check Open Files",
       "category": "Prose",
       "enablement": "isWorkspaceTrusted"
+    }, {
+      "command": "prose.run",
+      "title": "Run Current File",
+      "category": "Prose",
+      "icon": "$(play)",
+      "enablement": "isWorkspaceTrusted && editorLangId == prose && resourceScheme == file && processExecutionSupported"
+    }],
+    "menus": {
+      "editor/title": [{
+        "command": "prose.run",
+        "when": "resourceLangId == prose && resourceScheme == file && isWorkspaceTrusted && processExecutionSupported",
+        "group": "navigation@5"
+      }]
+    },
+    "taskDefinitions": [{
+      "type": "prose",
+      "required": ["file"],
+      "properties": { "file": { "type": "string", "description": "The Prose file to run." } },
+      "when": "processExecutionSupported"
     }],
     "configuration": {
       "title": "Prose",
       "properties": {
+        "prose.run.nodePath": {
+          "type": "string",
+          "default": "node",
+          "scope": "machine-overridable",
+          "description": "Node executable used by Run Current File (Node 20.6 or newer). Set a path to node.exe if Node is not on PATH; supply the executable only, without arguments."
+        },
         "prose.check.enabled": {
           "type": "boolean",
           "default": true,
@@ -430,6 +455,7 @@
     "refactoring.cjs",
     "semantic.cjs",
     "quick-fixes.cjs",
+    "running.cjs",
     "check-worker.cjs",
     "dist/**",
     "package.json",
