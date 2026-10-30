@@ -818,9 +818,30 @@ print Math:max with 3, 9, 4
 date is new Date with 2026, 0, 1
 ```
 
-Prose cannot tell whether `items:pop` is a property or a method, or how many
-arguments a JavaScript function takes, so these rules decide instead. `with`
-also works with one argument (`words:join with ", "`), and can introduce a
+Prose recognizes fixed method signatures on known `Map`, `Set`, `WeakMap`, and
+`WeakSet` values. For example, `Map.set` takes two arguments:
+
+```text
+counts is new Map
+counts.set "hello", 1
+counts.set "hello", (counts.get "hello" + 1)
+print counts.get "hello"
+```
+
+Collection constructors, type annotations, aliases, and declared function result
+types can establish the receiver's kind. As with Prose functions, a comma after
+the method's declared arguments starts an array element: `counts.set "a", 1, 2`
+is an array containing the map and `2`. Both `.` and `:` support these signatures.
+`run` is still required for zero-argument calls such as `counts.clear run`.
+
+Unknown receivers and methods with optional or variable argument counts still
+use the rules above: `items.map callback` takes one argument, and
+`items.map with callback, context` takes two. Mixed receiver assignments or
+visible writes replacing collection methods withdraw the affected signatures.
+This syntax analysis does not load TypeScript or execute imports; arbitrary
+JavaScript method signatures shown by editor hovers are not yet used for parsing.
+
+`with` also works with one argument (`words:join with ", "`), and can introduce a
 negative first argument. Prose reads
 `items:at -1` as ambiguous (the space before the minus but not after suggests
 a negative number) and asks for `items:at with -1`, `items:at (-1)`, or a

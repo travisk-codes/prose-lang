@@ -208,6 +208,20 @@ test('callback contracts allow omitted trailing maybe values and retain other ar
   assert.ok(typeCheck(mixed).some(item => item.code === 2554));
 });
 
+test('inferred collection argument counts retain key/value type checks and source locations', withTypeScript, () => {
+  const source = [
+    'function word_counts takes some_text as text giving map from text to number',
+    '    counts as map from text to number is new Map',
+    '    for each word in (some_text.split " ")',
+    '        counts.set word, ((counts.get word otherwise 0) + 1)',
+    '    return counts',
+    'result is word_counts "hello world hello"', 'result.set "hello", 2'
+  ].join('\n');
+  assert.deepEqual(typeCheck(source), []);
+  assert.deepEqual(typeCheck(source + '\nresult.set "bad", "wrong"').map(({ line, code }) => [line, code]), [[8, 2345]]);
+  assert.deepEqual(typeCheck(source + '\nresult.set 42, 1').map(({ line, code }) => [line, code]), [[8, 2345]]);
+});
+
 test("working Prose type-checks without complaint", withTypeScript, () => {
   const diagnostics = typeCheck([
     'use type Datum, DatumTag from "./types"',

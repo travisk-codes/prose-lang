@@ -436,6 +436,10 @@ class Expression {
   }
   calleeArity(node) {
     if (node.type === "name") return this.callScope?.lookup(node.value) ?? this.functions.get(node.value)?.params.length ?? null;
+    // The shallow export scan has no transitive import signatures. In that
+    // partial parse, retain loose method calls so an imported argument call
+    // such as `map.get make_key item` can still be read for export metadata.
+    if (node.type === "property") return this.callAnalysis?.partialImports ? null : this.callScope?.methodArity(node) ?? null;
     if (node.type === "lambda") return node.params.length;
     if (node.type === "conditional") {
       const left = this.calleeArity(node.then), right = this.calleeArity(node.otherwise);
@@ -1784,16 +1788,20 @@ export function parse(source, options = {}) {
 
 function discoverCallArities(source, settings, readImports = true) {
   const discovery = new Parser(source, settings, null, true, readImports);
-  let analysis = inferCallArities(discovery.program(), discovery.functions, discovery.valueArities);
   const invalidated = new Set();
+  const infer = (program, parser) => ({ ...inferCallArities(program, parser.functions, parser.valueArities, invalidated), partialImports: !readImports });
+  let analysis = infer(discovery.program(), discovery);
   for (let iteration = 0; iteration < 64; iteration++) {
     const parser = new Parser(source, settings, analysis, true, readImports);
     const program = parser.program();
-    let next = inferCallArities(program, parser.functions, parser.valueArities, invalidated);
+    let next = infer(program, parser);
     for (const [key, before] of analysis.scopes) for (const [name, count] of before.bindings) {
       if (count !== null && next.scopes.get(key)?.bindings.get(name) !== count) invalidated.add(`${key}/${name}`);
     }
-    next = inferCallArities(program, parser.functions, parser.valueArities, invalidated);
+    for (const [key, before] of analysis.scopes) for (const [name, kind] of before.kinds) {
+      if (kind !== null && next.scopes.get(key)?.kinds.get(name) !== kind) invalidated.add(`kind:${key}/${name}`);
+    }
+    next = infer(program, parser);
     if (next.fingerprint === analysis.fingerprint) {
       return { analysis: next };
     }

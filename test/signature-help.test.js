@@ -87,6 +87,18 @@ test('native methods keep Prose names and optional/rest parameters', () => {
   } finally { f.close(); }
 });
 
+test('known collection methods show parameters without with and stop at their boundary', () => {
+  const f = fixture();
+  try {
+    const prefix = 'counts as map from text to number is new Map\n';
+    assert.equal(active(f.help(prefix + 'counts.set |')), 'key as text');
+    assert.equal(active(f.help(prefix + 'counts.set "hello", |')), 'value as number');
+    assert.equal(active(f.help(prefix + 'counts.set "hello",\n    |')), 'value as number');
+    assert.equal(f.help(prefix + 'counts.set "hello", 1, |'), undefined);
+    assert.equal(active(f.help(prefix + 'counts.get |')), 'key as text');
+  } finally { f.close(); }
+});
+
 test('overloads and generic inference use the receiver and already-entered arguments', () => {
   const f = fixture();
   try {

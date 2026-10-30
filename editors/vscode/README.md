@@ -1,5 +1,9 @@
 # Prose Language for Visual Studio Code
 
+Version 0.1.35 infers fixed method argument counts on known `Map`, `Set`,
+`WeakMap`, and `WeakSet` receivers: `counts.set key, value` needs no `with`.
+Formatting, checking, and parameter hints use the same call boundaries.
+
 Version 0.1.34 makes trailing `maybe` parameters optional in callback type
 annotations, matching named functions and their generated declarations.
 

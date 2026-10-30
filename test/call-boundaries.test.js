@@ -130,3 +130,133 @@ test("unknown constructors need with for several arguments and one argument stay
   const output = compile('export function apply takes action as function taking number and number giving number\n    return action 1, 2, 3', { check: true });
   assert.match(output.code, /_prose_action\(1, 2\), 3/);
 });
+
+test("known collection methods consume their fixed signatures and keep their receiver", () => {
+  assert.deepEqual(run([
+    'function word_counts takes some_text as text giving Map',
+    '    words is some_text.split " "', '    counts is new Map',
+    '    for each word in words', '        if counts.has word',
+    '            counts.set word, (counts.get word + 1)',
+    '        else', '            counts.set word, 1', '    return counts',
+    'counts is word_counts "hello world hello"',
+    'print counts.get "hello", counts.get "world"',
+    'known is new Map', 'result is known.set "a", 3, 9',
+    'print result.1 = known, result.2, known.get "a"',
+    'second is known:("set") "b", 4, 10', 'print second.1 = known, second.2, known.get "b"',
+    'print known.delete "a", known.has "a"', 'known.clear run', 'print known.size',
+    'seen is new Set', 'print seen.add "a", 8', 'print seen.has "a", 9',
+    'key is object', 'weak is new WeakMap', 'weak.set key, 5', 'print weak.get key, 6',
+    'weak_seen is new WeakSet', 'weak_seen.add key', 'print weak_seen.has key, 7'
+  ].join('\n')), [
+    [2, 1], [true, 9, 3], [true, 10, 4], [true, false], 0,
+    [new Set(['a']), 8], [true, 9], [5, 6], [true, 7]
+  ]);
+});
+
+test("collection aliases, same-kind branches, captures, and setter results retain signatures", () => {
+  assert.deepEqual(run([
+    'counts is new Map', 'alias is counts', 'alias.set "a", 1',
+    'choice is counts if true else new Map', 'choice.set "b", 2',
+    'copy is alias.set "c", 3', 'copy.set "d", 4',
+    'function fill', '    counts.set "e", 5', 'fill run',
+    'later is unset', 'for i is 1 to 1', '    later is new Map', 'later.set "f", 6',
+    'print counts.get "e", copy.get "d", later.get "f"',
+    'print (new Map).set "g", 7, 8'
+  ].join('\n')), [[5, 4, 6], [new Map([['g', 7]]), 8]]);
+});
+
+test("collection type annotations and aliases provide method signatures", () => {
+  for (const annotation of ['map from text to number', 'Map from text to number', 'Map', 'maybe Map', '(Map)', 'Map or null']) {
+    assert.deepEqual(run([
+      `type Counts is ${annotation}`, 'function fill takes counts as Counts',
+      '    copy is counts', '    copy.set "a", 3', '    return copy.get "a", 4',
+      'print fill new Map', `local as ${annotation} is new Map`,
+      'local.set "b", 5', 'print local.get "b", 6'
+    ].join('\n')), [[3, 4], [5, 6]]);
+  }
+  assert.deepEqual(run('function fill takes seen as set of text\n    seen.add "a"\n    return seen.has "a", 2\nprint fill new Set'), [[true, 2]]);
+});
+
+test("declared collection return types flow through function values and aliases", () => {
+  assert.deepEqual(run([
+    'function create giving map from text to number', '    return new Map',
+    'make is create', 'counts is make run', 'counts.set "a", 1',
+    'factory is function giving Map return new Map', 'other is factory run', 'other.set "b", 2',
+    'type Factory is function giving Map', 'function fill takes build as Factory',
+    '    result is build run', '    result.set "c", 3', '    return result.get "c", 4',
+    'print counts.get "a", other.get "b"', 'print fill factory'
+  ].join('\n')), [[1, 2], [3, 4]]);
+});
+
+test("unknown receivers, mixed assignments, and shadowed constructors keep explicit boundaries", () => {
+  const unknown = [
+    'function fill takes counts\n    counts.set "a", 1',
+    'counts is new Map\nfunction fill takes counts\n    counts.set "a", 1',
+    'counts is new Map\nfunction fill\n    counts is JSON.parse "{}"\n    counts.set "a", 1',
+    'counts is new Map\ncounts is object\ncounts.set "a", 1',
+    'counts is new Map if true else new Set\ncounts.set "a", 1',
+    'function fill takes Map\n    counts is new Map\n    counts.set "a", 1',
+    'use Map from "./custom.js"\ncounts is new Map\ncounts.set "a", 1',
+    'function Map\n    return object\ncounts is new Map\ncounts.set "a", 1',
+    'type Map is object\n    set as unknown\nfunction fill takes counts as Map\n    counts.set "a", 1',
+    'counts is new Map\nresult is counts.get "nested"\nresult.set "a", 1',
+    'identity is function takes value return value\ncounts is identity 1, new Map\ncounts.set "a", 1'
+  ];
+  for (const source of unknown) assert.throws(() => compile(source), error => error.code === 'PROSE_CALL_BOUNDARY', source);
+  assert.deepEqual(run('function fill takes counts\n    counts.set with "a", 1\n    return counts.get "a"\nprint fill new Map'), [1]);
+});
+
+test("method writes through aliases and prototypes withdraw collection signatures", () => {
+  for (const mutation of [
+    'counts.set is function takes value return value',
+    'alias is counts\nalias.set is function takes value return value',
+    'alias is counts\nalias is object\nalias.set is function takes value return value',
+    'alias is counts if true else object\nalias.set is function takes value return value',
+    'key is "set"\ncounts.(key) is function takes value return value',
+    'Map.prototype.set is function takes value return value',
+    'Map.prototype is object'
+  ]) assert.throws(() => compile(`counts is new Map\n${mutation}\ncounts.set "a", 1`), error => error.code === 'PROSE_CALL_BOUNDARY', mutation);
+  assert.deepEqual(run('counts is new Map\ncounts.set is function takes a, b return a + b\nprint counts.set with 1, 2'), [3]);
+  assert.deepEqual(run('counts is new Map\ncounts.note is "hello"\ncounts.set "a", 1\nprint counts.get "a", 2'), [[1, 2]]);
+});
+
+test("optional and variable collection/list signatures preserve existing call boundaries", () => {
+  const prefix = 'items is 1, 2, 3\ncounts is new Map\ncallback is function takes value return value\n';
+  assert.deepEqual(run(prefix + 'print items.map callback\ncounts.for_each callback'), [[1, 2, 3]]);
+  for (const expression of ['items.map callback, unset', 'items.slice 0, 2', 'counts.for_each callback, unset', 'Math.max 1, 2']) {
+    assert.throws(() => compile(prefix + 'print ' + expression), error => error.code === 'PROSE_CALL_BOUNDARY');
+  }
+  assert.deepEqual(run(prefix + 'print items.map with callback, unset\nprint items.slice with 0, 2'), [[1, 2, 3], [1, 2]]);
+  assert.throws(() => compile('counts is new Map\ncounts.set "a", 1 + 2'), /ambiguous/);
+  assert.throws(() => compile('counts is new Map\ncounts.set run'), /takes 2 arguments/);
+  assert.throws(() => compile('counts is new Map\ncounts.set with "a", 1, 2'), /takes 2 arguments/);
+});
+
+test("collection method calls round-trip through formatting and checked output", () => {
+  const source = 'counts as map from text to number is new Map\ncounts.set "hello", 2\ncounts.set "hello", (counts.get "hello" + 1)\nprint counts.get "hello", 9';
+  const formatted = format(source, { width: 40 });
+  const meaning = text => JSON.stringify(parse(text), (key, value) => key === 'line' ? undefined : value);
+  assert.equal(meaning(formatted), meaning(source));
+  assert.equal(format(formatted, { width: 40 }), formatted);
+  assert.deepEqual(run(formatted), [[3, 9]]);
+  assert.match(compile(source, { check: true }).code, /_prose_counts\.set\("hello", 2\)/);
+});
+
+test("shallow export discovery tolerates collection arguments that call transitive imports", () => {
+  const module = [
+    'use make_key from "./keys.prose"', 'export label is "counts"',
+    'export add is function takes a, b return a + b',
+    'export function lookup takes counts as map from text to number, item as text',
+    '    return counts.get make_key item',
+    'export function contains takes keys as set of text, item as text',
+    '    return if keys.has make_key item then 1 else 0'
+  ].join('\n');
+  let reads = 0;
+  const code = compile('use lookup, contains, label, add from "./counts.prose"\nprint add 1, 2, 3', {
+    readModule: specifier => { assert.equal(specifier, './counts.prose'); reads++; return module; }
+  }).code;
+  assert.equal(reads, 1);
+  assert.match(code, /__prose_call\(_prose_add, \[1, 2\], 2\), 3/);
+  // Compiling the module itself uses its actual imported signature normally.
+  assert.doesNotThrow(() => compile(module, { readModule: () => 'export function make_key takes item\n    return item' }));
+});
