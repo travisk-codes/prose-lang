@@ -42,7 +42,7 @@ type errors can still have useful highlighting. Setup problems appear in
 
 This requires Workspace Trust, a local `.prose` file, and the project's TypeScript
 5 or 6. Set `prose.semanticHighlighting.enabled` to `false` to use grammar coloring
-alone. This setting is independent of saved-file checking and other editor
+alone. This setting is independent of diagnostic checking and other editor
 features. VS Code's `editor.semanticHighlighting.enabled` also controls display;
 its default follows the theme.
 
@@ -100,9 +100,10 @@ header, opening parenthesis, or misplaced clause. See
 
 ## Type checking
 
-Saved `.prose` files are checked when opened and saved. Errors have squiggles and
+Open `.prose` files are checked when opened, saved, and after a 350 ms pause in
+typing. Errors have squiggles and
 appear in VS Code's **Problems** panel with source **Prose** and the same diagnostic
-codes and locations as `prose check`. Use **Prose: Check Saved Files** from the
+codes and locations as `prose check`. Use **Prose: Check Open Files** from the
 Command Palette to recheck immediately. Set `prose.check.enabled` to `false` to
 disable checking for a workspace or folder.
 
@@ -113,12 +114,17 @@ exported return/value contracts. This opt-in policy matches CLI `prose check
 Typed callback inference counts, and imported Prose dependencies follow the
 same policy. See [stricter boundary checks](../../docs/type-checking.md#optional-stricter-boundary-checks).
 
-The open, saved Prose files are the roots; imported Prose dependencies are also
+The open local Prose files are the roots; imported Prose dependencies are also
 checked, including closed files. The nearest `tsconfig.json` selects each project,
-so nested projects get separate checks. Saving Prose, TypeScript, JavaScript, or
-JSON configuration refreshes checks. Checking runs in a background worker;
-superseded checks are canceled. Editing clears affected markers until the next
-save, and disk diagnostics are never applied to dirty buffers.
+so nested projects get separate checks. Checks use the current text of open
+Prose, TypeScript, JavaScript, and JSON files, including unsaved imports. Closed
+dependencies are read from disk. Editing clears affected markers immediately;
+after the typing pause, a background worker checks the latest buffer snapshot.
+New edits cancel superseded workers, and older results cannot replace a newer
+buffer's diagnostics. Opening or closing an imported buffer and dependency changes
+on disk also refresh checks. Project configuration remains read from saved files;
+save `tsconfig.json` changes to apply them. Untitled and virtual documents are
+excluded. Analysis never saves or executes program code.
 
 Install TypeScript 5 or 6 in the project (`npm.cmd install --save-dev typescript`).
 The checker loads that package and the project's configuration, keeps fresh import
@@ -149,7 +155,7 @@ An alternative is offered only when it parses as advertised; other Prose syntax
 errors or more involved nesting can prevent a fix. Normal type checking can still
 report other errors after the ambiguity is resolved.
 
-Fixes read current buffers, including unsaved Prose dependencies. Saved-file
+Fixes read current buffers, including unsaved Prose dependencies. Diagnostic
 checking supplies automatic lightbulbs; manually invoking Quick Fix also analyzes
 a dirty file or a file with checking disabled. The edits are prepared only when
 selected, with source versions and dependency contents rechecked. Changed or
@@ -194,7 +200,7 @@ variable could turn `words.map` into an index, selecting the `map` method insert
 
 Autocomplete requires Workspace Trust, a local file, and the project's TypeScript
 5 or 6. It has an independent `prose.completion.enabled` setting (default `true`);
-disabling saved-file diagnostics does not disable completions. Setup failures
+disabling diagnostic checking does not disable completions. Setup failures
 appear in **Prose Completion** Output. Strings, patterns, type-name contexts,
 unknown receivers, and unrelated syntax errors do not produce guessed members.
 Identifier suggestions exclude declaration names, property keys, type-only names,
@@ -233,7 +239,7 @@ is executed. Edits and cancellation discard stale results. This requires Workspa
 Trust, a local file, and the project's TypeScript 5 or 6.
 
 Set `prose.signatureHelp.enabled` to `false` to disable hints independently of
-autocomplete, hover, and saved-file checking. Setup problems appear in
+autocomplete, hover, and diagnostic checking. Setup problems appear in
 **Prose Parameters** Output. VS Code's `editor.parameterHints.enabled` setting
 also controls automatic parameter tooltips.
 
@@ -293,7 +299,7 @@ the executable JavaScript and exported declarations stay the same.
 
 Type checking requires **Workspace Trust** because it loads the project's
 TypeScript package. Highlighting and formatting still work in Restricted Mode
-and virtual workspaces. Diagnostics require saved files on disk. Setup problems
+and virtual workspaces. Diagnostics require local file-backed buffers. Setup problems
 appear on the configuration's first line, or the selected file when no config
 exists, and are recorded in the **Prose** output channel without popup messages.
 
@@ -342,7 +348,7 @@ workspace edit. Editing or cancellation discards stale results. Closed-file
 contents and the source inventory are checked again before returning project edits.
 
 Use `prose.references.enabled` and `prose.rename.enabled` to control these features
-independently. Both default to `true`; disabling saved-file checking does not
+independently. Both default to `true`; disabling diagnostic checking does not
 disable them. Setup problems appear in **Prose Refactoring** Output.
 
 ## Prose colors

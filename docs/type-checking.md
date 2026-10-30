@@ -157,7 +157,7 @@ Enable the same policy in a workspace or folder's VS Code settings:
 { "prose.check.strict": true }
 ```
 
-It defaults to `false`, takes effect on saved-file checking, and shares
+It defaults to `false`, takes effect on editor diagnostics, and shares
 `prose.check.enabled` and Workspace Trust requirements. Roots with different
 folder policies use separate jobs. For CI, add `--strict` to the project's check
 script. API callers can pass `checkProject({ ..., strict: true })`.
@@ -297,14 +297,19 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.26 checks open, saved Prose files and their imported Prose
-dependencies on open and save. Diagnostics appear as squiggles and in Problems.
-Use **Prose: Check Saved Files** to run immediately or disable checking with
+Prose Language 0.1.28 checks open local Prose files and their imported Prose
+dependencies on open, save, and after a 350 ms pause in typing. Diagnostics appear
+as squiggles and in Problems. Use **Prose: Check Open Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
-Dirty buffers wait until save; newer edits invalidate earlier results.
+Checks use current buffers, including unsaved Prose, TypeScript, JavaScript, and
+JSON imports. Editing clears affected markers and cancels older workers; a fresh
+snapshot supplies new diagnostics after the pause. Opening or closing dependencies
+and changes to closed files on disk also refresh checks. Project configuration
+still uses saved files. Untitled and virtual buffers are excluded.
 
 The extension packages this same checker, loading the project's TypeScript in a
-background worker only in trusted workspaces with files on disk. Project-wide
+background worker only in trusted workspaces with local file-backed buffers. It
+does not save or execute source files. Project-wide
 setup errors appear at the start of the config (or selected file if no config
 exists) and in the Prose output channel. Highlighting and formatting do not
 require TypeScript or Workspace Trust.
@@ -366,8 +371,9 @@ runtime conventions; they do not add new type checks or prove index bounds.
 `test/check.test.js` runs the real checker on representative good and bad
 programs. `test/check-cli.test.js` covers project selection, imported modules,
 fresh declarations, mapped diagnostics, exit codes, and read-only behavior.
-`test/checking-extension.test.js` covers background workers, saved-file
-diagnostics, cancellation, project isolation, trust, and disposal.
+`test/checking-extension.test.js` covers background workers, live-buffer
+diagnostics, debouncing, dependency changes, cancellation, project isolation,
+trust, and disposal.
 `test/hover.test.js` and `test/hovering-extension.test.js` cover inferred hover
 types, original token ranges, live buffers, caching, cancellation, and trust.
 `test/definition.test.js` covers lexical bindings, imports and re-exports, original

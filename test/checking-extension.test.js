@@ -39,6 +39,7 @@ function editor(f, { trusted = true, enabled = true, strict = false } = {}) {
     dispose() { this.disposed = true; entries.clear(); }
   };
   const output = { appendLine: text => logs.push(text), dispose() { this.disposed = true; } };
+  const watcher = { onDidChange: listen('disk'), onDidCreate: listen('created'), onDidDelete: listen('deleted'), dispose() { this.disposed = true; } };
   const vscode = {
     Range: class { constructor(line, character, endLine, endCharacter) {
       this.start = { line, character }; this.end = { line: endLine, character: endCharacter };
@@ -55,6 +56,7 @@ function editor(f, { trusted = true, enabled = true, strict = false } = {}) {
       textDocuments: documents, isTrusted: trusted,
       getConfiguration: () => ({ get: (key, fallback) => key === "check.enabled" ? enabled : key === "check.strict" ? strict : fallback }),
       getWorkspaceFolder: () => ({ uri: uri(f.root) }),
+      createFileSystemWatcher: () => watcher,
       onDidOpenTextDocument: listen("open"), onDidCloseTextDocument: listen("close"),
       onDidSaveTextDocument: listen("save"), onDidChangeTextDocument: listen("change"),
       onDidChangeConfiguration: listen("settings"), onDidChangeWorkspaceFolders: listen("folders"),
@@ -63,7 +65,7 @@ function editor(f, { trusted = true, enabled = true, strict = false } = {}) {
   };
   const add = (file, text = 'print 1', extra = {}) => {
     const path = f.write(file, text);
-    const document = { uri: uri(path), languageId: "prose", isClosed: false, isDirty: false, version: 1, getText: () => text, ...extra };
+    const document = { uri: uri(path), languageId: "prose", isClosed: false, isDirty: false, version: 1, text, getText() { return this.text; }, ...extra };
     documents.push(document);
     return document;
   };
@@ -77,7 +79,7 @@ function editor(f, { trusted = true, enabled = true, strict = false } = {}) {
   const fire = (name, value) => { for (const callback of events[name] ?? []) callback(value); };
   return {
     vscode, documents, jobs, entries, collection, output, logs, events, commands, add, fire,
-    start: () => createDiagnostics(vscode, { runCheck, delay: 0 }),
+    start: (options = {}) => createDiagnostics(vscode, { runCheck, delay: 0, ...options }),
     setEnabled: value => { enabled = value; fire("settings", { affectsConfiguration: key => key === "prose.check" }); },
     setStrict: value => { strict = value; fire("settings", { affectsConfiguration: key => key === "prose.check" }); }
   };
@@ -201,28 +203,46 @@ test("checking waits for trust and honors disabling it while a worker is running
   } finally { service.dispose(); f.close(); }
 });
 
-test("unsaved, dirty, and virtual documents do not start disk checks", async () => {
+test("dirty local buffers are checked while untitled and virtual documents are excluded", async () => {
   const f = fixture(), e = editor(f);
   e.add("src/dirty.prose", "print 1", { isDirty: true });
   e.add("src/untitled.prose", "print 1", { uri: { scheme: "untitled", fsPath: "untitled" } });
   e.add("src/virtual.prose", "print 1", { uri: { scheme: "vscode-vfs", fsPath: "virtual" } });
   e.add("src/other.txt", "print 1");
   const service = e.start();
-  try { await pause(); assert.equal(e.jobs.length, 0); }
+  try {
+    await pause(); assert.equal(e.jobs.length, 1);
+    assert.deepEqual(e.jobs[0].options.targets, [e.documents[0].uri.fsPath]);
+    assert.deepEqual(e.jobs[0].options.overlays, [[e.documents[0].uri.fsPath, 'print 1']]);
+  }
   finally { service.dispose(); f.close(); }
 });
 
-test("dirty imported buffers never receive disk diagnostics", async () => {
+test("dirty imported buffers receive current-buffer diagnostics", async () => {
   const f = fixture(), e = editor(f);
   const main = e.add("src/main.prose");
   const dirty = e.add("src/dirty.prose", 'print "unsaved"', { isDirty: true });
   const service = e.start();
   try {
     await pause();
-    assert.deepEqual(e.jobs[0].options.targets, [main.uri.fsPath]);
+    assert.deepEqual(e.jobs[0].options.targets, [main.uri.fsPath, dirty.uri.fsPath]);
+    assert.deepEqual(e.jobs[0].options.overlays, [[main.uri.fsPath, 'print 1'], [dirty.uri.fsPath, 'print "unsaved"']]);
     e.jobs[0].resolve(result([main.uri.fsPath, dirty.uri.fsPath], [error(dirty.uri.fsPath)]));
     await pause();
-    assert.equal(e.entries.size, 0);
+    assert.equal(e.entries.size, 1);
+  } finally { service.dispose(); f.close(); }
+});
+
+test("local file-backed text can be checked before it exists on disk", async () => {
+  const f = fixture(), e = editor(f);
+  const main = e.add('src/new.prose', 'count as number is "bad"', { isDirty: true });
+  rmSync(main.uri.fsPath);
+  const service = e.start();
+  try {
+    await pause(); assert.deepEqual(e.jobs[0].options.targets, [main.uri.fsPath]);
+    assert.deepEqual(e.jobs[0].options.overlays, [[main.uri.fsPath, main.text]]);
+    e.jobs[0].resolve(result([main.uri.fsPath], [error(main.uri.fsPath)])); await pause();
+    assert.equal(e.entries.size, 1);
   } finally { service.dispose(); f.close(); }
 });
 
@@ -263,6 +283,147 @@ test("saving a TypeScript dependency rechecks open Prose roots and a clean resul
   } finally { service.dispose(); f.close(); }
 });
 
+test("typing is debounced and the worker receives the newest dirty-buffer snapshot", async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture(), e = editor(f), document = e.add('src/main.prose', 'count as number is 1');
+  const service = e.start({ delay: 350 });
+  try {
+    t.mock.timers.tick(349); assert.equal(e.jobs.length, 0);
+    document.text = 'count as number is "bad"'; document.version++; document.isDirty = true;
+    e.fire('change', { document, contentChanges: [{ text: '"bad"' }] });
+    t.mock.timers.tick(349); assert.equal(e.jobs.length, 0);
+    t.mock.timers.tick(1); assert.equal(e.jobs.length, 1);
+    assert.deepEqual(e.jobs[0].options.overlays, [[document.uri.fsPath, document.text]]);
+    e.jobs[0].resolve(result([document.uri.fsPath], [error(document.uri.fsPath)]));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(e.entries.size, 1);
+    document.text = 'count as number is 2'; document.version++;
+    e.fire('change', { document, contentChanges: [{ text: '2' }] });
+    assert.equal(e.entries.size, 0);
+    t.mock.timers.tick(350); assert.equal(e.jobs.length, 2);
+    e.jobs[1].resolve(result([document.uri.fsPath]));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(e.entries.size, 0);
+    assert.equal(readFileSync(document.uri.fsPath, 'utf8'), 'count as number is 1');
+  } finally { service.dispose(); f.close(); }
+});
+
+test("dirty TypeScript, JavaScript and JSON imports refresh checks without saving", async () => {
+  const f = fixture(), e = editor(f), main = e.add('src/main.prose');
+  const sources = [
+    e.add('src/types.ts', 'export const label = "saved"', { languageId: 'typescript' }),
+    e.add('src/data.js', 'export const label = "saved"', { languageId: 'javascript' }),
+    e.add('src/data.json', '{"label":"saved"}', { languageId: 'json' })
+  ];
+  const service = e.start();
+  try {
+    await pause();
+    for (const document of sources) {
+      const old = e.jobs.at(-1);
+      document.version++; document.isDirty = true; document.text = document.text.replace('saved', 'changed');
+      e.fire('change', { document, contentChanges: [{ text: 'changed' }] });
+      assert.equal(old.canceled, 1); await pause();
+      const job = e.jobs.at(-1);
+      assert.deepEqual(job.options.targets, [main.uri.fsPath]);
+      assert.ok(job.options.overlays.some(([file, source]) => file === document.uri.fsPath && source === document.text));
+    }
+    e.jobs.at(-1).resolve(result([main.uri.fsPath], [error(main.uri.fsPath)])); await pause();
+    assert.equal(e.entries.size, 1);
+    for (const old of e.jobs.slice(0, -1)) old.resolve(result([main.uri.fsPath]));
+    await pause(); assert.equal(e.entries.size, 1);
+  } finally { service.dispose(); f.close(); }
+});
+
+test("closing an unsaved dependency rechecks against disk and drops its buffer overlay", async () => {
+  const f = fixture(), e = editor(f), main = e.add('src/main.prose');
+  const child = e.add('src/child.prose', 'count as number is "bad"', { isDirty: true });
+  const service = e.start();
+  try {
+    await pause(); e.jobs[0].resolve(result([main.uri.fsPath, child.uri.fsPath], [error(child.uri.fsPath)])); await pause();
+    assert.equal(e.entries.size, 1);
+    child.isClosed = true; e.fire('close', child);
+    assert.equal(e.entries.size, 0); await pause();
+    assert.deepEqual(e.jobs[1].options.targets, [main.uri.fsPath]);
+    assert.ok(!e.jobs[1].options.overlays.some(([file]) => file === child.uri.fsPath));
+    e.jobs[1].resolve(result([main.uri.fsPath, child.uri.fsPath])); await pause();
+    assert.equal(e.entries.size, 0);
+  } finally { service.dispose(); f.close(); }
+});
+
+test("disk changes to closed dependencies invalidate results and schedule a fresh check", async () => {
+  const f = fixture(), e = editor(f), main = e.add('src/main.prose');
+  const child = f.write('src/child.prose', 'print 1');
+  const service = e.start();
+  try {
+    await pause(); e.jobs[0].resolve(result([main.uri.fsPath, child], [error(child)])); await pause();
+    assert.equal(e.entries.size, 1);
+    for (const event of ['disk', 'created', 'deleted']) {
+      e.fire(event, e.vscode.Uri.file(child)); assert.equal(e.entries.size, 0); await pause();
+    }
+    assert.equal(e.jobs.length, 4); assert.equal(e.jobs[1].canceled, 1); assert.equal(e.jobs[2].canceled, 1);
+    e.jobs[3].resolve(result([main.uri.fsPath, child])); await pause(); assert.equal(e.entries.size, 0);
+  } finally { service.dispose(); f.close(); }
+});
+
+test("the first result rejects edits to an external Prose dependency discovered during checking", async () => {
+  const f = fixture(), e = editor(f);
+  f.write('app/tsconfig.json', '{}'); f.write('library/tsconfig.json', '{}');
+  const main = e.add('app/main.prose'), child = e.add('library/child.prose', 'print 1');
+  const service = e.start();
+  try {
+    await pause();
+    const appJob = e.jobs.find(job => job.options.targets.includes(main.uri.fsPath));
+    child.version++; child.isDirty = true; child.text = 'print 2';
+    e.fire('change', { document: child, contentChanges: [{ text: '2' }] });
+    assert.equal(appJob.canceled, 0);
+    appJob.resolve(result([main.uri.fsPath, child.uri.fsPath], [error(main.uri.fsPath)])); await pause();
+    assert.equal(e.entries.size, 0);
+    const fresh = e.jobs.filter(job => job.options.targets.includes(main.uri.fsPath)).at(-1);
+    assert.notEqual(fresh, appJob); assert.ok(fresh.options.overlays.some(([file, source]) => file === child.uri.fsPath && source === 'print 2'));
+    fresh.resolve(result([main.uri.fsPath, child.uri.fsPath])); await pause(); assert.equal(e.entries.size, 0);
+  } finally { service.dispose(); f.close(); }
+});
+
+test("manual checking flushes the debounce and checks dirty text immediately", async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture(), e = editor(f), main = e.add('src/main.prose', 'print "unsaved"', { isDirty: true });
+  const service = e.start({ delay: 350 });
+  try {
+    const pending = e.commands.get('prose.check')();
+    assert.equal(e.jobs.length, 1); assert.deepEqual(e.jobs[0].options.overlays, [[main.uri.fsPath, main.text]]);
+    e.jobs[0].resolve(result([main.uri.fsPath])); await pending;
+    t.mock.timers.tick(350); assert.equal(e.jobs.length, 1);
+    main.text = 'print "new"'; main.version++; e.fire('change', { document: main, contentChanges: [{ text: 'new' }] });
+    service.dispose(); t.mock.timers.tick(350); assert.equal(e.jobs.length, 1);
+  } finally { service.dispose(); f.close(); }
+});
+
+test("version mismatches without an event cannot publish stale dirty-buffer diagnostics", async () => {
+  const f = fixture(), e = editor(f), main = e.add('src/main.prose', 'print 1', { isDirty: true });
+  const service = e.start();
+  try {
+    await pause(); main.version++; main.text = 'print 2';
+    e.jobs[0].resolve(result([main.uri.fsPath], [error(main.uri.fsPath)])); await pause();
+    assert.equal(e.entries.size, 0); assert.equal(e.jobs.length, 2);
+    e.jobs[1].resolve(result([main.uri.fsPath])); await pause(); assert.equal(e.entries.size, 0);
+  } finally { service.dispose(); f.close(); }
+});
+
+test("parse errors cannot publish stale imports before dependency discovery completes", async () => {
+  const f = fixture(), e = editor(f);
+  f.write('app/tsconfig.json', '{}'); f.write('library/tsconfig.json', '{}');
+  const main = e.add('app/main.prose'), child = e.add('library/child.prose', 'print 1');
+  const service = e.start();
+  try {
+    await pause(); const old = e.jobs.find(job => job.options.targets.includes(main.uri.fsPath));
+    child.version++; child.text = 'print 2'; child.isDirty = true;
+    e.fire('change', { document: child, contentChanges: [{ text: '2' }] });
+    old.resolve(result([main.uri.fsPath], [{ ...error(main.uri.fsPath), source: 'prose', code: 'PROSE', message: 'In imported file, expected an expression.' }]));
+    await pause(); assert.equal(e.entries.size, 0);
+    assert.equal(e.jobs.filter(job => job.options.targets.includes(main.uri.fsPath)).length, 2);
+  } finally { service.dispose(); f.close(); }
+});
+
 test("setup errors appear on the project config and are logged without popup notifications", async () => {
   const f = fixture(), e = editor(f);
   e.add("src/main.prose");
@@ -277,6 +438,18 @@ test("setup errors appear on the project config and are logged without popup not
     assert.match(diagnostic.message, /^Type checking setup: TypeScript is not installed/);
     assert.equal(diagnostic.range.start.line, 0);
     assert.equal(e.logs.length, 1);
+  } finally { service.dispose(); f.close(); }
+});
+
+test("saved configuration diagnostics never map onto unsaved configuration text", async () => {
+  const f = fixture(), e = editor(f);
+  e.add('src/main.prose');
+  const config = { uri: e.vscode.Uri.file(join(f.root, 'tsconfig.json')), languageId: 'json', version: 2, isDirty: true, getText: () => '\n\n{}' };
+  e.documents.push(config);
+  const service = e.start();
+  try {
+    await pause(); e.jobs[0].resolve(result([], [{ file: config.uri.fsPath, source: 'configuration', code: 'PROSE_CHECK_SETUP', severity: 'error', line: 1, column: 1, message: 'Invalid saved configuration.' }]));
+    await pause(); assert.equal(e.entries.size, 0); assert.equal(e.logs.length, 1);
   } finally { service.dispose(); f.close(); }
 });
 
@@ -385,6 +558,29 @@ test("packaged strict worker matches CLI boundary diagnostics and never writes a
     assert.deepEqual(snapshot(f.root), before);
     const manifest = JSON.parse(readFileSync(new URL('../editors/vscode/package.json', import.meta.url), 'utf8'));
     assert.equal(manifest.contributes.configuration.properties['prose.check.strict'].default, false);
+  } finally { f.close(); }
+});
+
+test("packaged diagnostic worker checks unsaved root and imported Prose/TypeScript together", async () => {
+  const f = fixture();
+  try {
+    const startCheck = packagedChecker(f);
+    f.write('node_modules/typescript/package.json', '{"main":"index.cjs"}');
+    f.write('node_modules/typescript/index.cjs', `module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+    const main = f.write('src/main.prose', 'use amount from "./child.prose"\nuse label from "./types"\ncount as number is amount run\ntitle as text is label\nfail "Never run source"');
+    const child = f.write('src/child.prose', 'export function amount giving number\n    return 42\nfail "Never run imports"');
+    const types = f.write('src/types.ts', 'export const label = "saved";\nthrow new Error("Never execute TS");');
+    const source = '"😀"\n' + readFileSync(main, 'utf8');
+    const before = snapshot(f.root), options = { cwd: f.root, targets: [main], overlays: [
+      [main, source], [child, 'export function amount giving text\n    return "changed"\nfail "Never run imports"'],
+      [types, 'export const label = 42;\nthrow new Error("Never execute TS");']
+    ] };
+    const checked = await startCheck(options).promise;
+    assert.deepEqual(checked, checkProject(options));
+    assert.equal(checked.exitCode, 1);
+    assert.ok(checked.diagnostics.some(item => item.file === main && item.code === 2322 && item.line === 4));
+    assert.ok(checked.diagnostics.some(item => item.file === main && item.code === 2322 && item.line === 5));
+    assert.deepEqual(snapshot(f.root), before);
   } finally { f.close(); }
 });
 

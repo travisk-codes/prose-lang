@@ -2,7 +2,7 @@
   "name": "prose-language",
   "displayName": "Prose Language",
   "description": "Semantic and syntax highlighting, formatting, type checking, quick fixes, autocomplete, parameter hints, navigation, references, and rename for Prose.",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -36,7 +36,7 @@
   "contributes": {
     "commands": [{
       "command": "prose.check",
-      "title": "Check Saved Files",
+      "title": "Check Open Files",
       "category": "Prose",
       "enablement": "isWorkspaceTrusted"
     }],
@@ -47,7 +47,7 @@
           "type": "boolean",
           "default": true,
           "scope": "resource",
-          "description": "Check saved Prose files on open and save using the project's TypeScript. Diagnostics appear in the editor and Problems panel."
+          "description": "Check open Prose files after a short pause in typing, using current buffers and the project's TypeScript. Diagnostics appear in the editor and Problems panel."
         },
         "prose.check.strict": {
           "type": "boolean",

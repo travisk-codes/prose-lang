@@ -69,10 +69,10 @@ standard-library calls, strings, numbers, operators, and indexing with a
 Prose-only palette for dark backgrounds. Standalone quoted comments receive
 comment coloring.
 
-Saved Prose files are checked on open and save, with error squiggles and Problems
+Open Prose files are checked after a short pause in typing, with error squiggles and Problems
 entries from the same checker as the CLI. Checking uses the project's TypeScript
 and requires a trusted workspace. Set `prose.check.enabled` to `false` to disable
-it. Dirty buffers wait until save; highlighting and formatting remain available
+it. Checks use current buffers, including unsaved imports. Highlighting and formatting remain available
 without TypeScript or Workspace Trust.
 
 Build and install the extension as [its README](editors/vscode/README.md#install)
