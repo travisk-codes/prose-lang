@@ -1590,7 +1590,11 @@ function typeText(type) {
   if (type.kind === "set") return `Set<${typeText(type.of)}>`;
   if (type.kind === "map") return `Map<${typeText(type.from)}, ${typeText(type.to)}>`;
   if (type.kind === "function") {
-    const params = type.params.map((param, index) => `arg${index + 1}: ${typeText(param)}`).join(", ");
+    let optionalFrom = type.params.length;
+    while (optionalFrom && type.params[optionalFrom - 1].kind === "maybe") optionalFrom--;
+    const params = type.params.map((param, index) => index >= optionalFrom
+      ? `arg${index + 1}?: ${typeText(param.of)}`
+      : `arg${index + 1}: ${typeText(param)}`).join(", ");
     return `(${params}) => ${type.returns ? typeText(type.returns) : "void"}`;
   }
   return type.args.length ? `${type.name}<${type.args.map(typeText).join(", ")}>` : type.name;

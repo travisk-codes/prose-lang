@@ -1,5 +1,8 @@
 # Prose Language for Visual Studio Code
 
+Version 0.1.34 makes trailing `maybe` parameters optional in callback type
+annotations, matching named functions and their generated declarations.
+
 Version 0.1.33 adds `{like props}` to copy an object's properties into markup
 attributes, with type checking and editor features inside spread expressions.
 

@@ -1146,6 +1146,9 @@ Parentheses group types: `list of (number or unset)`. With commas they make a
 tuple, like Prose's own lists: `list of (text, number)` is a list of pairs. A trailing parameter that
 is untyped or `maybe` may be left out by callers. List parameters are declared
 read-only (`readonly T[]`), so TypeScript can pass read-only arrays to them.
+Trailing `maybe` parameters are also optional in callback types, such as
+`function taking text and maybe number giving nothing`. A `maybe` parameter
+before a required parameter must still be supplied, using `unset` when absent.
 A type inside a namespace is written with a colon: `Intl:DateTimeFormatOptions`. Field types written
 `maybe T` make optional fields. `type Name is …` declares a type at the top
 level; type names start with a capital letter. `use type A, B from "path"`

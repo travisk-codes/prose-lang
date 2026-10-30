@@ -200,6 +200,14 @@ function typeCheck(source) {
   });
 }
 
+test('callback contracts allow omitted trailing maybe values and retain other argument checks', withTypeScript, () => {
+  const source = 'type Hooks is object\n    on_change as function taking text and maybe number giving nothing\nfunction notify takes hooks as Hooks\n    hooks.on_change with "Ada"\n    hooks.on_change with "Ada", unset\n    hooks.on_change with "Ada", 2';
+  assert.deepEqual(typeCheck(source), []);
+  assert.ok(typeCheck(source.replace('"Ada", 2', '"Ada", true')).some(item => item.code === 2345));
+  const mixed = 'function invoke takes handler as function taking maybe text and number and maybe boolean giving nothing\n    handler with unset';
+  assert.ok(typeCheck(mixed).some(item => item.code === 2554));
+});
+
 test("working Prose type-checks without complaint", withTypeScript, () => {
   const diagnostics = typeCheck([
     'use type Datum, DatumTag from "./types"',

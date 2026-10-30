@@ -125,6 +125,22 @@ test("untyped and maybe trailing parameters are optional; earlier maybe paramete
   ]);
 });
 
+test('callback types make only trailing maybe parameters optional', () => {
+  const source = [
+    'export type Handler is function taking text and maybe number giving nothing',
+    'export type Mixed is function taking maybe text and number and maybe boolean giving nothing',
+    'export type Hooks is object',
+    '    on_change as function taking text and maybe number and maybe boolean giving nothing',
+    '    on_clear as function taking maybe text giving nothing',
+  ].join('\n');
+  const result = declarations(source);
+  assert.match(result, /export type Handler = \(arg1: string, arg2\?: number\) => void;/);
+  assert.match(result, /export type Mixed = \(arg1: string \| undefined, arg2: number, arg3\?: boolean\) => void;/);
+  assert.match(result, /onChange: \(arg1: string, arg2\?: number, arg3\?: boolean\) => void;/);
+  assert.match(result, /onClear: \(arg1\?: string\) => void;/);
+  assert.match(compile(source, { check: true }).code, /onChange: \(arg1: string, arg2\?: number, arg3\?: boolean\) => void;/);
+});
+
 test("object types declare interfaces with documented and optional fields; others declare aliases", () => {
   assert.equal(declarations([
     '"A run of consecutive days."',
