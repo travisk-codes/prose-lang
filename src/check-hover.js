@@ -71,7 +71,7 @@ function hoverSignature(ts, checker, signature, location, seen, internalLine = f
  * generated spelling changed (snake_case members, parameters, and dot helpers).
  * Compiler objects stay internal and are stripped before returning editor data.
  */
-export function collectSourceInfo(ts, checker, generated, record, { hover = true, explainAny } = {}) {
+export function collectSourceInfo(ts, checker, generated, record, { hover = true, explainAny, includeType = false } = {}) {
   const lines = sourceLines(record.source, { locations: true });
   const owners = new Map();
   for (const line of lines) for (const token of line.tokens) owners.set(token.source.line, line);
@@ -217,7 +217,8 @@ export function collectSourceInfo(ts, checker, generated, record, { hover = true
       if (unchecked.length) notes = [...(notes ?? []), ...unchecked];
     }
     found.set(key, { file: record.file, line: token.source.line, column: token.source.start + 1,
-      endColumn: token.source.start + token.source.raw.length + 1, code, documentation, ...(notes?.length ? { notes } : {}), priority, node, symbol });
+      endColumn: token.source.start + token.source.raw.length + 1, code, documentation, ...(notes?.length ? { notes } : {}),
+      ...(includeType ? { valueType: type } : {}), priority, node, symbol });
   }
   function visit(node) {
     if (hover) {

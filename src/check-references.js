@@ -78,7 +78,7 @@ export function collectReferences(ts, checker, generated, record) {
               (previous?.value === 'object' || previous?.value === ',');
             const binding = bindings.get(symbol) ?? { name, kind: ts.isImportSpecifier(declaration) ? 'import' : ts.isParameter(declaration) ? 'parameter' : ts.isFunctionDeclaration(declaration) ? 'function' : 'variable', occurrences: new Map() };
             bindings.set(symbol, binding);
-            const occurrence = { ...range(token), mode, ...(shorthand ? { shorthand: true } : {}) };
+            const occurrence = { ...range(token), mode, ...(reason ? { ambiguous: true } : {}), ...(shorthand ? { shorthand: true } : {}) };
             binding.occurrences.set(key(occurrence), occurrence);
             if (declares(ts, node) && (!binding.declaration || occurrence.line < binding.declaration.line || occurrence.line === binding.declaration.line && occurrence.column < binding.declaration.column)) binding.declaration = range(token);
             if (reason) binding.reason = reason;

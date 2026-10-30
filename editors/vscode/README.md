@@ -1,6 +1,6 @@
 # Prose Language for Visual Studio Code
 
-Syntax highlighting, formatting, type checking, autocomplete, parameter hints,
+Semantic and syntax highlighting, formatting, type checking, autocomplete, parameter hints,
 references, and rename
 for `.prose` files, with a softened rainbow
 palette for dark backgrounds matching the Prose website.
@@ -11,12 +11,48 @@ A quoted string alone on a line receives comment coloring. Other strings
 receive normal string coloring. Unterminated strings stop at the end of the
 line, matching the compiler's single-line strings.
 
-The grammar distinguishes function declarations and standard-library calls.
-User-defined calls currently receive identifier coloring; resolving those
-symbols across a document is a future semantic-highlighting feature.
+The grammar supplies immediate coloring while semantic highlighting refines names
+using their types and bindings. Function values and aliases receive function
+coloring, parameters keep their scoped identity, and known numeric dot selectors
+follow their index variable's role.
 
 The extension includes the Prose formatter, parser, and checker. Formatting reads source
 text and imported signatures; it never executes the program or its imports.
+
+## Semantic highlighting
+
+Semantic highlighting uses the project's TypeScript and current editor buffers,
+including unsaved imported files. It recognizes function declarations, function
+values and aliases, callable parameters at call sites, ordinary parameters,
+variable declarations and assignments, property names, loop variables, and native
+functions. Reassignment follows the type at that occurrence.
+
+The semantic roles map back to the existing Prose TextMate color scopes: functions
+are yellow and bold, parameters lime and italic, loop variables lime, bindings
+blue, reads pale blue, properties teal, and standard-library/native functions cyan.
+Only word segments receive semantic spans. Underscores, dots, colons, strings,
+comments, and other punctuation keep their grammar styling. Ambiguous contextual
+dots keep grammar coloring until their meaning is known.
+
+The feature runs in a background worker and never executes program code or writes
+files. New edits, settings changes, and dependency changes invalidate old tokens.
+Invalid Prose syntax clears semantic colors until analysis can succeed; ordinary
+type errors can still have useful highlighting. Setup problems appear in
+**Prose Highlighting** Output.
+
+This requires Workspace Trust, a local `.prose` file, and the project's TypeScript
+5 or 6. Set `prose.semanticHighlighting.enabled` to `false` to use grammar coloring
+alone. This setting is independent of saved-file checking and other editor
+features. VS Code's `editor.semanticHighlighting.enabled` also controls display;
+its default follows the theme.
+
+Existing `editor.tokenColorCustomizations` rules for Prose apply through semantic
+scope fallbacks. For a semantic-only override, use a selector such as
+`proseFunction:prose` in `editor.semanticTokenColorCustomizations.rules`.
+The registered types are `proseFunction`, `proseParameter`, `proseVariable`,
+`proseBinding`, `proseProperty`, `proseIterator`, and `proseBuiltin`. See
+[VS Code's semantic highlighting guide](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#theming)
+for theme and customization controls.
 
 ## Formatting
 
@@ -292,13 +328,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.24.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.25.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.24.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.25.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -323,7 +359,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.24.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.25.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

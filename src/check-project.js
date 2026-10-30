@@ -11,6 +11,7 @@ import { strictDiagnostics } from "./check-strict.js";
 import { collectCompletions } from "./completions.js";
 import { collectSignatureHelp } from "./signature-help.js";
 import { collectReferences } from "./check-references.js";
+import { collectSemanticTokens } from "./check-semantic.js";
 import { definitionResolver } from "./check-definition.js";
 
 export class CheckSetupError extends Error {
@@ -41,7 +42,7 @@ function filesUnder(directory) {
 /** Check Prose and its imported Prose dependencies without writing or executing
  * anything. Resolve TypeScript from the selected project, never from this tool.
  */
-export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], referenceTargets = [], referenceAll = false, overlays = [], strict = false, completionProbe, signatureProbe } = {}) {
+export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], referenceTargets = [], referenceAll = false, semanticTargets = [], overlays = [], strict = false, completionProbe, signatureProbe } = {}) {
   cwd = resolve(cwd);
   const bufferKey = file => process.platform === "win32" ? resolve(file).toLowerCase() : resolve(file);
   const buffers = new Map(overlays.map(([file, source]) => [bufferKey(file), source]));
@@ -212,8 +213,14 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
   if (hoverTargets.length) result.hovers = [];
   if (definitionTargets.length) result.definitions = [];
   if (referenceTargets.length || referenceAll) result.references = [];
+  if (semanticTargets.length) result.semanticTokens = [];
   if (completionProbe) result.completions = [];
   if (sourceErrors.length) return result;
+  for (const file of semanticTargets) {
+    const record = records.get(canonical(resolve(cwd, file)));
+    if (record) result.semanticTokens.push({ file: record.file,
+      tokens: collectSemanticTokens(ts, program.getTypeChecker(), program.getSourceFile(record.name), record) });
+  }
   for (const file of referenceAll ? [...records.values()].map(record => record.file) : referenceTargets) {
     const record = records.get(canonical(resolve(cwd, file)));
     if (record) result.references.push({ file: record.file,

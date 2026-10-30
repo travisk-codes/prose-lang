@@ -43,6 +43,10 @@ files; see [Type checking](docs/type-checking.md).
 
 ## VS Code support
 
+[Semantic highlighting](editors/vscode/README.md#semantic-highlighting) colors
+function values and aliases, scoped parameters, properties, and known numeric
+indexes using current project types, with the existing Prose palette.
+
 Type `.` or `:` after a value for type-aware field and method suggestions, or
 use **Ctrl+Space** inside a partial name. See
 [autocomplete](editors/vscode/README.md#autocomplete) for details and requirements.

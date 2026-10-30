@@ -204,13 +204,14 @@ class Expression {
       return { spread: true, value: this.parse(60), line: this.line };
     }
     if (named) {
+      const token = this.peek();
       const name = this.propertyName();
       this.take("is");
-      return { name, value: this.parse() };
+      return located({ name, value: this.parse() }, token);
     }
     if (this.peek()?.type !== "word") fail(this.line, "Expected an object entry: name is value, a name, or like another object.");
     const token = this.peek(), name = this.variableName();
-    return { name, value: located({ type: "name", value: name, line: this.line }, token) };
+    return located({ name, value: located({ type: "name", value: name, line: this.line }, token) }, token);
   }
   // Whether `object` is followed by entries on its line, rather than ending or leading into other syntax.
   startsObjectEntries() {
@@ -1134,7 +1135,7 @@ class Parser {
       const value = expr.peek() ? expr.list() : { type: "unset" };
       expr.end();
       this.indentedValue(expr, value, line);
-      object.properties.push({ name, value });
+      object.properties.push(located({ name, value }, line.tokens[0]));
     }
   }
   simple(expr, inFunction, parent = null) {
@@ -1731,7 +1732,7 @@ export function compile(source, options = {}) {
       : child.type === "literal" && child.value === null ? "(null as any)" : expression(child, scope, depth);
     const own = new Set(node.properties.filter(property => !property.spread).map(property => property.name));
     const entries = node.properties.map(property => property.spread
-      ? `...${expression(property.value, scope, depth)}` : `${camel(property.name)}: ${value(property.value)}`);
+      ? `...${expression(property.value, scope, depth)}` : `${mapped(property, camel(property.name))}: ${value(property.value)}`);
     for (const name of extra) if (!own.has(name)) entries.push(`${camel(name)}: (undefined as any)`);
     // An empty object, such as a fallback after otherwise, can hold anything.
     return entries.length ? `({${entries.join(", ")}})` : "({} as any)";

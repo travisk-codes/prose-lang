@@ -509,3 +509,21 @@ test("packaged project rename includes a closed importer and never changes eithe
     assert.deepEqual(snapshot(f.root), before);
   } finally { f.close(); }
 });
+
+test("packaged semantic worker matches source analysis of an unsaved buffer without execution or writes", async () => {
+  const f = fixture();
+  try {
+    const startCheck = packagedChecker(f);
+    f.write('node_modules/typescript/package.json', '{"main":"index.cjs"}');
+    f.write('node_modules/typescript/index.cjs', `module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+    const main = f.write('src/main.prose', 'print "saved"');
+    const source = 'action is function takes value return value\nalias is action\nprint alias 2\nfail "Do not execute"';
+    const options = { cwd: f.root, targets: [main], semanticTargets: [main], overlays: [[main,source]] };
+    const before = snapshot(f.root), result = await startCheck(options).promise;
+    assert.deepEqual(result, checkProject(options));
+    assert.ok(result.semanticTokens[0].tokens.some(token => token.line === 3 && token.type === 'proseFunction'));
+    assert.deepEqual(snapshot(f.root),before);
+    const manifest = JSON.parse(readFileSync(new URL('../editors/vscode/package.json', import.meta.url),'utf8'));
+    assert.ok(manifest.files.includes('semantic.cjs'));
+  } finally { f.close(); }
+});

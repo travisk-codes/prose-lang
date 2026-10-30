@@ -1,8 +1,8 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Syntax highlighting, formatting, type checking, autocomplete, parameter hints, navigation, references, and rename for Prose.",
-  "version": "0.1.24",
+  "description": "Semantic and syntax highlighting, formatting, type checking, autocomplete, parameter hints, navigation, references, and rename for Prose.",
+  "version": "0.1.25",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -91,6 +91,12 @@
           "scope": "resource",
           "description": "Rename Prose variables, parameters, and functions, including exports and direct Prose imports across the project. Rejects collisions, capture, and ambiguous dots. Requires Workspace Trust and project TypeScript."
         },
+        "prose.semanticHighlighting.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Color function values, parameters, variables, properties, and known numeric indexes using project types and current buffers. Requires Workspace Trust and project TypeScript."
+        },
         "prose.format.width": {
           "type": "integer",
           "minimum": 20,
@@ -119,6 +125,27 @@
         "path": "./syntaxes/prose.tmLanguage.json"
       }
     ],
+    "semanticTokenTypes": [
+      { "id": "proseFunction", "description": "A Prose function or function-valued name." },
+      { "id": "proseParameter", "description": "A reference to a function parameter." },
+      { "id": "proseVariable", "description": "A reference to an ordinary Prose value binding." },
+      { "id": "proseBinding", "description": "A Prose variable declaration or assignment." },
+      { "id": "proseProperty", "description": "A Prose object property name." },
+      { "id": "proseIterator", "description": "A loop variable or its reference." },
+      { "id": "proseBuiltin", "description": "A Prose standard-library function or native JavaScript function." }
+    ],
+    "semanticTokenScopes": [{
+      "language": "prose",
+      "scopes": {
+        "proseFunction": ["source.prose entity.name.function.prose"],
+        "proseParameter": ["source.prose variable.parameter.prose"],
+        "proseVariable": ["source.prose variable.other.readwrite.prose"],
+        "proseBinding": ["source.prose variable.other.binding.prose"],
+        "proseProperty": ["source.prose variable.other.property.prose"],
+        "proseIterator": ["source.prose variable.other.iterator.prose"],
+        "proseBuiltin": ["source.prose support.function.prose"]
+      }
+    }],
     "configurationDefaults": {
       "[prose]": {
         "editor.defaultFormatter": "travisk-codes.prose-language"
@@ -395,6 +422,7 @@
     "completing.cjs",
     "signatures.cjs",
     "refactoring.cjs",
+    "semantic.cjs",
     "check-worker.cjs",
     "dist/**",
     "package.json",
