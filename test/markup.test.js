@@ -191,3 +191,15 @@ test('generic arrow callbacks and object attributes generate valid TSX checking 
     assert.deepEqual(run('print <div style={object color is "red", font_size is 12} />')[0].props.style, { color: 'red', fontSize: 12 });
   } finally { f.close(); }
 });
+
+test('explicit constrained generics remain checked in TSX functions and arrow callbacks', () => {
+  const f = fixture();
+  try {
+    const source = 'type Props of item as text is object\n    value as item\nfunction Card of item as text takes props as Props of item\n    identity is function of choice as text takes value as choice giving choice return value\n    return <div title={identity props.value}>{props.value}</div>\nview is <Card value="Prose" />';
+    const file = f.write('main.prose', source);
+    const result = checkProject({ cwd: f.root, typescript: ts, targets: [file] });
+    assert.equal(result.exitCode, 0, JSON.stringify(result.diagnostics));
+    f.write('main.prose', source.replace('value="Prose"', 'value={42}'));
+    assert.ok(checkProject({ cwd: f.root, typescript: ts, targets: [file] }).diagnostics.some(item => item.code === 2322));
+  } finally { f.close(); }
+});

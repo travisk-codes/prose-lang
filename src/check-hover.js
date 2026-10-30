@@ -58,12 +58,22 @@ export function hoverType(ts, checker, type, location, seen = new Set(), compact
   return "object";
 }
 
+export function genericClause(ts, checker, signature, location, seen = new Set()) {
+  const parameters = signature.typeParameters ?? signature.target?.typeParameters ?? [];
+  // Keep existing concise hovers for inferred, unconstrained signatures.
+  if (!parameters.some(parameter => parameter.getConstraint())) return '';
+  return ' of ' + parameters.map(parameter => {
+    const bound = parameter.getConstraint();
+    return checker.typeToString(parameter) + (bound ? ' as ' + hoverType(ts, checker, bound, location, seen, true) : '');
+  }).join(', ');
+}
+
 function hoverSignature(ts, checker, signature, location, seen, internalLine = false) {
   const parameters = signature.getParameters().filter(parameter => !internalLine || parameter.getName() !== "line").map(parameter => {
     const type = checker.getTypeOfSymbolAtLocation(parameter, location);
     return `${clean(parameter.getName())} as ${hoverType(ts, checker, type, location, seen, true)}`;
   });
-  return `function${parameters.length ? ` takes ${parameters.join(", ")}` : ""} giving ${hoverType(ts, checker, signature.getReturnType(), location, seen, true)}`;
+  return `function${genericClause(ts, checker, signature, location, seen)}${parameters.length ? ` takes ${parameters.join(", ")}` : ""} giving ${hoverType(ts, checker, signature.getReturnType(), location, seen, true)}`;
 }
 
 /** Collect source words and their checker symbols for hovers and navigation.

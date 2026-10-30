@@ -22,6 +22,9 @@
       "include": "#properties"
     },
     {
+      "include": "#generic-functions"
+    },
+    {
       "include": "#function-declarations"
     },
     {
@@ -29,6 +32,9 @@
     },
     {
       "include": "#loop-iterators"
+    },
+    {
+      "include": "#generic-type-declarations"
     },
     {
       "include": "#type-declarations"
@@ -631,6 +637,69 @@
         {
           "name": "constant.character.escape.prose",
           "match": "&(?:#x[0-9a-fA-F]+|#\\d+|[A-Za-z]+);"
+        }
+      ]
+    },
+    "generic-functions": {
+      "name": "meta.function.generics.prose",
+      "begin": "\\b(function)(?:\\s+((?!(?:of|takes|giving|return)\\b)[A-Za-z_][A-Za-z_0-9]*))?\\s+(of)\\b",
+      "end": "(?=\\b(?:takes|giving|return)\\b)|$",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.type.function.prose"
+        },
+        "2": {
+          "name": "entity.name.function.prose",
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
+        },
+        "3": {
+          "name": "keyword.other.prose"
+        }
+      },
+      "patterns": [
+        {
+          "match": "\\b(?:as|is)\\b",
+          "name": "keyword.other.prose"
+        },
+        {
+          "include": "#types"
+        }
+      ]
+    },
+    "generic-type-declarations": {
+      "name": "meta.type.generics.prose",
+      "begin": "^\\s*(?:(export)\\s+)?(type)\\s+([A-Z][A-Za-z_0-9]*)\\s+(of)\\b",
+      "end": "$",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.prose"
+        },
+        "2": {
+          "name": "storage.type.prose"
+        },
+        "3": {
+          "name": "entity.name.type.prose",
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
+        },
+        "4": {
+          "name": "keyword.other.prose"
+        }
+      },
+      "patterns": [
+        {
+          "match": "\\b(?:as|is)\\b",
+          "name": "keyword.other.prose"
+        },
+        {
+          "include": "#types"
         }
       ]
     }

@@ -2,7 +2,7 @@
   "name": "prose-language",
   "displayName": "Prose Language",
   "description": "Highlighting, formatting, live type checking, autocomplete, navigation, running, and F5 debugging for Prose.",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],

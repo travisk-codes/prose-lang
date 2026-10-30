@@ -1,5 +1,9 @@
 # Prose Language for Visual Studio Code
 
+Version 0.1.32 adds explicit generic declarations such as `of item` and
+constraints such as `of choice as text`, including highlighting, type checking,
+and constraint information in hovers and parameter hints.
+
 Version 0.1.31 adds React markup in `.prose` files: colored tags and attributes,
 Prose expressions in braces, React prop/event checking, and brace-expression
 completion, hover, navigation, and rename. Component rename updates both tags.

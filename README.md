@@ -1036,6 +1036,44 @@ See [react_components.prose](examples/react_components.prose) for typed componen
 
 ## Types
 
+Lowercase names in type annotations are inferred generic type parameters. You can
+also declare them explicitly after a function or type name with `of`:
+
+```prose
+function identity of item takes value as item, giving item
+    return value
+
+type Box of item is object
+    value as item
+```
+
+An optional `as` bound restricts a type parameter while retaining its specific
+type throughout the declaration:
+
+```prose
+type TextOption of choice as text is object
+    value as choice
+    label as text
+
+function identity of item as text takes value as item, giving item
+    return value
+
+print identity "Ada"
+```
+
+This emits `identity<item extends string>(value: item): item`. A numeric argument
+is a type error. Named functions, inline functions, object types and type aliases
+all support explicit parameters. Use commas for several parameters, for example
+`of key as text, value`. Bounds can refer to another declared parameter.
+
+Explicit lists name every type parameter owned by that declaration. Nested
+functions can also use their outer function's parameters, or declare their own.
+Names remain lowercase; uppercase type names refer to existing named types.
+Declarations without `of` retain their existing inference behavior. Runtime
+function calls still infer type arguments from values, such as `identity "Ada"`.
+These declarations and bounds affect checking and generated TypeScript types;
+the running JavaScript has no extra type arguments or runtime checks.
+
 Annotations are optional and change nothing about how a program runs. They
 describe a module's exports to TypeScript: the compiler turns them into a
 declaration file (`text.d.prose.ts` beside `text.prose`), so TypeScript code

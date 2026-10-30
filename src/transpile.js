@@ -450,8 +450,28 @@ class Expression {
     return ["number", "string", "pattern", "markup"].includes(next.type) || next.type === "symbol" && ["(", "-"].includes(next.value) ||
       next.type === "word" && (!reserved.has(next.value) || ["function", "if", "new", "not", "maybe", "array", "object", "unset", "true", "false", "null", "each"].includes(next.value));
   }
+  // Explicit type parameters live beside the declaration, with optional bounds.
+  genericParameters() {
+    const parameters = [];
+    if (!this.at('of')) return parameters;
+    this.take('of');
+    while (true) {
+      const token = this.peek(), name = this.name();
+      if (!/^[a-z][A-Za-z_0-9]*$/.test(name) || Object.hasOwn(builtinTypes, name) || ['list', 'set', 'map', 'of', 'from', 'to'].includes(name)) {
+        fail(this.line, 'Type parameter names are lowercase placeholders, like item or choice.');
+      }
+      if (parameters.some(parameter => parameter.name === name)) fail(this.line, `Duplicate type parameter '${name}'.`);
+      const bound = this.optionalType();
+      parameters.push(located({ name, ...(bound ? { bound } : {}) }, token));
+      if (!this.at(',')) break;
+      this.take(',');
+      if (['takes', 'giving', 'is', 'return'].some(word => this.at(word))) break;
+    }
+    return parameters;
+  }
   // `takes` names, each optionally followed by `as` and a type, then an optional `giving` type.
   parameters() {
+    const typeParams = this.genericParameters();
     const names = [];
     Object.defineProperty(names, "locations", { value: [] });
     const types = [];
@@ -472,7 +492,7 @@ class Expression {
       this.take("giving");
       returns = this.typeExpression();
     }
-    return { names, types, returns };
+    return { names, types, returns, ...(typeParams.length ? { typeParams } : {}) };
   }
   optionalType() {
     if (!this.at("as")) return undefined;
@@ -567,8 +587,8 @@ class Expression {
     return { type: "pattern", literal: `/${regex.source}/${regex.flags}` };
   }
   lambda(token) {
-    const { names, types, returns } = this.parameters();
-    const node = { type: "lambda", params: names, types, returns, line: this.line };
+    const { names, types, returns, typeParams } = this.parameters();
+    const node = { type: "lambda", params: names, types, returns, ...(typeParams ? { typeParams } : {}), line: this.line };
     Object.defineProperty(node, "callScopeKey", { value: callScopeKey(token) });
     if (this.at("return")) {
       this.take("return");
@@ -831,9 +851,9 @@ function functionHeader(tokens, line) {
   if (expr.at("export")) expr.take("export");
   expr.take("function");
   const name = expr.name();
-  const { names: params, types, returns } = expr.parameters();
+  const { names: params, types, returns, typeParams } = expr.parameters();
   expr.end();
-  return { name, params, types, returns };
+  return { name, params, types, returns, ...(typeParams ? { typeParams } : {}) };
 }
 
 const startsFunction = tokens => isWord(tokens[isWord(tokens[0], "export") ? 1 : 0], "function");
@@ -1227,11 +1247,12 @@ class Parser {
     expr.take("type");
     const name = expr.name();
     if (!/^[A-Z]/.test(name)) fail(line.line, "Type names start with a capital letter, like StreakRun.");
+    const typeParams = expr.genericParameters();
     expr.take("is");
     const value = expr.typeExpression();
     expr.end();
     const fields = value.kind === "object" ? this.typeFields(line) : null;
-    return { type: "typeDeclaration", name, exported, doc, value, fields, line: line.line };
+    return { type: "typeDeclaration", name, exported, doc, value, fields, ...(typeParams.length ? { typeParams } : {}), line: line.line };
   }
   // The indented `name as type` lines of an object type; a quoted line documents the next field.
   typeFields(parent) {
@@ -1579,7 +1600,34 @@ function typeVariables(types, found = []) {
   return found;
 }
 
-const generic = variables => variables.length ? `<${variables.join(", ")}>` : "";
+// Inferred parameters retain their existing order. An explicit list names every
+// parameter owned by that declaration; nested functions may use outer types.
+function genericParametersFor(node, inherited = new Set()) {
+  const types = node.type === 'typeDeclaration' ? node.fields ? node.fields.map(field => field.type) : [node.value]
+    : [...(node.types ?? []), node.returns];
+  const inferred = typeVariables([...types, ...(node.typeParams ?? []).map(parameter => parameter.bound)]);
+  if (!node.typeParams) return inferred.filter(name => !inherited.has(name)).map(name => ({ name }));
+  const declared = new Set(node.typeParams.map(parameter => parameter.name));
+  for (const name of inferred) if (!declared.has(name) && !inherited.has(name)) {
+    fail(node.line, `Type parameter '${name}' is not declared. Include it in the of list.`);
+  }
+  return node.typeParams;
+}
+
+function validateGenericParameters(node, inherited = new Set()) {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) { node.forEach(child => validateGenericParameters(child, inherited)); return; }
+  if (['function', 'lambda', 'typeDeclaration'].includes(node.type)) {
+    const own = genericParametersFor(node, inherited);
+    if (node.type !== 'typeDeclaration') validateGenericParameters(node.body ?? node.value, new Set([...inherited, ...own.map(parameter => parameter.name)]));
+    return;
+  }
+  for (const child of Object.values(node)) if (child && typeof child === 'object') validateGenericParameters(child, inherited);
+}
+
+const generic = (parameters, typeOf = typeText, parameterOf = (parameter, code) => code) => parameters.length
+  ? `<${parameters.map(parameter => typeof parameter === 'string' ? parameter
+    : parameterOf(parameter, parameter.name + (parameter.bound ? ` extends ${typeOf(parameter.bound)}` : ''))).join(', ')}>` : '';
 const docComment = (doc, indent = "") => doc ? [`${indent}/** ${doc.replace(/\*\//g, "*\\/")} */`] : [];
 // Parameter names only document a declaration, so JavaScript's reserved words get a suffix.
 const parameterName = name => /^(?:break|case|catch|class|const|continue|debugger|default|delete|do|enum|extends|finally|implements|import|instanceof|interface|let|package|private|protected|public|static|super|switch|this|throw|try|typeof|var|void|yield)$/.test(name) ? `${name}_` : name;
@@ -1621,9 +1669,9 @@ function typeDeclarationLines(node,
   fieldOf = (field, code) => code) {
   const prefix = node.exported ? "export " : "";
   if (!node.fields) {
-    return [...docComment(node.doc), `${prefix}type ${node.name}${generic(typeVariables([node.value]))} = ${typeOf(node.value)};`];
+    return [...docComment(node.doc), `${prefix}type ${node.name}${generic(genericParametersFor(node), typeOf, fieldOf)} = ${typeOf(node.value)};`];
   }
-  const lines = [...docComment(node.doc), `${prefix}interface ${node.name}${generic(typeVariables(node.fields.map(field => field.type)))} {`];
+  const lines = [...docComment(node.doc), `${prefix}interface ${node.name}${generic(genericParametersFor(node), typeOf, fieldOf)} {`];
   for (const field of node.fields) {
     const optional = field.type.kind === "maybe";
     lines.push(...docComment(field.doc, "  "), fieldOf(field, `  ${camel(field.name)}${optional ? "?" : ""}: ${typeOf(field.type, optional)};`));
@@ -1693,7 +1741,7 @@ function declarationsFor(program) {
   for (const node of program) {
     if (node.type === "function" && node.exported) {
       const params = parameterList(node, name => parameterName(camel(name)), name => `${name}: any`);
-      const variables = typeVariables([...node.types, node.returns]);
+      const variables = genericParametersFor(node);
       lines.push(...docComment(node.doc),
         `export function ${camel(node.name)}${generic(variables)}(${params}): ${returnType(node)};`);
     } else if (node.type === "assign" && node.exported) {
@@ -1718,6 +1766,7 @@ export function parse(source, options = {}) {
     const final = new Parser(source, settings, analysis, false);
     const result = final.program();
     final.validateContinuations();
+    validateGenericParameters(result);
     return result;
   } catch (error) {
     throw explainLayoutError(error, source, () => sourceLines(source, { locations: true }), continues);
@@ -1787,7 +1836,8 @@ export function compile(source, options = {}) {
     if (!scopes.has(node)) {
       const inner = createScope(node.params, node.body ?? [], parent);
       const inherited = parent.typeVariables ?? new Set();
-      inner.ownTypeVariables = new Set([...typeVariables([...(node.types ?? []), node.returns])].filter(name => !inherited.has(name)));
+      inner.typeParams = genericParametersFor(node, inherited);
+      inner.ownTypeVariables = new Set(inner.typeParams.map(parameter => parameter.name));
       inner.typeVariables = new Set([...inherited, ...inner.ownTypeVariables]);
       scopes.set(node, inner);
     }
@@ -1877,7 +1927,7 @@ export function compile(source, options = {}) {
       const predicate = checkedPredicate(node, inner, filterPredicate);
       const returns = node.returns ? `: ${mapped(node.returns, returnType(node))}` : predicate ? `: ${unmapped(predicate)}` : "";
       const async = awaits(node.body ?? node.value) ? "async " : "";
-      let variables = generic([...inner.ownTypeVariables]);
+      let variables = generic(inner.typeParams, checkedType, mapped);
       if (hasMarkup) variables = variables.replace(/^<([^,>]+)>$/, '<$1,>');
       if (node.body) return `(${async}${variables}(${params})${returns} => {\n${emitScope(node.body, inner, depth + 1)}\n${pad(depth)}})`;
       return `(${async}${variables}(${params})${returns} => ${expression(node.value, inner, depth)})`;
@@ -2034,7 +2084,7 @@ export function compile(source, options = {}) {
       if (node.type === "function") {
         const inner = innerScope(node, scope);
         const signature = check
-          ? `${generic(typeVariables([...node.types, node.returns]))}(${parameterList(node, (name, index) => mapped({ location: node.params.locations?.[index] }, variable(name)), undefined, checkedParameter)})${node.returns ? `: ${mapped(node.returns, returnType(node))}` : ""}`
+          ? `${generic(inner.typeParams, checkedType, mapped)}(${parameterList(node, (name, index) => mapped({ location: node.params.locations?.[index] }, variable(name)), undefined, checkedParameter)})${node.returns ? `: ${mapped(node.returns, returnType(node))}` : ""}`
           : `(${node.params.map(variable).join(", ")})`;
         const documentation = check && node.doc ? docComment(node.doc, indent).join("\n") + "\n" : "";
         return `${documentation}${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}${signature} {\n${emitScope(node.body, inner, depth + 1)}${closeBody(node.body, depth)}`;

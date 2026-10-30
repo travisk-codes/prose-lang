@@ -44,6 +44,22 @@ function hasScope(line, fragment, scope) {
   assert.ok(scopesAt(line, fragment).includes(scope), `${JSON.stringify(fragment)} should have ${scope}`);
 }
 
+test('explicit generics highlight their declaration, placeholders and bounds locally', () => {
+  const named = 'function identity of item as text takes value as item, giving item';
+  hasScope(named, 'identity', 'entity.name.function.prose');
+  hasScope(named, 'of item', 'keyword.other.prose');
+  hasScope(named, 'item as', 'entity.name.type.parameter.prose');
+  hasScope(named, 'text', 'support.type.prose');
+  hasScope(named, 'value as', 'variable.parameter.prose');
+  hasScope('identity is function of item as text takes value as item return value', 'item as', 'entity.name.type.parameter.prose');
+  const object = 'export type Box of item as text is object';
+  hasScope(object, 'Box', 'entity.name.type.prose');
+  hasScope(object, 'item', 'entity.name.type.parameter.prose');
+  hasScope(object, 'text', 'support.type.prose');
+  hasScope(object, 'is object', 'keyword.other.prose');
+  hasScope('print record.of', 'of', 'variable.other.property.prose');
+});
+
 test('markup highlights tags and attributes, with Prose expressions and literal child text', () => {
   const lines = ['return <div class_name="hello">', '    if words are text <span>{book.title}</span>', '    <button disabled={true} on_click={function takes event return event.prevent_default run} />', '</div>', 'print count <limit'];
   const tokens = tokenize(lines.join('\n'));

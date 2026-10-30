@@ -1,6 +1,6 @@
 import { camel, continues, sourceLines, markupExpressionAt } from "./transpile.js";
 import { markupPosition } from "./markup.js";
-import { hoverType } from "./check-hover.js";
+import { genericClause, hoverType } from "./check-hover.js";
 
 // The parser decides whether the cursor is an argument, including when a comma
 // actually starts an array element. These probes never enter the user's buffer.
@@ -118,7 +118,7 @@ export function collectSignatureHelp(ts, checker, generated, record, context) {
   }
   const rendered = signatures.map(signature => {
     const parameters = signature.getParameters().filter(parameter => !builtin || parameter.getName() !== 'line');
-    let label = (ts.isNewExpression(call) ? 'new ' : '') + name + (parameters.length ? ' takes ' : '');
+    let label = (ts.isNewExpression(call) ? 'new ' : '') + name + genericClause(ts, checker, signature, call) + (parameters.length ? ' takes ' : '');
     const information = parameters.map((parameter, index) => {
       const declaration = parameter.valueDeclaration ?? parameter.getDeclarations()?.[0];
       const rest = Boolean(declaration?.dotDotDotToken), optional = Boolean(parameter.flags & ts.SymbolFlags.Optional || declaration?.questionToken || declaration?.initializer);
