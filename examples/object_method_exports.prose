@@ -1,0 +1,5 @@
+"A library entry point can forward objects from another module."
+use calculator, tools from "./object_method_tools.prose"
+
+export math is calculator
+export toolbox is tools

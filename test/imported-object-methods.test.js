@@ -102,7 +102,7 @@ test('declared object result types and nested typed fields survive module bounda
 test('signature discovery stays text-only and opaque dependency exports stay unknown', () => {
   const module = tools + '\nfail "Do not execute imported code"';
   assert.doesNotThrow(() => compile('use calculator from "./tools.prose"\nprint calculator.add 1, 2', options(module)));
-  const opaque = 'use original from "./other.prose"\nexport calculator is original';
+  const opaque = 'use original from "./other.js"\nexport calculator is original';
   let reads = 0;
   boundary('use calculator from "./tools.prose"\nprint calculator.add 1, 2', opaque);
   compile('use calculator from "./tools.prose"\nprint calculator.add with 1, 2', {

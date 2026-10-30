@@ -124,6 +124,20 @@ test('imported object signatures track unsaved module changes and declared call 
   } finally { f.close(); }
 });
 
+test('forwarded object hints follow unsaved edits in a transitive module', () => {
+  const f = fixture();
+  try {
+    const source = 'export calculator is object\n    add is function takes left as number, right as number giving number return left + right';
+    const leaf = f.write('calculator.prose', source);
+    f.write('public/tools.prose', 'use calculator from "../calculator.prose"\nexport math is calculator');
+    const prefix = 'use math from "./public/tools.prose"\n';
+    assert.equal(active(f.help(prefix + 'math.add 1, |')), 'right as number');
+    const changed = source.replace('right as number giving', 'right as number, bonus as number giving');
+    assert.equal(active(f.help(prefix + 'math.add 1, 2, |', { overlays: [[leaf, changed]] })), 'bonus as number');
+    assert.equal(readFileSync(leaf, 'utf8'), source);
+  } finally { f.close(); }
+});
+
 test('overloads and generic inference use the receiver and already-entered arguments', () => {
   const f = fixture();
   try {

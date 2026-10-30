@@ -65,7 +65,7 @@ export function functionTypeArity(type, aliases = new Map(), seen = new Set()) {
   return null;
 }
 
-export function inferCallArities(program, functions, imports = new Map(), invalidated = new Set(), normalize = name => name, valueSignatures = new Map()) {
+export function inferCallArities(program, functions, imports = new Map(), invalidated = new Set(), normalize = name => name, valueSignatures = new Map(), lazyImports = false) {
   const aliases = new Map(program.filter(node => node.type === "typeDeclaration").map(node => [node.name, node.value]));
   const scopes = new Map(), all = [], mutations = [], blockedMethods = new Map(), properties = [];
   function scope(parent, key, params = [], types = []) {
@@ -183,7 +183,7 @@ export function inferCallArities(program, functions, imports = new Map(), invali
     }
     return result;
   }
-  const objects = objectCallArities(program, root, scopes, functions, functionTypeArity, normalize, valueSignatures);
+  const objects = objectCallArities(program, root, scopes, functions, functionTypeArity, normalize, valueSignatures, lazyImports);
   for (const current of all) {
     for (const [name, count] of current.contracts) current.bindings.set(name, count);
     for (const name of current.bindings.keys()) if (invalidated.has(`${current.key}/${name}`)) current.bindings.set(name, null);

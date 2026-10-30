@@ -1,0 +1,9 @@
+use math, toolbox from "./object_method_exports.prose"
+
+print math.add 2, 3
+print math.multiply 4, 5
+print toolbox.calculator.add 6, 7
+
+"The function still ends after its declared two arguments."
+results is math.add 2, 3, 9
+print results

@@ -1,21 +1,37 @@
 // Resolve local object properties without executing a program or loading TS.
 // Object literals retain their identity so writes through aliases contribute
 // to the same property. Every locally resolved assignment must agree on count.
-export function objectCallArities(program, root, scopes, functions, functionTypeArity, normalize, imports = new Map()) {
+export function objectCallArities(program, root, scopes, functions, functionTypeArity, normalize, imports = new Map(), lazyImports = false) {
   const unknown = {}, missing = {}, absent = {};
   const definitions = new Map(program.filter(node => node.type === "typeDeclaration").map(node => [node.name, node]));
   const declarations = new Map(program.filter(node => node.type === "function").map(node => [node.name, node]));
   const aliases = new Map([...definitions].map(([name, node]) => [name, node.value]));
   const sources = new WeakMap(), typed = new WeakMap(), imported = new Map(), writes = new Map(), mutations = [], external = new WeakMap();
+  let importsEnabled = !lazyImports, revision = 0;
   const unique = values => [...new Set(values)];
   const keyOf = node => node.name !== undefined ? normalize(node.name)
     : node.key?.type === "literal" && typeof node.key.value === "string" ? node.key.value : null;
-  function importedValues(signatures) {
-    return signatures.map(signature => {
+  const step = (reference, part) => reference && { ...reference, steps: [...(reference.steps ?? []), part] };
+  function importedValues(supplied, reference, seen = new Set()) {
+    if (typeof supplied === "function") {
+      if (!importsEnabled) return [unknown];
+      supplied = supplied();
+    }
+    if (!Array.isArray(supplied)) { reference = supplied.reference ?? reference; supplied = supplied.values; }
+    return supplied.map(signature => {
       if (signature.kind === "unknown") return unknown;
       if (signature.kind === "absent") return absent;
-      if (!external.has(signature)) external.set(signature, { signature });
-      return external.get(signature);
+      const identity = signature.identity ?? signature;
+      if (!external.has(identity)) external.set(identity, { signature, views: new Set(), reference });
+      const value = external.get(identity);
+      if (!value.reference && reference) value.reference = reference;
+      if (!value.views.has(signature)) { value.views.add(signature); revision++; }
+      if (!seen.has(signature)) {
+        const visited = new Set(seen).add(signature);
+        signature.properties?.forEach((parts, key) => importedValues(parts, step(reference, { property: key }), visited));
+        if (signature.returns) importedValues(signature.returns, step(reference, { returns: true }), visited);
+      }
+      return value;
     });
   }
   // Share descriptor identities across exported aliases and separate use lines.
@@ -79,8 +95,14 @@ export function objectCallArities(program, root, scopes, functions, functionType
     }
     if (node.type === "invoke" || node.type === "call") {
       const callee = node.callee ?? { type: "name", value: node.name };
-      return unique(values(callee, current, depth + 1, seen).flatMap(value => value.signature
-        ? importedValues(value.signature.returns ?? [{ kind: "unknown" }]) : typeValues(value.node?.returns ?? value.type?.returns)));
+      return unique(values(callee, current, depth + 1, seen).flatMap(value => {
+        const count = arityOf(value);
+        // A shallow export parse may have collected commas before an imported
+        // count was available. Extra values could really be array elements.
+        if (count !== null && count >= 0 && node.args.length > count) return [unknown];
+        return value.signature ? importedValues(value.signature.returns ?? [{ kind: "unknown" }], step(value.reference, { returns: true }))
+          : typeValues(value.node?.returns ?? value.type?.returns);
+      }));
     }
     return [unknown];
   }
@@ -97,8 +119,8 @@ export function objectCallArities(program, root, scopes, functions, functionType
         } else if (normalize(entry.name) === key) result = values(entry.value, value.current, depth + 1);
       }
     } else if (value.signature?.kind === "object") {
-      result = value.signature.properties.has(key) ? importedValues(value.signature.properties.get(key))
-        : [value.signature.open ? unknown : missing];
+      result = unique([...value.views].flatMap(view => view.properties.has(key)
+        ? importedValues(view.properties.get(key), step(value.reference, { property: key })) : [view.open ? unknown : missing]));
     } else if (value.type?.fields) {
       const field = value.type.fields.find(field => normalize(field.name) === key);
       if (field) result = typeValues(field.type);
@@ -126,17 +148,20 @@ export function objectCallArities(program, root, scopes, functions, functionType
   // Property writes can reveal further objects, such as holder.child = object.
   // Grow the possible targets until every alias and nested write is accounted
   // for. Each pair of a mutation and an object is added at most once.
-  let changed;
-  do {
-    changed = false;
-    for (const mutation of mutations) for (const value of values(mutation.target.object, mutation.current)) {
-      if (value.node?.type !== "object" && !value.type?.fields && value.signature?.kind !== "object") continue;
-      if (!writes.has(value)) writes.set(value, new Map());
-      const properties = writes.get(value), key = keyOf(mutation.target) ?? "*";
-      if (!properties.has(key)) properties.set(key, new Set());
-      if (!properties.get(key).has(mutation)) { properties.get(key).add(mutation); changed = true; }
-    }
-  } while (changed);
+  function resolveMutations() {
+    let changed;
+    do {
+      changed = false;
+      for (const mutation of mutations) for (const value of values(mutation.target.object, mutation.current)) {
+        if (value.node?.type !== "object" && !value.type?.fields && value.signature?.kind !== "object") continue;
+        if (!writes.has(value)) writes.set(value, new Map());
+        const properties = writes.get(value), key = keyOf(mutation.target) ?? "*";
+        if (!properties.has(key)) properties.set(key, new Set());
+        if (!properties.get(key).has(mutation)) { properties.get(key).add(mutation); changed = true; }
+      }
+    } while (changed);
+  }
+  resolveMutations();
   function arityOf(value) {
     return value.node?.params?.length ?? (value.type ? functionTypeArity(value.type, aliases)
       : value.binding ? value.binding.lookup(value.name) : value.signature?.arity ?? null);
@@ -159,7 +184,7 @@ export function objectCallArities(program, root, scopes, functions, functionType
       }
     } else if (value.type?.fields) value.type.fields.forEach(field => names.add(normalize(field.name)));
     else if (value.signature?.kind === "object") {
-      value.signature.properties.forEach((_, name) => names.add(name)); open ||= value.signature.open;
+      for (const view of value.views) { view.properties.forEach((_, name) => names.add(name)); open ||= view.open; }
     } else open = value !== absent;
     changes?.forEach((_, name) => { if (name !== "*") names.add(name); });
     return { names, open };
@@ -172,6 +197,8 @@ export function objectCallArities(program, root, scopes, functions, functionType
     const arity = arityOf(value);
     const result = object ? { kind: "object", properties: new Map(), open: false }
       : arity !== null && arity >= 0 ? { kind: "function", arity } : { kind: "unknown" };
+    if (result.kind !== "unknown") result.identity = value.signature?.identity ?? value.signature ?? value;
+    if (value.reference) result.reference = value.reference;
     described.set(value, result);
     if (object) {
       const info = keys(value); result.open = info.open;
@@ -186,7 +213,17 @@ export function objectCallArities(program, root, scopes, functions, functionType
   }
   return {
     signatures(names) {
-      return new Map([...names].map(name => [name, values({ type: "name", value: name }, root).map(describe)]));
+      importsEnabled = true;
+      const entries = [...names];
+      // Export-only discovery resolves imports when their values are needed,
+      // rather than reading dependencies used only inside unrelated functions.
+      let result, before;
+      do {
+        before = revision;
+        resolveMutations(); described.clear();
+        result = new Map(entries.map(name => [name, values({ type: "name", value: name }, root).map(describe)]));
+      } while (before !== revision);
+      return result;
     },
     arity(node, current) {
       const possible = values(node, current);

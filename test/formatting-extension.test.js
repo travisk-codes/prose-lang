@@ -71,6 +71,45 @@ test("VS Code formatter preserves imported object method boundaries from unsaved
   assert.deepEqual(errors, []);
 });
 
+test("VS Code formatter reads transitive forwarding modules from current buffers", async () => {
+  const source = 'use math from "./public/tools.prose"\nprint  math.add 1, 2, 3';
+  const { document, provider, reads, errors } = editor(source, { open: [
+    { uri: new URL('file:///project/public/tools.prose'), getText: () => 'use calculator from "../calculator.prose"\nexport math is calculator' },
+    { uri: new URL('file:///project/calculator.prose'), getText: () => 'export calculator is object\n    add is function takes a, b return a + b' }
+  ] });
+  const edits = await provider.provideDocumentFormattingEdits(document, settings, cancellation);
+  assert.equal(apply(source, edits), source.replace('print  ', 'print ') + '\n');
+  assert.deepEqual(reads, []); assert.deepEqual(errors, []);
+});
+
+test("formatter dependency prefetch does not turn unused missing modules into source errors", async () => {
+  const source = 'use calculator from "./tools.prose"\nprint  calculator.add 1, 2';
+  const { document, provider, errors } = editor(source, { imports: {
+    '/project/tools.prose': 'use ignored from "./missing.prose"\nexport calculator is object\n    add is function takes a, b return a + b'
+  } });
+  const edits = await provider.provideDocumentFormattingEdits(document, settings, cancellation);
+  assert.equal(apply(source, edits), source.replace('print  ', 'print ') + '\n');
+  assert.deepEqual(errors, []);
+});
+
+test("formatter dependency discovery distinguishes object properties from module imports", async () => {
+  const source = 'value is object\n    use is "./private.prose"\nprint  value.use';
+  const { document, provider, reads, errors } = editor(source);
+  const edits = await provider.provideDocumentFormattingEdits(document, settings, cancellation);
+  assert.equal(apply(source, edits), source.replace('print  ', 'print ') + '\n');
+  assert.deepEqual(reads, []); assert.deepEqual(errors, []);
+});
+
+test("formatter discards edits when an imported buffer changes during dependency reads", async () => {
+  const child = { uri: new URL('file:///project/calculator.prose'), version: 1, getText: () => 'export calculator is object\n    add is function takes a, b return a + b' };
+  const imports = {};
+  Object.defineProperty(imports, '/project/other.prose', { get: () => { child.version++; return 'export value is 1'; } });
+  const source = 'use calculator from "./calculator.prose"\nuse value from "./other.prose"\nprint  calculator.add 1, 2';
+  const { document, provider, errors } = editor(source, { imports, open: [child] });
+  assert.deepEqual(await provider.provideDocumentFormattingEdits(document, settings, cancellation), []);
+  assert.deepEqual(errors, []);
+});
+
 test("VS Code formatter uses unsaved imported documents and skips type-only imports", async () => {
   const source = 'use type Thing from "./missing-types.prose"\nuse double from "./math.prose"\nprint  double 2';
   const { document, provider, reads, errors } = editor(source, {

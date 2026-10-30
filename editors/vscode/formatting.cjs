@@ -23,28 +23,43 @@ function createProvider(vscode, loadFormatter) {
       const source = document.getText();
       try {
         const { format, sourceLines } = await loadFormatter();
-        const modules = new Map();
+        const modules = new Map([[document.uri.toString(), source]]), failures = new Map(), buffers = [];
         // Read imported Prose signatures as text; formatting never executes imports.
-        for (const { tokens } of sourceLines(source)) {
-          const typeOnly = tokens[1]?.value === "type" && tokens[2]?.type === "word" && tokens[2]?.value !== "from";
-          if (tokens[0]?.value !== "use" || typeOnly) continue;
-          const specifier = tokens.at(-1)?.value;
-          if (typeof specifier !== "string" || !specifier.endsWith(".prose") || modules.has(specifier)) continue;
-          const uri = vscode.Uri.joinPath(document.uri, "..", specifier);
-          const open = vscode.workspace.textDocuments.find(other => other.uri.toString() === uri.toString());
-          modules.set(specifier, open ? open.getText() : new TextDecoder().decode(await vscode.workspace.fs.readFile(uri)));
+        async function dependencies(text, parent) {
+          let lines;
+          try { lines = sourceLines(text); } catch { return; } // The formatter reports syntax errors itself.
+          for (const { tokens, indent } of lines) {
+            if (cancellation.isCancellationRequested) return;
+            const typeOnly = tokens[1]?.value === "type" && tokens[2]?.type === "word" && tokens[2]?.value !== "from";
+            if (indent || tokens[0]?.value !== "use" || typeOnly) continue;
+            const specifier = tokens.at(-1)?.value;
+            if (typeof specifier !== "string" || !specifier.endsWith(".prose")) continue;
+            const uri = vscode.Uri.joinPath(parent, "..", specifier), key = uri.toString();
+            if (modules.has(key) || failures.has(key)) continue;
+            try {
+              const open = vscode.workspace.textDocuments.find(other => other.uri.toString() === key);
+              const child = open ? open.getText() : new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
+              if (open) buffers.push({ document: open, version: open.version });
+              modules.set(key, child);
+              await dependencies(child, uri);
+            } catch (error) { failures.set(key, error); }
+          }
         }
-        if (cancellation.isCancellationRequested || document.version !== version) return [];
+        await dependencies(source, document.uri);
+        const stale = () => document.version !== version || buffers.some(buffer => buffer.document.version !== buffer.version);
+        if (cancellation.isCancellationRequested || stale()) return [];
         const width = vscode.workspace.getConfiguration("prose", document.uri).get("format.width", 80);
         const formatted = format(source, {
           width, tabWidth: options.tabSize, insertSpaces: options.insertSpaces,
           endOfLine: document.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n",
           readModule: path => {
-            if (!modules.has(path)) throw new Error(`Can't read ${path}.`);
-            return modules.get(path);
+            const key = vscode.Uri.joinPath(document.uri, "..", path).toString();
+            if (failures.has(key)) throw failures.get(key);
+            if (!modules.has(key)) throw new Error(`Can't read ${path}.`);
+            return modules.get(key);
           }
         });
-        if (cancellation.isCancellationRequested || document.version !== version) return [];
+        if (cancellation.isCancellationRequested || stale()) return [];
         const change = changedRange(source, formatted);
         return change ? [vscode.TextEdit.replace(
           new vscode.Range(document.positionAt(change.start), document.positionAt(change.end)), change.text

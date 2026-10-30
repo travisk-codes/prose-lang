@@ -1073,7 +1073,7 @@ export function markupExpressionAt(source, line, column) {
 }
 
 // The functions (with their parameters) and variables a Prose module exports, from its export lines.
-function exportsOf(source) {
+function exportsOf(source, options = {}) {
   const functions = new Map();
   const values = new Set();
   for (const { line, indent, tokens } of sourceLines(source)) {
@@ -1085,9 +1085,19 @@ function exportsOf(source) {
       values.add(tokens[1].value);
     }
   }
-  const { analysis } = discoverCallArities(source, {}, false);
-  return { functions, values, valueArities: new Map([...values].map(name => [name, analysis.root.lookup(name)])),
-    valueSignatures: analysis.valueSignatures([...values, ...functions.keys()]) };
+  // Publish names before resolving forwarded values so cycles can return an
+  // unknown signature instead of recursing or inventing a parameter count.
+  const exported = { functions, values, valueArities: new Map([...values].map(name => [name, null])),
+    valueSignatures: new Map([...values, ...functions.keys()].map(name => [name, [{ kind: "unknown" }]])) };
+  options.exportCache?.set(options.modulePath, exported);
+  const { analysis } = discoverCallArities(source, options, false);
+  exported.valueSignatures = analysis.valueSignatures([...values, ...functions.keys()]);
+  for (const name of values) {
+    const signatures = exported.valueSignatures.get(name).filter(value => value.kind !== "absent");
+    const counts = new Set(signatures.map(value => value.kind === "function" ? value.arity : null));
+    exported.valueArities.set(name, counts.size === 1 ? [...counts][0] : null);
+  }
+  return exported;
 }
 
 function exportCacheKey(specifier) {
@@ -1101,23 +1111,40 @@ function exportCacheKey(specifier) {
   return "./" + parts.join("/");
 }
 
-function readExports(use, readModule, cache) {
-  const key = exportCacheKey(use.source);
+function importedModulePath(specifier, importer) {
+  if (!importer || !/^\.{1,2}\//.test(specifier)) return exportCacheKey(specifier);
+  const combined = importer.slice(0, importer.lastIndexOf("/") + 1) + specifier;
+  if (/^\.{1,2}\//.test(combined)) return exportCacheKey(combined);
+  // Absolute paths, URL specifiers, and package subpaths keep their prefix.
+  const parts = [];
+  for (const part of combined.split("/")) {
+    if (part === ".") continue;
+    if (part === ".." && parts.length && parts.at(-1) !== "..") parts.pop();
+    else parts.push(part);
+  }
+  return parts.join("/");
+}
+
+function readExports(use, options) {
+  const { readModule, exportCache: cache } = options;
+  const key = importedModulePath(use.source, options.modulePath);
   if (cache?.has(key)) return cache.get(key);
   if (!readModule) {
     fail(use.line, `To import "${use.source}", compile with a readModule option; the CLI and Vite plugin provide one.`);
   }
   let source;
   try {
-    source = readModule(use.source);
+    source = readModule(options.modulePath ? key : use.source);
   } catch (error) {
     fail(use.line, `Can't read "${use.source}": ${error.message}`);
   }
   try {
-    const exported = exportsOf(source);
+    if ((options.moduleDepth ?? 0) >= 128) fail(use.line, "Import signature discovery exceeded 128 modules in one chain.");
+    const exported = exportsOf(source, { ...options, modulePath: key, moduleDepth: (options.moduleDepth ?? 0) + 1 });
     cache?.set(key, exported);
     return exported;
   } catch (error) {
+    cache?.delete(key);
     fail(use.line, `In "${use.source}", ${error.message}`);
   }
 }
@@ -1175,9 +1202,14 @@ class Parser {
     for (const line of this.lines.filter(line => line.indent === 0 && isWord(line.tokens[0], "use"))) {
       const use = useStatement(line.tokens, line.line);
       if (use.typeOnly) continue;
-      const exported = readImports && use.source.endsWith(".prose") ? readExports(use, options.readModule, options.exportCache) : null;
+      const exported = readImports && use.source.endsWith(".prose") ? readExports(use, options) : null;
       for (const name of use.names) {
-        if (exported?.valueSignatures.has(name)) this.valueSignatures.set(name, exported.valueSignatures.get(name));
+        const supplied = result => {
+          if (!result.functions.has(name) && !result.values.has(name)) fail(use.line, `"${use.source}" doesn't export '${name}'.`);
+          return { values: result.valueSignatures.get(name) ?? [{ kind: "unknown" }], reference: { source: use.source, name: camel(name), steps: [] } };
+        };
+        if (exported) this.valueSignatures.set(name, supplied(exported));
+        else if (!readImports && options.readModule && use.source.endsWith(".prose")) this.valueSignatures.set(name, () => supplied(readExports(use, options)));
         const header = exported?.functions.get(name);
         if (header) {
           if (this.functions.has(name)) fail(use.line, `Duplicate function '${name}'.`);
@@ -1786,6 +1818,11 @@ function declarationsFor(program) {
     const types = values.map(value => {
       if (seen.has(value)) return "any";
       const next = new Set(seen).add(value);
+      if (value.reference) {
+        let type = `typeof import(${JSON.stringify(value.reference.source)}).${value.reference.name}`;
+        for (const step of value.reference.steps) type = step.returns ? `ReturnType<${type}>` : `(${type})[${JSON.stringify(step.property)}]`;
+        return type;
+      }
       if (value.kind === "function") {
         // A captured generic belongs to its declaring type or factory. Do not
         // invent a free type parameter in an inferred exported value.
@@ -1851,7 +1888,7 @@ export function parse(source, options = {}) {
 function discoverCallArities(source, settings, readImports = true) {
   const discovery = new Parser(source, settings, null, true, readImports);
   const invalidated = new Set();
-  const infer = (program, parser) => ({ ...inferCallArities(program, parser.functions, parser.valueArities, invalidated, camel, parser.valueSignatures), partialImports: !readImports });
+  const infer = (program, parser) => ({ ...inferCallArities(program, parser.functions, parser.valueArities, invalidated, camel, parser.valueSignatures, !readImports), partialImports: !readImports });
   let analysis = infer(discovery.program(), discovery);
   for (let iteration = 0; iteration < 64; iteration++) {
     const parser = new Parser(source, settings, analysis, true, readImports);

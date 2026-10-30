@@ -810,9 +810,18 @@ print calculator.add 2, 3
 ```
 
 Nested methods, exported aliases of the same object, and declared object result
-types retain their signatures too. Import analysis reads source text; it does
-not execute the module. Methods supplied by opaque values or another unresolved
-import still need explicit boundaries. See
+types retain their signatures too. Forwarding an imported object preserves its
+signature through further modules:
+
+```text
+use calculator from "./object_method_tools.prose"
+export math is calculator
+```
+
+Consumers can then call `math.add 2, 3` without `with`. Aliases through different
+import paths retain their shared identity. Import analysis reads source text;
+it does not execute modules. Opaque values and unresolved circular forwarding
+still require explicit boundaries. See
 [imported_object_methods.prose](examples/imported_object_methods.prose).
 
 An unknown-count call can take one argument or use `run`. A comma requires an

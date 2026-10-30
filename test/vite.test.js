@@ -42,6 +42,19 @@ test("imported Prose files supply their signatures and are watched for changes",
   }
 });
 
+test("forwarded method signatures watch their transitive source files", () => {
+  const folder = mkdtempSync(join(tmpdir(), "prose-vite-forwarded-"));
+  try {
+    const leaf = join(folder, 'calculator.prose'), forward = join(folder, 'tools.prose');
+    writeFileSync(leaf, 'export calculator is object\n    add is function takes a, b return a + b');
+    writeFileSync(forward, 'use calculator from "./calculator.prose"\nexport math is calculator');
+    const watched = [], watching = { ...context, addWatchFile: path => watched.push(path) };
+    const result = plugin.transform.call(watching, 'use math from "./tools.prose"\nprint math.add 1, 2, 3', join(folder, 'main.prose'));
+    assert.match(result.code, /\[1, 2\].*3\]/);
+    assert.deepEqual(watched, [forward, leaf]);
+  } finally { rmSync(folder, { recursive: true, force: true }); }
+});
+
 test("compile errors name the file and line", () => {
   assert.throws(() => plugin.transform.call(context, "x is 1\nprint y", "/src/bad.prose"), error => {
     assert.match(error.message, /\/src\/bad\.prose: Line 2: Unknown name 'y'/);

@@ -1,5 +1,9 @@
 # Prose Language for Visual Studio Code
 
+Version 0.2.3 preserves method signatures and types through forwarding modules.
+Formatting and parameter hints read transitive unsaved Prose buffers, and Vite
+watches the underlying signature sources. Unresolved cycles keep explicit calls.
+
 Version 0.2.2 preserves object method signatures across `.prose` imports,
 including nested methods and shared exported aliases. Formatting, checking,
 and parameter hints use current imported buffers without executing them.
