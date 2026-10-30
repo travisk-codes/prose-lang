@@ -1,0 +1,24 @@
+"Object methods follow the same argument-count rule as named functions."
+calculator is object
+    add is function takes left as number, right as number giving number
+        return left + right
+    multiply is function takes left as number, right as number giving number
+        return left * right
+
+print calculator.add 2, 3
+results is calculator.add 2, 3, calculator.multiply 4, 5
+print results
+
+"An alias refers to the same object."
+alias is calculator
+print alias.multiply 3, 7
+
+"Like copies the properties into another object."
+copy is object like calculator
+copy.add is function takes left as number, right as number giving number
+    return left + right + 100
+print copy.add 2, 3
+print calculator.add 2, 3
+
+"A comma after the method's arguments starts the next array element."
+print calculator.add 2, 3, 9

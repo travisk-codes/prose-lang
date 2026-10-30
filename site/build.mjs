@@ -144,7 +144,7 @@ const errata = [
 
 // The compiler itself, for the playground: runtime and transpiler in one script, exporting compile.
 const strip = file => readFileSync(repo + file, "utf8").split("\n").filter(line => !line.startsWith("import ")).join("\n").replace(/^export /gm, "");
-const compiler = `const Prose = (() => {\n${strip("src/runtime.js")}\n${strip("src/check.js")}\n${strip("src/source-map.js")}\n${strip("src/call-arity.js")}\n${strip("src/layout-diagnostics.js")}\n${strip("src/markup.js")}\n${strip("src/transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`;
+const compiler = `const Prose = (() => {\n${strip("src/runtime.js")}\n${strip("src/check.js")}\n${strip("src/source-map.js")}\n${strip("src/object-call-arity.js")}\n${strip("src/call-arity.js")}\n${strip("src/layout-diagnostics.js")}\n${strip("src/markup.js")}\n${strip("src/transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`;
 
 const examples = [
   { name: "Reading list", source: readFileSync(new URL("play.prose", here), "utf8").trim() },

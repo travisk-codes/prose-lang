@@ -80,6 +80,13 @@ function located(node, token) {
   return node;
 }
 
+// Keep each accessor's identity when a surrounding call or grouping gets its
+// own location. Signature discovery must withdraw the same proof on reparse.
+function memberLocated(node, token) {
+  if (token?.source) Object.defineProperty(node, "memberLocation", { value: token.source });
+  return node;
+}
+
 // Prose's words for TypeScript's basic types.
 const builtinTypes = {
   text: "string", number: "number", boolean: "boolean", any: "any", unknown: "unknown",
@@ -323,14 +330,15 @@ class Expression {
   // Bare words after a dot can index a list or text using a numeric variable.
   // Their spelling stays literal on other receivers.
   dotStep(object) {
+    const token = this.peek();
     if (this.at("(")) {
       this.take("(");
       const key = this.inParentheses(() => this.parse());
       this.take(")");
-      return { type: "property", object, key, contextual: true, line: this.line };
+      return memberLocated({ type: "property", object, key, contextual: true, line: this.line }, token);
     }
     if (this.peek()?.type === "word") {
-      return { type: "property", object, name: this.propertyName(), contextual: true, line: this.line };
+      return memberLocated({ type: "property", object, name: this.propertyName(), contextual: true, line: this.line }, token);
     }
     return { type: "index", object, index: this.index(), line: this.line };
   }
@@ -693,8 +701,9 @@ class Expression {
       while (this.at(":") || this.at(".")) {
         const dot = this.at(".");
         this.pos++;
+        const member = this.peek();
         callee = dot ? this.dotStep(callee)
-          : { type: "property", object: callee, name: this.propertyName(), line: this.line };
+          : memberLocated({ type: "property", object: callee, name: this.propertyName(), line: this.line }, member);
       }
       const args = [];
       if (this.at("with")) {
@@ -744,14 +753,15 @@ class Expression {
       }
       if (this.at(":") && min <= 70) {
         this.take(":");
+        const member = this.peek();
         if (this.at("(")) {
           // A computed property: settings:(name) is the property named by name's value.
           this.take("(");
           const key = this.inParentheses(() => this.parse());
           this.take(")");
-          left = { type: "property", object: left, key, line: this.line };
+          left = memberLocated({ type: "property", object: left, key, line: this.line }, member);
         } else {
-          left = { type: "property", object: left, name: this.propertyName(), line: this.line };
+          left = memberLocated({ type: "property", object: left, name: this.propertyName(), line: this.line }, member);
         }
         continue;
       }
@@ -1345,13 +1355,14 @@ class Parser {
       while (!declaredType && (expr.at(":") || expr.at("."))) {
         if (expr.at(":")) {
           expr.take(":");
+          const member = expr.peek();
           if (expr.at("(")) {
             expr.take("(");
             const key = expr.inParentheses(() => expr.parse());
             expr.take(")");
-            target = { type: "property", object: target, key, line: expr.line };
+            target = memberLocated({ type: "property", object: target, key, line: expr.line }, member);
           } else {
-            target = { type: "property", object: target, name: expr.propertyName(), line: expr.line };
+            target = memberLocated({ type: "property", object: target, name: expr.propertyName(), line: expr.line }, member);
           }
         } else {
           expr.take(".");
@@ -1789,7 +1800,7 @@ export function parse(source, options = {}) {
 function discoverCallArities(source, settings, readImports = true) {
   const discovery = new Parser(source, settings, null, true, readImports);
   const invalidated = new Set();
-  const infer = (program, parser) => ({ ...inferCallArities(program, parser.functions, parser.valueArities, invalidated), partialImports: !readImports });
+  const infer = (program, parser) => ({ ...inferCallArities(program, parser.functions, parser.valueArities, invalidated, camel), partialImports: !readImports });
   let analysis = infer(discovery.program(), discovery);
   for (let iteration = 0; iteration < 64; iteration++) {
     const parser = new Parser(source, settings, analysis, true, readImports);
@@ -1800,6 +1811,9 @@ function discoverCallArities(source, settings, readImports = true) {
     }
     for (const [key, before] of analysis.scopes) for (const [name, kind] of before.kinds) {
       if (kind !== null && next.scopes.get(key)?.kinds.get(name) !== kind) invalidated.add(`kind:${key}/${name}`);
+    }
+    for (const [key, count] of analysis.propertyArities) {
+      if (count !== null && next.propertyArities.get(key) !== count) invalidated.add(key);
     }
     next = infer(program, parser);
     if (next.fingerprint === analysis.fingerprint) {

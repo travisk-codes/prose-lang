@@ -222,6 +222,18 @@ test('inferred collection argument counts retain key/value type checks and sourc
   assert.deepEqual(typeCheck(source + '\nresult.set 42, 1').map(({ line, code }) => [line, code]), [[8, 2345]]);
 });
 
+test('inferred object method calls retain typed arguments and original error locations', withTypeScript, () => {
+  const source = [
+    'type Calculator is object', '    add as function taking number and number giving number',
+    'calculator is object',
+    '    add is function takes left as number, right as number giving number return left + right',
+    'function apply takes tool as Calculator giving number', '    return tool.add 1, 2',
+    'print apply calculator', 'print calculator.add 2, 3'
+  ].join('\n');
+  assert.deepEqual(typeCheck(source), []);
+  assert.deepEqual(typeCheck(source + '\nprint calculator.add 1, "wrong"').map(({ line, code }) => [line, code]), [[9, 2345]]);
+});
+
 test("working Prose type-checks without complaint", withTypeScript, () => {
   const diagnostics = typeCheck([
     'use type Datum, DatumTag from "./types"',

@@ -99,6 +99,17 @@ test('known collection methods show parameters without with and stop at their bo
   } finally { f.close(); }
 });
 
+test('Prose object methods show arguments without with and stop at the declared count', () => {
+  const f = fixture();
+  try {
+    const prefix = 'calculator is object\n    add is function takes left as number, right as number giving number return left + right\n';
+    assert.equal(active(f.help(prefix + 'calculator.add |')), 'left as number');
+    assert.equal(active(f.help(prefix + 'calculator.add 1, |')), 'right as number');
+    assert.equal(active(f.help(prefix + 'alias is calculator\nalias.add 1, |')), 'right as number');
+    assert.equal(f.help(prefix + 'calculator.add 1, 2, |'), undefined);
+  } finally { f.close(); }
+});
+
 test('overloads and generic inference use the receiver and already-entered arguments', () => {
   const f = fixture();
   try {

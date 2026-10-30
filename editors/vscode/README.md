@@ -1,5 +1,9 @@
 # Prose Language for Visual Studio Code
 
+Version 0.2.1 infers argument counts for methods defined on Prose objects,
+including aliases, `like` copies, and local object type fields. Calls such as
+`calculator.add 2, 3` work in formatting, checking, and parameter hints.
+
 Version 0.2.0 aligns the extension version with the Prose compiler. Future
 releases use the same version number for both; the extension build checks this.
 

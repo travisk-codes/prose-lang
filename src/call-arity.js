@@ -1,9 +1,16 @@
 // Arity is syntax information, not a runtime function.length check. A binding
 // may hold several implementations; only a common, provable count is inferred.
+import { objectCallArities } from "./object-call-arity.js";
+
 export function callScopeKey(node) {
   if (node?.callScopeKey) return node.callScopeKey;
   const at = node?.location ?? node?.source ?? node;
   return at ? `${at.line}:${at.start}` : "program";
+}
+
+export function propertyCallKey(node) {
+  const at = node.memberLocation ?? node.location;
+  return at ? `property:${at.line}:${at.start}` : null;
 }
 
 const arityBottom = -1;
@@ -58,11 +65,11 @@ export function functionTypeArity(type, aliases = new Map(), seen = new Set()) {
   return null;
 }
 
-export function inferCallArities(program, functions, imports = new Map(), invalidated = new Set()) {
+export function inferCallArities(program, functions, imports = new Map(), invalidated = new Set(), normalize = name => name) {
   const aliases = new Map(program.filter(node => node.type === "typeDeclaration").map(node => [node.name, node.value]));
-  const scopes = new Map(), all = [], mutations = [], blockedMethods = new Map();
+  const scopes = new Map(), all = [], mutations = [], blockedMethods = new Map(), properties = [];
   function scope(parent, key, params = [], types = []) {
-    const current = { parent, key, bindings: new Map(), writes: new Map(), contracts: new Map(), kinds: new Map(), kindContracts: new Map(), resultContracts: new Map() };
+    const current = { parent, key, bindings: new Map(), writes: new Map(), contracts: new Map(), kinds: new Map(), kindContracts: new Map(), resultContracts: new Map(), valueTypes: new Map(params.map((name, i) => [name, types[i]])), dynamicBindings: new Set() };
     current.lookup = name => {
       if (current.bindings.has(name)) return current.bindings.get(name);
       return parent ? parent.lookup(name) : functions.has(name) ? functions.get(name).params.length : null;
@@ -72,9 +79,10 @@ export function inferCallArities(program, functions, imports = new Map(), invali
     current.constructorKind = node => node.type === "name" && collectionMethods.has(node.value) && !current.hasBinding(node.value) && !functions.has(node.value) ? node.value : null;
     current.methodArity = node => {
       if (node.type !== "property") return null;
+      if (invalidated.has(propertyCallKey(node))) return null;
       const kind = valueKind(node.object, current), name = propertyName(node);
       if (blockedMethods.get(kind)?.has(name) || blockedMethods.get(kind)?.has("*")) return null;
-      return collectionMethods.get(kind)?.get(name) ?? null;
+      return collectionMethods.get(kind)?.get(name) ?? objects.arity(node, current);
     };
     params.forEach((name, i) => {
       const count = functionTypeArity(types[i], aliases);
@@ -100,6 +108,7 @@ export function inferCallArities(program, functions, imports = new Map(), invali
       return;
     }
     if (node.type === "assign") {
+      if (node.declaredType && !current.valueTypes.get(node.name)) current.valueTypes.set(node.name, node.declaredType);
       if (!current.bindings.has(node.name)) current.bindings.set(node.name, arityBottom);
       if (!current.kinds.has(node.name)) current.kinds.set(node.name, arityBottom);
       if (!current.writes.has(node.name)) current.writes.set(node.name, []);
@@ -112,9 +121,10 @@ export function inferCallArities(program, functions, imports = new Map(), invali
       if (result !== null && !current.resultContracts.has(node.name)) current.resultContracts.set(node.name, result);
     }
     if (node.type === "assignTarget" && node.target.type === "property") mutations.push([node.target, current]);
+    if (node.type === "property") properties.push([node, current]);
     const dynamic = node.type === "for" ? [node.name]
       : ["foreach", "destructure"].includes(node.type) ? node.names : node.type === "try" && node.name ? [node.name] : [];
-    for (const name of dynamic) { current.bindings.set(name, null); current.kinds.set(name, null); }
+    for (const name of dynamic) { current.bindings.set(name, null); current.kinds.set(name, null); current.dynamicBindings.add(name); }
     for (const child of Object.values(node)) scan(child, current);
   }
   scan(program, root);
@@ -173,6 +183,7 @@ export function inferCallArities(program, functions, imports = new Map(), invali
     }
     return result;
   }
+  const objects = objectCallArities(program, root, scopes, functions, functionTypeArity, normalize);
   for (const current of all) {
     for (const [name, count] of current.contracts) current.bindings.set(name, count);
     for (const name of current.bindings.keys()) if (invalidated.has(`${current.key}/${name}`)) current.bindings.set(name, null);
@@ -207,7 +218,8 @@ export function inferCallArities(program, functions, imports = new Map(), invali
   for (const current of all) for (const [name, count] of current.bindings) if (count === arityBottom) current.bindings.set(name, null);
   for (const current of all) for (const [name, kind] of current.kinds) if (kind === arityBottom) current.kinds.set(name, null);
   const sorted = entries => [...entries].sort(([a], [b]) => a.localeCompare(b));
+  const propertyArities = new Map(properties.map(([node, current]) => [propertyCallKey(node), current.methodArity(node)]).filter(([key]) => key !== null));
   const fingerprint = JSON.stringify([all.map(current => [current.key, current.parent?.key, sorted(current.bindings), sorted(current.kinds)])
-    .sort(([a], [b]) => a.localeCompare(b)), sorted(blockedMethods).map(([kind, names]) => [kind, [...names].sort()])]);
-  return { root, scopes, fingerprint };
+    .sort(([a], [b]) => a.localeCompare(b)), sorted(blockedMethods).map(([kind, names]) => [kind, [...names].sort()]), sorted(propertyArities)]);
+  return { root, scopes, fingerprint, propertyArities };
 }

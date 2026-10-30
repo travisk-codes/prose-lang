@@ -784,6 +784,24 @@ keep that count. Different counts, an untyped parameter, or a value whose
 signature cannot be proved leave the count unknown. Reassignment is allowed;
 Prose does not guess boundaries from a runtime function's `length`.
 
+Methods defined on Prose objects use the same inference:
+
+```text
+calculator is object
+    add is function takes left, right return left + right
+
+print calculator.add 2, 3
+results is calculator.add 2, 3, 9
+```
+
+This prints `5` and assigns `[5, 9]` to `results`: the two-argument call finishes
+before the last comma. Object aliases, nested properties, `like` copies, local
+object type fields, and declared result types can supply signatures. Replacing
+a method with another function of the same count preserves inference. Different
+counts, unknown receiver values, and dynamic property writes require an explicit
+boundary. Literal computed keys such as `calculator.("add")` work too.
+See [object_methods.prose](examples/object_methods.prose) for a runnable example.
+
 An unknown-count call can take one argument or use `run`. A comma requires an
 explicit boundary: `action with 1, 2` passes two arguments, while `(action 1), 2`
 is an array containing a one-argument call and `2`. For a two-argument call
