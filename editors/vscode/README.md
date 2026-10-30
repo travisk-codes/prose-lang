@@ -88,6 +88,33 @@ declarations in memory, and never runs application code or writes output files.
 It shares the CLI's strict checking and untyped-value policy; see
 [type checking](../../docs/type-checking.md) for current limits.
 
+## Autocomplete
+
+Type `.` or `:` after a value, or press **Ctrl+Space** within a partial member
+name, to suggest fields and methods from its current type. Native methods use
+Prose spelling when it round-trips to the JavaScript name: `to_upper_case` and
+`to_iso_string`. Suggestions show types, function signatures, and available
+documentation. Completing a method inserts its name; add arguments or `run`
+according to the usual call rules.
+
+Completion works on unfinished access such as `book.` and within typed callbacks
+and loops. Current buffers, including unsaved imported Prose and TypeScript
+files, supply the types. A temporary analysis probe completes the expression
+without changing or executing the source. New edits and cancellation prevent
+stale suggestions from being inserted.
+
+Exact JavaScript keys that cannot be represented as a bare Prose name use a
+computed string suggestion, such as `("user_id")`. If a numeric or untyped
+variable could turn `words.map` into an index, selecting the `map` method inserts
+`words:map`. Its detail explains that property escape.
+
+Autocomplete requires Workspace Trust, a local file, and the project's TypeScript
+5 or 6. It has an independent `prose.completion.enabled` setting (default `true`);
+disabling saved-file diagnostics does not disable completions. Setup failures
+appear in **Prose Completion** Output. Strings, patterns, type-name contexts,
+unknown receivers, and unrelated syntax errors do not produce guessed members.
+This first version focuses on property and method completion.
+
 ## Hover types
 
 Hover over a variable, property, parameter, or function name to inspect its type.
@@ -178,13 +205,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.20.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.21.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.20.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.21.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -209,7 +236,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.20.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.21.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

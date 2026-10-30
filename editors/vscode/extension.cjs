@@ -2,6 +2,7 @@ const vscode = require("vscode");
 const { createProvider } = require("./formatting.cjs");
 const { createDiagnostics } = require("./checking.cjs");
 const { createLanguageFeatures } = require("./hovering.cjs");
+const { createCompletions } = require("./completing.cjs");
 
 exports.activate = context => {
   let formatter;
@@ -14,4 +15,5 @@ exports.activate = context => {
   ));
   context.subscriptions.push(createDiagnostics(vscode));
   context.subscriptions.push(createLanguageFeatures(vscode));
+  context.subscriptions.push(createCompletions(vscode));
 };

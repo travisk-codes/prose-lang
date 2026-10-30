@@ -4,7 +4,10 @@ const { parentPort, workerData } = require("node:worker_threads");
   const { checkProject, CheckSetupError } = await import("./dist/formatter/check-project.js");
   let result;
   try {
-    result = checkProject(workerData);
+    if (workerData.completion) {
+      const { completeProject } = await import("./dist/formatter/check-completion.js");
+      result = completeProject(workerData);
+    } else result = checkProject(workerData);
   } catch (error) {
     result = {
       files: [], exitCode: 2,

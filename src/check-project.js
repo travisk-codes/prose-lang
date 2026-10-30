@@ -8,6 +8,7 @@ import { sourceMapLookup } from "./source-map.js";
 import { collectSourceInfo } from "./check-hover.js";
 import { createAnyExplainer } from "./check-any.js";
 import { strictDiagnostics } from "./check-strict.js";
+import { collectCompletions } from "./completions.js";
 import { definitionResolver } from "./check-definition.js";
 
 export class CheckSetupError extends Error {
@@ -38,7 +39,7 @@ function filesUnder(directory) {
 /** Check Prose and its imported Prose dependencies without writing or executing
  * anything. Resolve TypeScript from the selected project, never from this tool.
  */
-export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], overlays = [], strict = false } = {}) {
+export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], overlays = [], strict = false, completionProbe } = {}) {
   cwd = resolve(cwd);
   const bufferKey = file => process.platform === "win32" ? resolve(file).toLowerCase() : resolve(file);
   const buffers = new Map(overlays.map(([file, source]) => [bufferKey(file), source]));
@@ -207,7 +208,12 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
   };
   if (hoverTargets.length) result.hovers = [];
   if (definitionTargets.length) result.definitions = [];
+  if (completionProbe) result.completions = [];
   if (sourceErrors.length) return result;
+  if (completionProbe) {
+    const record = records.get(canonical(completionProbe.file));
+    if (record) result.completions = collectCompletions(ts, program.getTypeChecker(), program.getSourceFile(record.name), completionProbe);
+  }
   if (strict || hoverTargets.length || definitionTargets.length) {
     const hoverFiles = new Set(hoverTargets.map(file => canonical(resolve(cwd, file))));
     const definitionFiles = new Set(definitionTargets.map(file => canonical(resolve(cwd, file))));

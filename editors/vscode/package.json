@@ -1,8 +1,8 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Syntax highlighting, formatting, type checking, hover types, and Go to Definition for Prose.",
-  "version": "0.1.20",
+  "description": "Syntax highlighting, formatting, type checking, autocomplete, hover types, and Go to Definition for Prose.",
+  "version": "0.1.21",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -26,11 +26,11 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Syntax highlighting and formatting work in Restricted Mode. Type checking, hovers, and navigation load the project's TypeScript and require Workspace Trust."
+      "description": "Syntax highlighting and formatting work in Restricted Mode. Type checking, autocomplete, hovers, and navigation load the project's TypeScript and require Workspace Trust."
     },
     "virtualWorkspaces": {
       "supported": "limited",
-      "description": "Syntax highlighting and formatting are available. Type checking, hovers, and navigation require a local project."
+      "description": "Syntax highlighting and formatting are available. Type checking, autocomplete, hovers, and navigation require a local project."
     }
   },
   "contributes": {
@@ -60,6 +60,12 @@
           "default": true,
           "scope": "resource",
           "description": "Show inferred types and function signatures on hover using the project's TypeScript and current editor buffers. Requires Workspace Trust."
+        },
+        "prose.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Suggest typed properties and methods after . or :, using Prose spellings and current buffers. Requires Workspace Trust and the project's TypeScript."
         },
         "prose.definition.enabled": {
           "type": "boolean",
@@ -368,6 +374,7 @@
     "formatting.cjs",
     "checking.cjs",
     "hovering.cjs",
+    "completing.cjs",
     "check-worker.cjs",
     "dist/**",
     "package.json",

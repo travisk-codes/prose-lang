@@ -128,12 +128,13 @@ test("extension activation registers the document formatter and disposes it with
   const exports = {};
   const diagnostics = { dispose() {} };
   const hovers = { dispose() {} };
+  const completions = { dispose() {} };
   const source = readFileSync(new URL("../editors/vscode/extension.cjs", import.meta.url), "utf8");
   runInNewContext(source, { exports, require: name => name === "vscode" ? vscode
     : name === "./formatting.cjs" ? { createProvider } : name === "./checking.cjs" ? { createDiagnostics: api => {
       assert.equal(api, vscode);
       return diagnostics;
-    } } : { createLanguageFeatures: api => {
+    } } : name === "./completing.cjs" ? { createCompletions: api => { assert.equal(api, vscode); return completions; } } : { createLanguageFeatures: api => {
       assert.equal(name, "./hovering.cjs");
       assert.equal(api, vscode);
       return hovers;
@@ -142,5 +143,5 @@ test("extension activation registers the document formatter and disposes it with
   exports.activate(context);
   assert.equal(registrations[0].language, "prose");
   assert.equal(typeof registrations[0].provider.provideDocumentFormattingEdits, "function");
-  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers]);
+  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers, completions]);
 });

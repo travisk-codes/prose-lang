@@ -43,6 +43,10 @@ files; see [Type checking](docs/type-checking.md).
 
 ## VS Code support
 
+Type `.` or `:` after a value for type-aware field and method suggestions, or
+use **Ctrl+Space** inside a partial name. See
+[autocomplete](editors/vscode/README.md#autocomplete) for details and requirements.
+
 The language extension in `editors/vscode` registers `.prose` files as **Prose**
 and colors keywords, function declarations, parameters, loop variables,
 standard-library calls, strings, numbers, operators, and indexing with a

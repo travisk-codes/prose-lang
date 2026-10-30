@@ -297,7 +297,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.20 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.21 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
@@ -310,6 +310,13 @@ exists) and in the Prose output channel. Highlighting and formatting do not
 require TypeScript or Workspace Trust.
 
 ## Current limits
+
+Type-aware [member autocomplete](../editors/vscode/README.md#autocomplete) uses
+the same project TypeScript and current editor buffers. It handles unfinished
+`.`/`:` access through a temporary analysis probe. Suggestions use Prose spelling,
+computed strings for exact keys, and explicit colons when a visible numeric
+variable could shadow a selected sequence property. It does not validate the
+runtime value or automatically call a completed method.
 
 Hover types include [Prose/JavaScript convention notes](javascript-interop.md)
 for text lengths, positions, native methods, and property spelling. These explain

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { checkProject } from "../src/check-project.js";
+import { completeProject } from "../src/check-completion.js";
 import { build } from "../editors/vscode/build.mjs";
 
 const require = createRequire(import.meta.url);
@@ -431,5 +432,22 @@ test("packaged worker supplies hover types from unsaved snapshots without changi
     const manifest = JSON.parse(readFileSync(new URL("../editors/vscode/package.json", import.meta.url), "utf8"));
     assert.ok(manifest.files.includes('hovering.cjs'));
     assert.equal(manifest.contributes.configuration.properties['prose.hover.enabled'].default, true);
+  } finally { f.close(); }
+});
+
+test("packaged completion worker uses the current unfinished buffer without writes or execution", async () => {
+  const f = fixture();
+  try {
+    const startCheck = packagedChecker(f);
+    f.write('node_modules/typescript/package.json', '{"main":"index.cjs"}');
+    f.write('node_modules/typescript/index.cjs', `module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+    const main = f.write('src/main.prose', 'book is object title is "Saved"\nbook.');
+    const source = 'book is object pages is 12\nbook.\nfail "Do not execute"';
+    const options = { cwd: f.root, completion: { file: main, line: 2, column: 6 }, overlays: [[main, source]] };
+    const before = snapshot(f.root), checked = await startCheck(options).promise;
+    assert.deepEqual(checked, completeProject(options));
+    assert.ok(checked.items.some(item => item.label === 'pages'));
+    assert.ok(!checked.items.some(item => item.label === 'title'));
+    assert.deepEqual(snapshot(f.root), before);
   } finally { f.close(); }
 });
