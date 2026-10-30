@@ -209,8 +209,8 @@ class Expression {
       return { name, value: this.parse() };
     }
     if (this.peek()?.type !== "word") fail(this.line, "Expected an object entry: name is value, a name, or like another object.");
-    const name = this.variableName();
-    return { name, value: { type: "name", value: name, line: this.line } };
+    const token = this.peek(), name = this.variableName();
+    return { name, value: located({ type: "name", value: name, line: this.line }, token) };
   }
   // Whether `object` is followed by entries on its line, rather than ending or leading into other syntax.
   startsObjectEntries() {
@@ -395,10 +395,12 @@ class Expression {
   // `takes` names, each optionally followed by `as` and a type, then an optional `giving` type.
   parameters() {
     const names = [];
+    Object.defineProperty(names, "locations", { value: [] });
     const types = [];
     if (this.at("takes")) {
       this.take("takes");
       while (true) {
+        names.locations.push(this.peek()?.source);
         names.push(this.variableName());
         types.push(this.optionalType());
         if (!this.at(",")) break;
@@ -1456,8 +1458,8 @@ function parameterList(node, nameOf, untyped = name => name,
   while (optionalFrom > 0 && (!types[optionalFrom - 1] || types[optionalFrom - 1].kind === "maybe")) optionalFrom--;
   return node.params.map((name, index) => {
     const type = types[index];
-    if (index < optionalFrom) return type ? `${nameOf(name)}: ${typeOf(type, false)}` : untyped(nameOf(name));
-    return `${nameOf(name)}?: ${typeOf(type, true)}`;
+    if (index < optionalFrom) return type ? `${nameOf(name, index)}: ${typeOf(type, false)}` : untyped(nameOf(name, index));
+    return `${nameOf(name, index)}?: ${typeOf(type, true)}`;
   }).join(", ");
 }
 
@@ -1708,8 +1710,10 @@ export function compile(source, options = {}) {
     if (node.type === "lambda") {
       const inner = innerScope(node, scope);
       // Untyped parameters take their types from where the function is passed.
-      const params = node.params.map((name, index) => node.types?.[index]
-        ? `${variable(name)}: ${mapped(node.types[index], parameterType(node.types[index]))}` : variable(name)).join(", ");
+      const params = node.params.map((name, index) => {
+        const parameter = mapped({ location: node.params.locations?.[index] }, variable(name));
+        return node.types?.[index] ? `${parameter}: ${mapped(node.types[index], parameterType(node.types[index]))}` : parameter;
+      }).join(", ");
       const predicate = checkedPredicate(node, inner, filterPredicate);
       const returns = node.returns ? `: ${mapped(node.returns, returnType(node))}` : predicate ? `: ${unmapped(predicate)}` : "";
       const async = awaits(node.body ?? node.value) ? "async " : "";
@@ -1864,7 +1868,7 @@ export function compile(source, options = {}) {
       if (node.type === "function") {
         const inner = innerScope(node, scope);
         const signature = check
-          ? `${generic(typeVariables([...node.types, node.returns]))}(${parameterList(node, variable, undefined, checkedParameter)})${node.returns ? `: ${mapped(node.returns, returnType(node))}` : ""}`
+          ? `${generic(typeVariables([...node.types, node.returns]))}(${parameterList(node, (name, index) => mapped({ location: node.params.locations?.[index] }, variable(name)), undefined, checkedParameter)})${node.returns ? `: ${mapped(node.returns, returnType(node))}` : ""}`
           : `(${node.params.map(variable).join(", ")})`;
         const documentation = check && node.doc ? docComment(node.doc, indent).join("\n") + "\n" : "";
         return `${documentation}${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}${signature} {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;

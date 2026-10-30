@@ -1,8 +1,8 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Syntax highlighting, formatting, type checking, autocomplete, parameter hints, hover types, and Go to Definition for Prose.",
-  "version": "0.1.22",
+  "description": "Syntax highlighting, formatting, type checking, autocomplete, parameter hints, navigation, references, and rename for Prose.",
+  "version": "0.1.23",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -26,11 +26,11 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Syntax highlighting and formatting work in Restricted Mode. Type checking, autocomplete, parameter hints, hovers, and navigation load the project's TypeScript and require Workspace Trust."
+      "description": "Syntax highlighting and formatting work in Restricted Mode. Type checking and semantic editor features load the project's TypeScript and require Workspace Trust."
     },
     "virtualWorkspaces": {
       "supported": "limited",
-      "description": "Syntax highlighting and formatting are available. Type checking, autocomplete, parameter hints, hovers, and navigation require a local project."
+      "description": "Syntax highlighting and formatting are available. Type checking and semantic editor features require a local project."
     }
   },
   "contributes": {
@@ -78,6 +78,18 @@
           "default": true,
           "scope": "resource",
           "description": "Show function parameter hints and highlight the current argument while typing calls. Uses current buffers and requires Workspace Trust and the project's TypeScript."
+        },
+        "prose.references.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Find references to Prose value bindings in the current file, using current buffers and project TypeScript. Requires Workspace Trust."
+        },
+        "prose.rename.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Rename local Prose variables, parameters, and functions in the current file, rejecting name capture and ambiguous dots. Requires Workspace Trust and project TypeScript."
         },
         "prose.format.width": {
           "type": "integer",
@@ -382,6 +394,7 @@
     "hovering.cjs",
     "completing.cjs",
     "signatures.cjs",
+    "refactoring.cjs",
     "check-worker.cjs",
     "dist/**",
     "package.json",

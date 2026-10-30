@@ -1,6 +1,7 @@
 # Prose Language for Visual Studio Code
 
-Syntax highlighting, formatting, type checking, autocomplete, and parameter hints
+Syntax highlighting, formatting, type checking, autocomplete, parameter hints,
+references, and rename
 for `.prose` files, with a softened rainbow
 palette for dark backgrounds matching the Prose website.
 
@@ -213,6 +214,38 @@ and virtual workspaces. Diagnostics require saved files on disk. Setup problems
 appear on the configuration's first line, or the selected file when no config
 exists, and are recorded in the **Prose** output channel without popup messages.
 
+## References and rename
+
+Use **Find All References** (`Shift+F12`) on a variable, parameter, or function
+name to find its declaration, reads, and assignments in the current Prose file.
+References follow lexical scope, including closures, reassignment, destructuring,
+loop variables, and exception bindings. Local uses of imported and exported
+bindings also appear; this first version does not search other files.
+
+Use **Rename Symbol** (`F2`) to rename a local variable, parameter, or function
+throughout that file. Same-named bindings in other scopes stay separate.
+Object shorthand preserves its property name: renaming `name` to `person_name`
+changes `object name` into `object name is person_name`. Strings and property
+keys keep their spelling. Known numeric dot indexes follow the renamed binding.
+
+Rename validates the edited program before returning edits. It rejects invalid
+names, collisions, captured bindings, and changes that would turn a property
+into a contextual index. If an existing dot could mean either an index or a
+property, make the intended access explicit before renaming. Broad object
+contracts can still hold arrays, so these cases are handled conservatively.
+Renaming imports, exports, types, globals, and property keys is not supported yet.
+Parameters inside exported functions can be renamed locally.
+
+Both features read current buffers, including unsaved dependencies, in a
+background worker. They require valid Prose syntax, Workspace Trust, a local
+file, and the project's TypeScript 5 or 6. Analysis never runs program code or
+writes source files; VS Code applies an accepted rename as a normal undoable
+workspace edit. Editing or cancellation discards stale results.
+
+Use `prose.references.enabled` and `prose.rename.enabled` to control these features
+independently. Both default to `true`; disabling saved-file checking does not
+disable them. Setup problems appear in **Prose Refactoring** Output.
+
 ## Prose colors
 
 The extension supplies Prose-only token colors through VS Code configuration
@@ -243,13 +276,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.22.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.23.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.22.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.23.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -274,7 +307,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.22.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.23.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

@@ -4,6 +4,7 @@ const { createDiagnostics } = require("./checking.cjs");
 const { createLanguageFeatures } = require("./hovering.cjs");
 const { createCompletions } = require("./completing.cjs");
 const { createSignatureHelp } = require("./signatures.cjs");
+const { createRefactoring } = require("./refactoring.cjs");
 
 exports.activate = context => {
   let formatter;
@@ -18,4 +19,5 @@ exports.activate = context => {
   context.subscriptions.push(createLanguageFeatures(vscode));
   context.subscriptions.push(createCompletions(vscode));
   context.subscriptions.push(createSignatureHelp(vscode));
+  context.subscriptions.push(createRefactoring(vscode));
 };

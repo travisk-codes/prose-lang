@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import { checkProject } from "../src/check-project.js";
 import { completeProject } from "../src/check-completion.js";
 import { signatureHelpProject } from "../src/check-signature.js";
+import { refactorProject } from "../src/check-refactor.js";
 import { build } from "../editors/vscode/build.mjs";
 
 const require = createRequire(import.meta.url);
@@ -470,5 +471,25 @@ test("packaged parameter worker analyzes unfinished calls in current buffers wit
     const manifest = JSON.parse(readFileSync(new URL('../editors/vscode/package.json', import.meta.url), 'utf8'));
     assert.equal(manifest.contributes.configuration.properties['prose.signatureHelp.enabled'].default, true);
     assert.ok(manifest.files.includes('signatures.cjs'));
+  } finally { f.close(); }
+});
+
+test("packaged refactoring worker returns current-buffer references and validated edits without writes", async () => {
+  const f = fixture();
+  try {
+    const startCheck = packagedChecker(f);
+    f.write('node_modules/typescript/package.json', '{"main":"index.cjs"}');
+    f.write('node_modules/typescript/index.cjs', `module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+    const main = f.write('src/main.prose', 'print "saved"');
+    const source = 'count is 1\nprint count + count\nfail "Do not execute"';
+    const options = { cwd: f.root, refactor: { file: main, line: 1, column: 2, newName: 'total' }, overlays: [[main, source]] };
+    const before = snapshot(f.root), result = await startCheck(options).promise;
+    assert.deepEqual(result, refactorProject(options));
+    assert.equal(result.edits.length, 3); assert.equal(result.references.length, 3);
+    assert.deepEqual(snapshot(f.root), before);
+    const manifest = JSON.parse(readFileSync(new URL('../editors/vscode/package.json', import.meta.url), 'utf8'));
+    assert.equal(manifest.contributes.configuration.properties['prose.rename.enabled'].default, true);
+    assert.equal(manifest.contributes.configuration.properties['prose.references.enabled'].default, true);
+    assert.ok(manifest.files.includes('refactoring.cjs'));
   } finally { f.close(); }
 });

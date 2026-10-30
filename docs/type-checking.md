@@ -297,7 +297,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.22 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.23 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
@@ -310,6 +310,13 @@ exists) and in the Prose output channel. Highlighting and formatting do not
 require TypeScript or Workspace Trust.
 
 ## Current limits
+
+Editor [references and rename](../editors/vscode/README.md#references-and-rename)
+track value bindings within the current Prose file. Rename validates the edited
+program's binding identities to reject capture and changed contextual indexes.
+It preserves shorthand property names and uses current buffers. Cross-file
+rename, exported/imported binding rename, types, and property-key rename are not
+supported in this version.
 
 Editor [parameter hints](../editors/vscode/README.md#parameter-hints) use the
 same types and current buffers to show call signatures and the active argument.

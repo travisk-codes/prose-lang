@@ -130,13 +130,15 @@ test("extension activation registers the document formatter and disposes it with
   const hovers = { dispose() {} };
   const completions = { dispose() {} };
   const signatures = { dispose() {} };
+  const refactoring = { dispose() {} };
   const source = readFileSync(new URL("../editors/vscode/extension.cjs", import.meta.url), "utf8");
   runInNewContext(source, { exports, require: name => name === "vscode" ? vscode
     : name === "./formatting.cjs" ? { createProvider } : name === "./checking.cjs" ? { createDiagnostics: api => {
       assert.equal(api, vscode);
       return diagnostics;
     } } : name === "./completing.cjs" ? { createCompletions: api => { assert.equal(api, vscode); return completions; } }
-      : name === "./signatures.cjs" ? { createSignatureHelp: api => { assert.equal(api, vscode); return signatures; } } : { createLanguageFeatures: api => {
+      : name === "./signatures.cjs" ? { createSignatureHelp: api => { assert.equal(api, vscode); return signatures; } }
+      : name === "./refactoring.cjs" ? { createRefactoring: api => { assert.equal(api, vscode); return refactoring; } } : { createLanguageFeatures: api => {
       assert.equal(name, "./hovering.cjs");
       assert.equal(api, vscode);
       return hovers;
@@ -145,5 +147,5 @@ test("extension activation registers the document formatter and disposes it with
   exports.activate(context);
   assert.equal(registrations[0].language, "prose");
   assert.equal(typeof registrations[0].provider.provideDocumentFormattingEdits, "function");
-  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers, completions, signatures]);
+  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers, completions, signatures, refactoring]);
 });
