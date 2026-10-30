@@ -1,8 +1,8 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Syntax highlighting, formatting, type checking, autocomplete, hover types, and Go to Definition for Prose.",
-  "version": "0.1.21",
+  "description": "Syntax highlighting, formatting, type checking, autocomplete, parameter hints, hover types, and Go to Definition for Prose.",
+  "version": "0.1.22",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -26,11 +26,11 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Syntax highlighting and formatting work in Restricted Mode. Type checking, autocomplete, hovers, and navigation load the project's TypeScript and require Workspace Trust."
+      "description": "Syntax highlighting and formatting work in Restricted Mode. Type checking, autocomplete, parameter hints, hovers, and navigation load the project's TypeScript and require Workspace Trust."
     },
     "virtualWorkspaces": {
       "supported": "limited",
-      "description": "Syntax highlighting and formatting are available. Type checking, autocomplete, hovers, and navigation require a local project."
+      "description": "Syntax highlighting and formatting are available. Type checking, autocomplete, parameter hints, hovers, and navigation require a local project."
     }
   },
   "contributes": {
@@ -72,6 +72,12 @@
           "default": true,
           "scope": "resource",
           "description": "Enable Go to Definition for Prose variables and functions, including imported Prose modules. Uses current buffers and requires Workspace Trust."
+        },
+        "prose.signatureHelp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Show function parameter hints and highlight the current argument while typing calls. Uses current buffers and requires Workspace Trust and the project's TypeScript."
         },
         "prose.format.width": {
           "type": "integer",
@@ -375,6 +381,7 @@
     "checking.cjs",
     "hovering.cjs",
     "completing.cjs",
+    "signatures.cjs",
     "check-worker.cjs",
     "dist/**",
     "package.json",

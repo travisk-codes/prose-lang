@@ -297,7 +297,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.21 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.22 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
@@ -310,6 +310,12 @@ exists) and in the Prose output channel. Highlighting and formatting do not
 require TypeScript or Workspace Trust.
 
 ## Current limits
+
+Editor [parameter hints](../editors/vscode/README.md#parameter-hints) use the
+same types and current buffers to show call signatures and the active argument.
+The parser preserves the distinction between argument commas and array commas.
+Temporary cursor probes recover unfinished calls for analysis; normal compilation
+still rejects missing arguments and ambiguous call boundaries.
 
 Type-aware [member autocomplete](../editors/vscode/README.md#autocomplete) uses
 the same project TypeScript and current editor buffers. It handles unfinished

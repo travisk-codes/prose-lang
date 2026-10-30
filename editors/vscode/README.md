@@ -1,6 +1,7 @@
 # Prose Language for Visual Studio Code
 
-Syntax highlighting, formatting, and type checking for `.prose` files, with a softened rainbow
+Syntax highlighting, formatting, type checking, autocomplete, and parameter hints
+for `.prose` files, with a softened rainbow
 palette for dark backgrounds matching the Prose website.
 
 Highlights keywords, function declarations and parameters, standard-library
@@ -115,6 +116,43 @@ appear in **Prose Completion** Output. Strings, patterns, type-name contexts,
 unknown receivers, and unrelated syntax errors do not produce guessed members.
 This first version focuses on property and method completion.
 
+## Parameter hints
+
+While writing a call, spaces, commas, and opening parentheses trigger a parameter
+tooltip. Use **Trigger Parameter Hints** (`Ctrl+Shift+Space` on Windows) to open
+it manually. The current argument is highlighted in the function's signature:
+
+```prose
+function cipher takes message as text, rotate as number, giving text
+    return message
+
+cipher "hello",
+```
+
+Here the tooltip highlights `rotate as number`. It supports named Prose
+functions, function values, typed function parameters, imported functions,
+native methods, and explicit `with` calls. Optional and rest parameters,
+overloads, and available documentation appear in the tooltip. Types use Prose
+spelling, and the method name keeps its source spelling.
+
+The existing parser selects the call and argument, including nested and wrapped
+calls. A comma that starts another array element does not advance a completed
+call's parameter. Unknown parameter counts still require `with` for several
+arguments, following the normal language rules. Unfinished strings are supported;
+unrelated syntax errors can prevent hints. Unknown or untyped callees do not
+receive guessed signatures.
+
+Parameter hints use current buffers, including unsaved imported files, in a
+background worker. Temporary cursor probes fill only the unfinished call for
+analysis; source files and executable output are unchanged. No program or import
+is executed. Edits and cancellation discard stale results. This requires Workspace
+Trust, a local file, and the project's TypeScript 5 or 6.
+
+Set `prose.signatureHelp.enabled` to `false` to disable hints independently of
+autocomplete, hover, and saved-file checking. Setup problems appear in
+**Prose Parameters** Output. VS Code's `editor.parameterHints.enabled` setting
+also controls automatic parameter tooltips.
+
 ## Hover types
 
 Hover over a variable, property, parameter, or function name to inspect its type.
@@ -205,13 +243,13 @@ settings. All palette selectors are scoped to `source.prose`.
 ## Install
 
 In VS Code, run **Extensions: Install from VSIX...** and choose
-`dist/prose-language-0.1.21.vsix` from the repository. Open a `.prose` file.
+`dist/prose-language-0.1.22.vsix` from the repository. Open a `.prose` file.
 Its language mode should be **Prose**.
 
 Or use the CLI:
 
 ```powershell
-code.cmd --install-extension dist/prose-language-0.1.21.vsix --force
+code.cmd --install-extension dist/prose-language-0.1.22.vsix --force
 ```
 
 Reload the VS Code window if a previously open file retains its old coloring.
@@ -236,7 +274,7 @@ Install Microsoft's optional [vsce packaging tool](https://code.visualstudio.com
 then run the following from `editors/vscode` after creating the root `dist` folder:
 
 ```powershell
-vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.21.vsix
+vsce.cmd package --no-dependencies --out ../../dist/prose-language-0.1.22.vsix
 ```
 
 Packaging creates a local VSIX; it does not publish to the Marketplace.

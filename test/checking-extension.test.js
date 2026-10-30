@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { checkProject } from "../src/check-project.js";
 import { completeProject } from "../src/check-completion.js";
+import { signatureHelpProject } from "../src/check-signature.js";
 import { build } from "../editors/vscode/build.mjs";
 
 const require = createRequire(import.meta.url);
@@ -449,5 +450,25 @@ test("packaged completion worker uses the current unfinished buffer without writ
     assert.ok(checked.items.some(item => item.label === 'pages'));
     assert.ok(!checked.items.some(item => item.label === 'title'));
     assert.deepEqual(snapshot(f.root), before);
+  } finally { f.close(); }
+});
+
+test("packaged parameter worker analyzes unfinished calls in current buffers without execution or writes", async () => {
+  const f = fixture();
+  try {
+    const startCheck = packagedChecker(f);
+    f.write('node_modules/typescript/package.json', '{"main":"index.cjs"}');
+    f.write('node_modules/typescript/index.cjs', `module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+    const main = f.write('src/main.prose', 'print "saved"');
+    const source = 'function cipher takes message as text, rotate as number\n    return message\ncipher "hello", \nfail "Do not execute"';
+    const options = { cwd: f.root, signature: { file: main, line: 3, column: 17 }, overlays: [[main, source]] };
+    const before = snapshot(f.root), result = await startCheck(options).promise;
+    assert.deepEqual(result, signatureHelpProject(options));
+    assert.equal(result.signatureHelp.activeParameter, 1);
+    assert.match(result.signatureHelp.signatures[0].label, /rotate as number/);
+    assert.deepEqual(snapshot(f.root), before);
+    const manifest = JSON.parse(readFileSync(new URL('../editors/vscode/package.json', import.meta.url), 'utf8'));
+    assert.equal(manifest.contributes.configuration.properties['prose.signatureHelp.enabled'].default, true);
+    assert.ok(manifest.files.includes('signatures.cjs'));
   } finally { f.close(); }
 });

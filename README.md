@@ -46,6 +46,9 @@ files; see [Type checking](docs/type-checking.md).
 Type `.` or `:` after a value for type-aware field and method suggestions, or
 use **Ctrl+Space** inside a partial name. See
 [autocomplete](editors/vscode/README.md#autocomplete) for details and requirements.
+While writing a function call, [parameter hints](editors/vscode/README.md#parameter-hints)
+show its signature and highlight the current argument (`Ctrl+Shift+Space` opens
+them manually).
 
 The language extension in `editors/vscode` registers `.prose` files as **Prose**
 and colors keywords, function declarations, parameters, loop variables,

@@ -4,7 +4,10 @@ const { parentPort, workerData } = require("node:worker_threads");
   const { checkProject, CheckSetupError } = await import("./dist/formatter/check-project.js");
   let result;
   try {
-    if (workerData.completion) {
+    if (workerData.signature) {
+      const { signatureHelpProject } = await import("./dist/formatter/check-signature.js");
+      result = signatureHelpProject(workerData);
+    } else if (workerData.completion) {
       const { completeProject } = await import("./dist/formatter/check-completion.js");
       result = completeProject(workerData);
     } else result = checkProject(workerData);

@@ -9,6 +9,7 @@ import { collectSourceInfo } from "./check-hover.js";
 import { createAnyExplainer } from "./check-any.js";
 import { strictDiagnostics } from "./check-strict.js";
 import { collectCompletions } from "./completions.js";
+import { collectSignatureHelp } from "./signature-help.js";
 import { definitionResolver } from "./check-definition.js";
 
 export class CheckSetupError extends Error {
@@ -39,7 +40,7 @@ function filesUnder(directory) {
 /** Check Prose and its imported Prose dependencies without writing or executing
  * anything. Resolve TypeScript from the selected project, never from this tool.
  */
-export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], overlays = [], strict = false, completionProbe } = {}) {
+export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], overlays = [], strict = false, completionProbe, signatureProbe } = {}) {
   cwd = resolve(cwd);
   const bufferKey = file => process.platform === "win32" ? resolve(file).toLowerCase() : resolve(file);
   const buffers = new Map(overlays.map(([file, source]) => [bufferKey(file), source]));
@@ -147,6 +148,7 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
       record.source = sourceText(file);
       const result = compile(record.source, {
         check: true, sourceMap: true, filename: file,
+        signatureProbe: signatureProbe && canonical(signatureProbe.file) === key ? signatureProbe.probe : undefined,
         readModule: specifier => sourceText(importedSource(specifier, file))
       });
       record.code = result.code;
@@ -213,6 +215,10 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
   if (completionProbe) {
     const record = records.get(canonical(completionProbe.file));
     if (record) result.completions = collectCompletions(ts, program.getTypeChecker(), program.getSourceFile(record.name), completionProbe);
+  }
+  if (signatureProbe) {
+    const record = records.get(canonical(signatureProbe.file));
+    if (record) result.signatureHelp = collectSignatureHelp(ts, program.getTypeChecker(), program.getSourceFile(record.name), record, signatureProbe);
   }
   if (strict || hoverTargets.length || definitionTargets.length) {
     const hoverFiles = new Set(hoverTargets.map(file => canonical(resolve(cwd, file))));

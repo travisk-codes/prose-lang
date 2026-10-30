@@ -356,6 +356,12 @@ class Expression {
       this.argumentDepth++;
       this.adjacentValues++;
       for (let index = 0; index < params.length; index++) {
+        // Only editor analysis may complete a call after its unique cursor probe.
+        // Normal parsing, formatting, checking, and executable output stay strict.
+        if (index && this.signatureProbe && (!this.peek() || this.at(")")) &&
+            this.tokens.slice(0, this.pos).some(token => token.type === "string" && token.value === this.signatureProbe)) {
+          args.push({ type: "unset", signaturePadding: true }); continue;
+        }
         if (index) this.take(",");
         // Calls bind before arithmetic; compound arguments, including calls, require parentheses.
         args.push(this.parse(60));
@@ -948,6 +954,7 @@ class Parser {
     this.loopDepth = 0;
     this.lines = sourceLines(source, { locations: true });
     this.callAnalysis = analysis; this.callScope = analysis?.root ?? null; this.loose = loose;
+    this.signatureProbe = options.signatureProbe;
     this.lineScopes = new Map(); this.valueArities = new Map();
     // Discover top-level signatures before parsing calls, supporting forward recursion.
     this.functions = new Map(["length", "char_to_number", "number_to_char"].map(name =>
@@ -999,7 +1006,9 @@ class Parser {
   }
   expression(line, tokens = line.tokens) {
     this.lineScopes.set(line, this.callScope);
-    return new Expression(tokens, line.line, this.functions, this.callAnalysis, this.callScope, this.loose);
+    const expression = new Expression(tokens, line.line, this.functions, this.callAnalysis, this.callScope, this.loose);
+    expression.signatureProbe = this.signatureProbe;
+    return expression;
   }
   program() {
     try { return this.block(); }
@@ -1632,6 +1641,10 @@ export function compile(source, options = {}) {
   const later = check ? laterProperties(program, programScope, innerScope) : new Map();
 
   function expression(node, scope, depth, filterPredicate = false) {
+    if (check && node.type === "literal" && node.value === options.signatureProbe) {
+      return mapped(node, `(${JSON.stringify(node.value)} as never)`);
+    }
+    if (check && node.signaturePadding) return '(undefined as never)';
     return mapped(node, (check && checkValue(node, scope, depth, filterPredicate)) || expressionValue(node, scope, depth));
   }
 
