@@ -2,7 +2,7 @@
   "name": "prose-language",
   "displayName": "Prose Language",
   "description": "Syntax highlighting, formatting, type checking, autocomplete, parameter hints, navigation, references, and rename for Prose.",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -83,13 +83,13 @@
           "type": "boolean",
           "default": true,
           "scope": "resource",
-          "description": "Find references to Prose value bindings in the current file, using current buffers and project TypeScript. Requires Workspace Trust."
+          "description": "Find references to Prose value bindings, including direct Prose consumers across the project. Uses current buffers and project TypeScript; requires Workspace Trust."
         },
         "prose.rename.enabled": {
           "type": "boolean",
           "default": true,
           "scope": "resource",
-          "description": "Rename local Prose variables, parameters, and functions in the current file, rejecting name capture and ambiguous dots. Requires Workspace Trust and project TypeScript."
+          "description": "Rename Prose variables, parameters, and functions, including exports and direct Prose imports across the project. Rejects collisions, capture, and ambiguous dots. Requires Workspace Trust and project TypeScript."
         },
         "prose.format.width": {
           "type": "integer",

@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, statSync, utimesSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-const { createRefactoring } = createRequire(import.meta.url)('../editors/vscode/refactoring.cjs');
+import { dirname, join } from 'node:path';
+const { createRefactoring, snapshotMatches } = createRequire(import.meta.url)('../editors/vscode/refactoring.cjs');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function token() {
   const listeners = new Set();
@@ -97,5 +98,44 @@ test('trust, local-file rules and independent settings gate refactoring; setup e
     e.setEnabled('rename', true); main.uri.scheme = 'untitled'; assert.equal(await e.prepare(main), undefined);
     main.uri.scheme = 'file'; const setup = e.prepare(main); e.jobs[1].resolve({ exitCode: 2, diagnostics: [{ message: 'Install TypeScript' }] });
     assert.equal(await setup, undefined); assert.match(e.logs.join('\n'), /Install TypeScript/);
+  } finally { e.close(); }
+});
+
+test('changed closed-file content retries before returning multi-file workspace edits', async () => {
+  const e = editor(), main = e.add('main.prose'), closed = e.add('closed.prose', 'print count', { isClosed: true });
+  const hash = text => createHash('sha256').update(text).digest('hex');
+  const result = text => ({ ...response(main.uri.fsPath), projectSnapshot: { directories: [], files: [{ file: closed.uri.fsPath, hash: hash(text) }] },
+    edits: [main, closed].map(document => ({ file: document.uri.fsPath, line: 1, column: 1, endColumn: 6, newText: 'total' })) });
+  try {
+    const pending = e.rename(main, 'total');
+    writeFileSync(closed.uri.fsPath, 'print count + 1'); e.jobs[0].resolve(result('print count')); await tick();
+    assert.equal(e.jobs.length, 2);
+    e.jobs[1].resolve(result('print count + 1'));
+    const edit = await pending; assert.equal(edit.edits.length, 2);
+    assert.equal(edit.edits[1].uri.fsPath, closed.uri.fsPath);
+  } finally { e.close(); }
+});
+
+test('project snapshots use dirty buffers and detect changed directory inventories', () => {
+  const e = editor(), main = e.add('main.prose', 'count is 1');
+  const hash = text => createHash('sha256').update(text).digest('hex');
+  try {
+    main.text = 'count is 2';
+    const root = dirname(main.uri.fsPath), snapshot = { files: [{ file: main.uri.fsPath, hash: hash(main.text) }], directories: [{ file: root, mtimeMs: statSync(root).mtimeMs }] };
+    assert.equal(snapshotMatches(snapshot, [main]), true);
+    assert.equal(snapshotMatches(snapshot, []), false);
+    utimesSync(root, new Date(Date.now() + 60000), new Date(Date.now() + 60000));
+    assert.equal(snapshotMatches(snapshot, [main]), false);
+  } finally { e.close(); }
+});
+
+test('bursts of disk events do not cancel a project result whose snapshot is still current', async () => {
+  const e = editor(), main = e.add('main.prose');
+  try {
+    const pending = e.rename(main, 'total');
+    e.fire('created'); e.fire('disk'); e.fire('disk');
+    assert.equal(e.jobs[0].canceled, 0);
+    e.jobs[0].resolve({ ...response(main.uri.fsPath), projectSnapshot: { files: [], directories: [] }, edits: [] });
+    assert.ok(await pending); assert.equal(e.jobs.length, 1);
   } finally { e.close(); }
 });

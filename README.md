@@ -50,8 +50,9 @@ While writing a function call, [parameter hints](editors/vscode/README.md#parame
 show its signature and highlight the current argument (`Ctrl+Shift+Space` opens
 them manually).
 Use **Shift+F12** for [references](editors/vscode/README.md#references-and-rename)
-within the current file, or **F2** to rename a local variable, parameter, or
-function with scope and collision checks.
+to a value binding, or **F2** to rename it with scope and collision checks.
+Exports and direct `.prose` imports link these actions across the project,
+including closed consumers.
 
 The language extension in `editors/vscode` registers `.prose` files as **Prose**
 and colors keywords, function declarations, parameters, loop variables,

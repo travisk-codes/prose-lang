@@ -1,4 +1,4 @@
-import { sourceLines } from './transpile.js';
+import { camel, sourceLines } from './transpile.js';
 
 const range = token => ({ line: token.source.line, column: token.source.start + 1, endColumn: token.source.start + token.source.raw.length + 1 });
 const key = item => `${item.line}:${item.column}`;
@@ -93,9 +93,12 @@ export function collectReferences(ts, checker, generated, record) {
     const token = row.tokens[row.tokens[1]?.value === 'function' ? 2 : 1];
     return token && key(range(token));
   }));
-  return [...bindings.values()].filter(binding => binding.declaration).map(binding => ({ ...binding,
-    reason: binding.reason ?? (binding.kind === 'import' ? 'Renaming imported bindings is not supported yet.'
-      : exported.has(key(binding.declaration)) ? 'Renaming exported bindings needs references across files and is not supported yet.' : undefined),
+  return [...bindings.entries()].filter(([, binding]) => binding.declaration).map(([symbol, binding]) => {
+    const declaration = symbol.getDeclarations()?.find(ts.isImportSpecifier);
+    const imported = declaration && { source: declaration.parent.parent.parent.moduleSpecifier.text,
+      name: (declaration.propertyName ?? declaration.name).text };
+    return { ...binding, ...(imported ? { imported } : {}),
+    ...(exported.has(key(binding.declaration)) ? { exportName: camel(binding.name) } : {}),
     occurrences: [...binding.occurrences.values()].sort((a, b) => a.line - b.line || a.column - b.column)
-  }));
+  }; });
 }

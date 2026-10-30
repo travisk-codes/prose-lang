@@ -493,3 +493,19 @@ test("packaged refactoring worker returns current-buffer references and validate
     assert.ok(manifest.files.includes('refactoring.cjs'));
   } finally { f.close(); }
 });
+
+test("packaged project rename includes a closed importer and never changes either file", async () => {
+  const f = fixture();
+  try {
+    const startCheck = packagedChecker(f);
+    f.write('node_modules/typescript/package.json', '{"main":"index.cjs"}');
+    f.write('node_modules/typescript/index.cjs', `module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+    const library = f.write('src/library.prose', 'export count is 1');
+    const consumer = f.write('src/consumer.prose', 'use count from "./library.prose"\nprint count\nfail "Do not execute"');
+    const options = { cwd: f.root, refactor: { file: library, line: 1, column: 9, newName: 'total' } };
+    const before = snapshot(f.root), result = await startCheck(options).promise;
+    assert.deepEqual(result, refactorProject(options));
+    assert.equal(result.edits.length, 3); assert.ok(result.edits.some(item => item.file === consumer));
+    assert.deepEqual(snapshot(f.root), before);
+  } finally { f.close(); }
+});

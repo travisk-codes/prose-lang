@@ -143,14 +143,14 @@ test('ambiguous dots block rename while explicit index expressions are supported
   } finally { f.close(); }
 });
 
-test('imports and exports have local references but cannot be renamed yet', () => {
+test('direct Prose imports and exports link references while exported parameters remain local', () => {
   const f = fixture();
   try {
     const dependency = f.write('child.prose', 'export function action takes value\n    return value');
     const imported = f.query('use ac|tion from "./child.prose"\nprint action 1').result;
-    assert.equal(imported.references.length, 2); assert.match(imported.renameError, /imported/);
+    assert.equal(imported.references.length, 3); assert.equal(imported.renameError, undefined);
     const exported = f.query('export co|unt is 1\nprint count').result;
-    assert.equal(exported.references.length, 2); assert.match(exported.renameError, /exported/);
+    assert.equal(exported.references.length, 2); assert.equal(exported.renameError, undefined);
     const parameter = f.query('export function action takes va|lue\n    return value', { newName: 'input' });
     assert.match(changed(parameter), /takes input/);
     assert.equal(readFileSync(dependency, 'utf8'), 'export function action takes value\n    return value');
