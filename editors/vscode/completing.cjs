@@ -52,7 +52,9 @@ function createCompletions(vscode, { runCheck = startCheck, loadContext = () => 
       if (states.get(key) !== state || snapshot(document).stamp !== stamp) return retry ? query(document, position, cancellation, false) : undefined;
       if (result.exitCode === 2) { for (const diagnostic of result.diagnostics ?? []) output.appendLine(diagnostic.message); return; }
       const items = (result.items ?? []).map(item => {
-        const completion = new vscode.CompletionItem(item.label, item.kind === "method" ? vscode.CompletionItemKind.Method : vscode.CompletionItemKind.Property);
+        const kinds = { method: vscode.CompletionItemKind.Method, property: vscode.CompletionItemKind.Property,
+          function: vscode.CompletionItemKind.Function, variable: vscode.CompletionItemKind.Variable };
+        const completion = new vscode.CompletionItem(item.label, kinds[item.kind] ?? vscode.CompletionItemKind.Variable);
         completion.insertText = item.insertText;
         completion.filterText = item.filterText;
         completion.sortText = item.label;

@@ -2,7 +2,7 @@
   "name": "prose-language",
   "displayName": "Prose Language",
   "description": "Semantic and syntax highlighting, formatting, type checking, quick fixes, autocomplete, parameter hints, navigation, references, and rename for Prose.",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -65,7 +65,7 @@
           "type": "boolean",
           "default": true,
           "scope": "resource",
-          "description": "Suggest typed properties and methods after . or :, using Prose spellings and current buffers. Requires Workspace Trust and the project's TypeScript."
+          "description": "Suggest in-scope variables, parameters, functions, and typed properties and methods using current buffers. Requires Workspace Trust and the project's TypeScript."
         },
         "prose.definition.enabled": {
           "type": "boolean",

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { checkProject } from "./check-project.js";
 import { completionContext } from "./completions.js";
 
-/** Complete one member against current buffers. Probe code is analysis-only. */
+/** Complete a member or in-scope name against current buffers. Probes are analysis-only. */
 export function completeProject({ cwd = process.cwd(), project, completion, overlays = [], typescript } = {}) {
   const file = resolve(cwd, completion.file);
   const canonical = name => process.platform === 'win32' ? resolve(cwd, name).toLowerCase() : resolve(cwd, name);

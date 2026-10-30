@@ -51,8 +51,9 @@ meaning directly in the editor.
 function values and aliases, scoped parameters, properties, and known numeric
 indexes using current project types, with the existing Prose palette.
 
-Type `.` or `:` after a value for type-aware field and method suggestions, or
-use **Ctrl+Space** inside a partial name. See
+Start typing a name for in-scope variables, parameters, and functions, or type
+`.` or `:` after a value for type-aware fields and methods. **Ctrl+Space** opens
+suggestions manually. See
 [autocomplete](editors/vscode/README.md#autocomplete) for details and requirements.
 While writing a function call, [parameter hints](editors/vscode/README.md#parameter-hints)
 show its signature and highlight the current argument (`Ctrl+Shift+Space` opens

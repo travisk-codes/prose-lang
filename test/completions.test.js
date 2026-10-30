@@ -114,3 +114,110 @@ test('current imported buffers and UTF-16 replacement positions work without wri
     assert.doesNotThrow(() => JSON.stringify(result));
   } finally { f.close(); }
 });
+
+test('identifier completion keeps Prose spelling, full token ranges and function signatures', () => {
+  const f = fixture();
+  try {
+    const result = f.complete('function cipher takes message as text, rotate as number, giving text\n    return message\nletter_count is 12\nprint cip|her');
+    const fn = item(result, 'cipher');
+    assert.equal(fn.kind, 'function');
+    assert.equal(fn.insertText, 'cipher');
+    assert.equal(fn.startColumn, 7); assert.equal(fn.endColumn, 13);
+    assert.match(fn.detail, /function cipher takes message as text, rotate as number giving text/);
+    assert.equal(item(result, 'letter_count').insertText, 'letter_count');
+    assert.equal(item(result, 'letter_count').kind, 'variable');
+    assert.ok(!result.items.some(item => /_prose_|__prose_|console|Math/.test(item.label)));
+    assert.doesNotThrow(() => JSON.stringify(result));
+  } finally { f.close(); }
+});
+
+test('identifier scopes respect parameters, captured names, siblings and shadowing', () => {
+  const f = fixture();
+  try {
+    const result = f.complete('shared is "outer"\nfunction hidden takes sibling\n    private_value is 2\n    return sibling\nfunction inspect takes shared as number, callback as function taking text giving text\n    local_value is "local"\n    action is function takes nested\n        return sha|\n    return local_value');
+    assert.match(item(result, 'shared').detail, /shared as number/);
+    assert.match(item(result, 'shared').documentation, /Parameter/);
+    assert.equal(result.items.filter(item => item.label === 'shared').length, 1);
+    assert.ok(item(result, 'nested')); assert.ok(item(result, 'local_value'));
+    assert.equal(item(result, 'callback').kind, 'function');
+    assert.ok(!result.items.some(item => ['sibling', 'private_value'].includes(item.label)));
+    const outside = f.complete('function inspect takes inside\n    local_value is 1\n    return inside\nprint ins|');
+    assert.ok(!outside.items.some(item => ['inside', 'local_value'].includes(item.label)));
+  } finally { f.close(); }
+});
+
+test('typed callbacks infer parameter fields and keep captured bindings', () => {
+  const f = fixture();
+  try {
+    const result = f.complete('heading is "Books"\nbooks is (object title is "A", pages is 12), (object title is "B", pages is 20)\nlabels is books.map function takes book\n    return bo|');
+    assert.match(item(result, 'book').detail, /title as text/);
+    assert.match(item(result, 'book').detail, /pages as number/);
+    assert.ok(item(result, 'heading'));
+  } finally { f.close(); }
+});
+
+test('identifier probes handle blank bodies, empty expressions, loops and forward functions', () => {
+  const f = fixture();
+  try {
+    for (const tail of ['print |', 'value is |', 'print (|)', 'print (ci|', 'type is ci|', 'print ci| "hello", 2']) {
+      assert.ok(item(f.complete('function cipher takes text, rotate\n    return text\n' + tail), 'cipher'), tail);
+    }
+    assert.ok(item(f.complete('function inspect takes input\n    |'), 'input'));
+    assert.ok(item(f.complete('for i is 1 to 3\n    print i|'), 'i'));
+    assert.ok(item(f.complete('items is 1, 2\nfor each entry in items\n    print en|'), 'entry'));
+    assert.ok(item(f.complete('print la|\nfunction later takes value\n    return value'), 'later'));
+    assert.ok(item(f.complete('function add takes left, right\n    return left + right\ncount is 2\nprint add co|'), 'count'));
+  } finally { f.close(); }
+});
+
+test('constructor positions and user names resembling probes retain the real scope', () => {
+  const f = fixture();
+  try {
+    f.write('types.ts', 'export class Widget { constructor(public title: string) {} }');
+    const result = f.complete('use Widget from "./types"\n__prose_identifier_probe_0 is 2\nvalue is new Wid|get "Hello"');
+    assert.equal(item(result, 'Widget').insertText, 'Widget');
+    assert.ok(item(result, '__prose_identifier_probe_0'));
+    assert.ok(!result.items.some(item => item.label === '__prose_identifier_probe_1'));
+  } finally { f.close(); }
+});
+
+test('function values, aliases and already imported values complete from current overlays', () => {
+  const f = fixture();
+  try {
+    const child = f.write('child.prose', 'export function title giving text\n    return "saved"');
+    const changed = 'export function title takes pages as number, giving number\n    return pages\nfail "Never execute imports"';
+    const result = f.complete('use title from "./child.prose"\nscale is function takes value as number return value * 2\nalias is scale\nprint ti|\nfail "Never execute source"', { overlays: [[child, changed]] });
+    assert.match(item(result, 'title').detail, /takes pages as number giving number/);
+    assert.equal(item(result, 'alias').kind, 'function');
+    assert.match(item(result, 'scale').detail, /value as number/);
+    assert.match(readFileSync(child, 'utf8'), /giving text/);
+    f.write('types.ts', 'export interface Book { title: string; }\nexport const answer = 42;');
+    const typed = f.complete('use type Book from "./types"\nuse answer from "./types"\nprint an|');
+    assert.ok(item(typed, 'answer')); assert.ok(!typed.items.some(item => item.label === 'Book'));
+  } finally { f.close(); }
+});
+
+test('identifier completion rejects strings, patterns, definitions, properties and types', () => {
+  const f = fixture();
+  try {
+    for (const tail of ['print "na|me"', 'print pattern "na|me"', 'na|me is 1', 'value as na|me',
+      'type Name is na|me', 'use na|me from "./types"', 'function na|me takes value\n    return value',
+      'action is function takes na|me return 1', 'data is object\n    na|me is 1', 'data is object na|me is 1',
+      'for na|me to 3\n    print 1', 'print 12|3', 'print tru|e']) {
+      assert.deepEqual(f.complete('name is "existing"\n' + tail).items, [], tail);
+    }
+    assert.deepEqual(f.complete('function inspect takes unknown\n    return unknown.na|').items, []);
+    assert.deepEqual(f.complete('broken is (\nname is 1\nprint na|').items, []);
+  } finally { f.close(); }
+});
+
+test('identifier replacement uses UTF-16 columns and preserves wrapped CRLF source', () => {
+  const f = fixture();
+  try {
+    const result = f.complete('letter_count is 3\r\nprint "😀", (\r\n\tletter_co|unt\r\n\t)');
+    const value = item(result, 'letter_count');
+    assert.equal(value.line, 3); assert.equal(value.startColumn, 2); assert.equal(value.endColumn, 14);
+    const sameLine = item(f.complete('letter_count is 3\nprint "😀", letter_co|unt'), 'letter_count');
+    assert.equal(sameLine.startColumn, 13); assert.equal(sameLine.endColumn, 25);
+  } finally { f.close(); }
+});

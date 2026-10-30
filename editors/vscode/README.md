@@ -165,6 +165,15 @@ their existing guidance.
 
 ## Autocomplete
 
+Start typing a variable, parameter, or function name, or press **Ctrl+Space** in
+an expression. Suggestions include names already in scope, with their types and
+function signatures. For example, `cip` can suggest `cipher` and show its
+parameters. Callbacks include their inferred parameters and captured variables;
+shadowed names use the nearest binding. Function values, aliases, loop variables,
+and already imported values are included. Suggestions insert the original Prose
+name only, replacing the full partial word even when the cursor is in its middle.
+They do not add imports, arguments, parentheses, or `run`.
+
 Type `.` or `:` after a value, or press **Ctrl+Space** within a partial member
 name, to suggest fields and methods from its current type. Native methods use
 Prose spelling when it round-trips to the JavaScript name: `to_upper_case` and
@@ -188,7 +197,8 @@ Autocomplete requires Workspace Trust, a local file, and the project's TypeScrip
 disabling saved-file diagnostics does not disable completions. Setup failures
 appear in **Prose Completion** Output. Strings, patterns, type-name contexts,
 unknown receivers, and unrelated syntax errors do not produce guessed members.
-This first version focuses on property and method completion.
+Identifier suggestions exclude declaration names, property keys, type-only names,
+and compiler helpers. Unrelated Prose syntax errors can prevent suggestions.
 
 ## Parameter hints
 

@@ -19,7 +19,7 @@ function editor({ enabled = true, trusted = true, loadContext = async () => ({ c
   const watcher = { onDidChange: listen('disk'), onDidCreate: listen('created'), onDidDelete: listen('deleted'), dispose() {} };
   const vscode = {
     CompletionItem: class { constructor(label, kind) { Object.assign(this, { label, kind }); } },
-    CompletionItemKind: { Method: 1, Property: 2 },
+    CompletionItemKind: { Method: 1, Property: 2, Function: 3, Variable: 4 },
     CompletionList: class { constructor(items, isIncomplete) { Object.assign(this, { items, isIncomplete }); } },
     Range: class { constructor(line, character, endLine, endCharacter) { this.start = { line, character }; this.end = { line: endLine, character: endCharacter }; } },
     MarkdownString: class { constructor() { this.parts = []; } appendText(text) { this.parts.push(text); } },
@@ -105,5 +105,33 @@ test('method completions preserve colon escape edit ranges and filter text', asy
     assert.equal(list.items[0].insertText, ':map'); assert.equal(list.items[0].filterText, '.map');
     assert.equal(list.items[0].kind, e.vscode.CompletionItemKind.Method);
     assert.deepEqual(list.items[0].range, new e.vscode.Range(0, 5, 0, 8));
+  } finally { e.close(); }
+});
+
+test('identifier suggestions retain kinds, signatures, complete token ranges and plain text insertion', async () => {
+  const e = editor(), main = e.add('main.prose', 'print cipher');
+  try {
+    const pending = e.request(main, token(), { line: 0, character: 9 }); await tick();
+    assert.equal(e.jobs.length, 1);
+    e.jobs[0].resolve({ ...response, items: [
+      { ...response.items[0], label: 'cipher', kind: 'function', insertText: 'cipher', filterText: 'cipher', detail: 'function cipher takes text as text giving text', startColumn: 7, endColumn: 13 },
+      { ...response.items[0], label: 'letter_count', kind: 'variable', insertText: 'letter_count', filterText: 'letter_count', detail: 'letter_count as number', startColumn: 7, endColumn: 13 }
+    ] });
+    const list = await pending;
+    assert.deepEqual(list.items.map(item => item.kind), [e.vscode.CompletionItemKind.Function, e.vscode.CompletionItemKind.Variable]);
+    assert.equal(list.items[0].insertText, 'cipher'); assert.match(list.items[0].detail, /takes text/);
+    assert.deepEqual(list.items[0].range, new e.vscode.Range(0, 6, 0, 12));
+    assert.equal(list.items[1].insertText, 'letter_count');
+  } finally { e.close(); }
+});
+
+test('identifier requests use current callback buffers and suppress stale lists after edits', async () => {
+  const e = editor(), main = e.add('main.prose', 'names is "A", "B"\nnames.map function takes name\n    return na', { isDirty: true });
+  try {
+    const pending = e.request(main, token(), { line: 2, character: 13 }); await tick();
+    assert.equal(e.jobs.length, 1); assert.equal(e.jobs[0].options.overlays[0][1], main.text);
+    assert.deepEqual(e.jobs[0].options.completion, { file: main.uri.fsPath, line: 3, column: 14 });
+    main.version++; main.text += 'me'; e.fire('change', { document: main, contentChanges: [{ text: 'me' }] });
+    e.jobs[0].resolve(response); assert.equal(await pending, undefined);
   } finally { e.close(); }
 });

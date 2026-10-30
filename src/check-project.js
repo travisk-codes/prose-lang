@@ -162,7 +162,8 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
       record.source = sourceText(file);
       const result = compile(record.source, {
         check: true, sourceMap: true, filename: file,
-        signatureProbe: signatureProbe && canonical(signatureProbe.file) === key ? signatureProbe.probe : undefined,
+        signatureProbe: signatureProbe && canonical(signatureProbe.file) === key ? signatureProbe.probe
+          : completionProbe?.kind === 'identifier' && canonical(completionProbe.file) === key ? completionProbe.probe : undefined,
         readModule
       });
       record.code = result.code;

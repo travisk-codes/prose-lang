@@ -454,6 +454,24 @@ test("packaged completion worker uses the current unfinished buffer without writ
   } finally { f.close(); }
 });
 
+test("packaged identifier worker returns scoped bindings from current unsaved imports without execution", async () => {
+  const f = fixture();
+  try {
+    const startCheck = packagedChecker(f);
+    f.write('node_modules/typescript/package.json', '{"main":"index.cjs"}');
+    f.write('node_modules/typescript/index.cjs', `module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+    const child = f.write('src/child.prose', 'export function cipher giving text\n    return "saved"');
+    const main = f.write('src/main.prose', 'print "saved"');
+    const source = 'use cipher from "./child.prose"\nfunction apply takes text as text\n    return ci\nfail "Never execute main"';
+    const options = { cwd: f.root, completion: { file: main, line: 3, column: 14 }, overlays: [[main, source], [child, 'export function cipher takes value as number, giving number\n    return value\nfail "Never execute child"']] };
+    const before = snapshot(f.root), checked = await startCheck(options).promise;
+    assert.deepEqual(checked, completeProject(options));
+    assert.match(checked.items.find(item => item.label === 'cipher').detail, /value as number giving number/);
+    assert.equal(checked.items.find(item => item.label === 'text').kind, 'variable');
+    assert.deepEqual(snapshot(f.root), before);
+  } finally { f.close(); }
+});
+
 test("packaged parameter worker analyzes unfinished calls in current buffers without execution or writes", async () => {
   const f = fixture();
   try {
