@@ -9,7 +9,7 @@ const builtinHelpers = new Set(['__prose_length', '__prose_char_to_number', '__p
  * while underscores, punctuation, strings and comments keep grammar styling. */
 export function collectSemanticTokens(ts, checker, generated, record) {
   const rows = record.source.split(/\r?\n/);
-  const lines = sourceLines(record.source, { locations: true }), owners = new Map();
+  const lines = sourceLines(record.source, { locations: true, embedded: true }), owners = new Map();
   for (const row of lines) for (const token of row.tokens) owners.set(token.source.line, row.tokens);
   const information = collectSourceInfo(ts, checker, generated, record, { hover: false, includeType: true });
   const found = new Map(information.map(item => [key(item), item]));

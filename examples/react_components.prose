@@ -1,0 +1,35 @@
+"Import these components into a React project with the Prose Vite plugin."
+
+export type EmptyStateProps is object
+    title as text
+    detail as text
+
+export function EmptyState takes props as EmptyStateProps
+    return <div class_name="empty-state">
+        <h3>{props.title}</h3>
+        <p>{props.detail}</p>
+    </div>
+
+export type SaveButtonProps is object
+    saving as boolean
+    on_save as function giving nothing
+
+export function SaveButton takes props as SaveButtonProps
+    return <button disabled={props.saving} on_click={props.on_save}>
+        {"Saving…" if props.saving else "Save"}
+    </button>
+
+export type Book is object
+    id as text
+    title as text
+
+export type ReadingListProps is object
+    books as list of Book
+
+export function ReadingList takes props as ReadingListProps
+    rows is props.books.map function takes book
+        return <li key={book.id}>{book.title}</li>
+    return <>
+        <h2>Reading list</h2>
+        <ul>{rows}</ul>
+    </>

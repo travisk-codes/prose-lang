@@ -2,7 +2,7 @@
   "name": "prose-language",
   "displayName": "Prose Language",
   "description": "Highlighting, formatting, live type checking, autocomplete, navigation, running, and F5 debugging for Prose.",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -196,6 +196,7 @@
       },
       "editor.tokenColorCustomizations": {
         "textMateRules": [
+          { "scope": ["source.prose entity.name.tag.prose"], "settings": { "foreground": "#7CDA9E" } },
           {
             "name": "Prose: Variables",
             "scope": [

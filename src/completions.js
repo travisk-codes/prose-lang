@@ -1,4 +1,4 @@
-import { camel, sourceLines } from "./transpile.js";
+import { camel, sourceLines, markupExpressionAt } from "./transpile.js";
 import { hoverType } from "./check-hover.js";
 
 // Locate a member or expression name without changing the user's source.
@@ -10,7 +10,7 @@ function memberContext(source, line, column) {
   const text = source.split(/\r?\n/)[line - 1], caret = column - 1;
   if (text === undefined || caret < 0 || caret > text.length) return;
   let lines;
-  try { lines = sourceLines(source, { locations: true }); } catch { return; }
+  try { const embedded = markupExpressionAt(source, line, column); lines = embedded ? [{ tokens: embedded.tokens }] : sourceLines(source, { locations: true }); } catch { return; }
   const logical = lines.find(row => row.tokens.some(token => token.source.line === line));
   if (!logical) return;
   const tokens = logical.tokens.filter(token => token.source.line === line);
@@ -60,7 +60,7 @@ function identifierContext(source, line, column) {
   const rows = source.split('\n'), text = rows[line - 1]?.replace(/\r$/, ''), caret = column - 1;
   if (text === undefined || caret < 0 || caret > text.length) return;
   let lines;
-  try { lines = sourceLines(source, { locations: true }); } catch { return; }
+  try { const embedded = markupExpressionAt(source, line, column); lines = embedded ? [{ tokens: embedded.tokens }] : sourceLines(source, { locations: true }); } catch { return; }
   const logical = lines.find(row => row.tokens.some(token => token.source.line === line));
   const tokens = logical?.tokens ?? [];
   const word = tokens.find(token => token.type === 'word' && token.source.line === line && token.source.start <= caret && token.source.start + token.source.raw.length >= caret);

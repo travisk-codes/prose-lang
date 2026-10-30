@@ -167,6 +167,8 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
         readModule
       });
       record.code = result.code;
+      record.jsx = result.jsx;
+      if (record.jsx) { options.jsx = ts.JsxEmit.ReactJSX; options.jsxImportSource = 'react'; }
       record.declarations = result.declarations ?? "export {};";
       record.lookup = sourceMapLookup(result.map);
     } catch (error) {
@@ -198,7 +200,8 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
     const entry = virtualFile(name);
     if (!entry) return buffers.has(bufferKey(name))
       ? ts.createSourceFile(name, buffers.get(bufferKey(name)), version, true) : getSourceFile.call(host, name, version, ...rest);
-    const source = ts.createSourceFile(name, entry.record[entry.declaration ? "declarations" : "code"], version, true, ts.ScriptKind.TS);
+    const source = ts.createSourceFile(name, entry.record[entry.declaration ? "declarations" : "code"], version, true,
+      entry.record.jsx && !entry.declaration ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
     if ([ts.ModuleKind.Node16, ts.ModuleKind.NodeNext].includes(options.module)) source.impliedNodeFormat = ts.ModuleKind.ESNext;
     return source;
   };

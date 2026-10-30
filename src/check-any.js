@@ -13,7 +13,7 @@ export function createAnyExplainer(ts, checker, program, records) {
   const unwrap = node => ts.isParenthesizedExpression(node) ? unwrap(node.expression) : node;
   for (const record of records) {
     byFile.set(canonical(record.name), record); byFile.set(canonical(record.declaration), record);
-    const lines = sourceLines(record.source, { locations: true });
+    const lines = sourceLines(record.source, { locations: true, embedded: true });
     tokens.set(record, lines);
     function scan(node) {
       const target = ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken ? node.left : null;

@@ -14,7 +14,7 @@ function declares(ts, node) {
 /** Index value bindings by checker identity. Source maps locate words; syntax
  * and receiver types distinguish property keys from references to local names. */
 export function collectReferences(ts, checker, generated, record) {
-  const lines = sourceLines(record.source, { locations: true }), owners = new Map(), bindings = new Map();
+  const lines = sourceLines(record.source, { locations: true, embedded: true }), owners = new Map(), bindings = new Map();
   for (const row of lines) for (const token of row.tokens) owners.set(token.source.line, row.tokens);
   function kind(type, seen = new Set()) {
     type = checker.getNonNullableType(type);

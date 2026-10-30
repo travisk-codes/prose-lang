@@ -980,6 +980,60 @@ returns only the code. Options:
 To run `.prose` files in your own Node.js program, register the module hook in
 `src/node-hooks.js` with `module.register`; the CLI's `--run` does this.
 
+## React markup
+
+HTML-style tags are expressions in `.prose` files. They compile to ordinary
+JavaScript calls to React's `createElement`; React must be installed in the
+consuming project. The compiler adds the React import automatically. A Vite
+project can use the existing Prose plugin alongside its React setup.
+
+```prose
+export function EmptyState takes props
+    return <div class_name="empty-state">
+        <h3>{props.title}</h3>
+        <p>{props.detail}</p>
+    </div>
+
+export function SaveButton takes props
+    return <button disabled={props.saving} on_click={props.on_save}>
+        {"Saving…" if props.saving else "Save"}
+    </button>
+```
+
+Braces contain **Prose expressions**. Lowercase tags name HTML or custom elements;
+uppercase tags refer to components in scope, including imported components.
+Nested tags, self-closing tags (`<EmptyState title="Nothing yet" />`), dotted
+component names (`<UI.Card />`), and fragments (`<>...</>`) are supported.
+Attribute names use the usual Prose conversion: `class_name` becomes `className`,
+`on_click` becomes `onClick`, and `aria-label` and `data-id` stay as written.
+A bare boolean attribute such as `disabled` means `disabled={true}`.
+
+```prose
+rows is books.map function takes book
+    return <li key={book.id}>{book.title}</li>
+view is <ul>{rows}</ul>
+```
+
+Text follows JSX whitespace rules: indentation and blank lines disappear, and
+nonempty text lines join with spaces. Same-line spaces are kept. For exact text,
+write a Prose string inside braces, such as `{"line one\nline two"}` or `{" "}`.
+Common entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, `&nbsp;`) and decimal or
+hexadecimal Unicode entities work in text and quoted attributes. Other characters
+can be written directly. Text and values are passed to React as children.
+
+`prose check` uses the project's React types to check native attributes, component
+props, children, and inline event callbacks. Add `as` contracts to component props
+for useful checking. Completion, hover, navigation, and rename work in brace
+expressions; component names can be renamed in both their opening and closing tags.
+The formatter preserves authored markup layout and formats surrounding Prose.
+
+For now, define callbacks with an indented body **before** the markup and pass
+their names in braces. Single-expression inline callbacks work inside braces.
+Attribute spreading, HTML comments, and JSX's JavaScript comment syntax are not
+supported. To pass a tag as a function argument, use `render (<Card />)` or
+`render with <Card />`; this keeps ordinary `a < b` comparisons unambiguous.
+See [react_components.prose](examples/react_components.prose) for typed components.
+
 ## Types
 
 Annotations are optional and change nothing about how a program runs. They

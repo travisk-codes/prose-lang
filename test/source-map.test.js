@@ -21,6 +21,23 @@ const position = (code, text, occurrence = 0) => {
 };
 const original = (result, text, occurrence) => new SourceMap(result.map).findEntry(...position(result.code, text, occurrence));
 
+test('markup maps nested expressions and both component tags to authored positions', () => {
+  const source = 'function Card takes props\r\n    return <span>{props.title}</span>\r\nvalue is <Card title={"😀" + "hello"}>\r\n    {JSON.parse "oops"}\r\n</Card>';
+  for (const check of [false, true]) {
+    const result = compile(source, { check, sourceMap: true, filename: 'markup.prose' });
+    const call = original(result, check ? 'JSON.parse' : '__prose_dot_method(JSON');
+    assert.equal(call.originalLine, 3);
+    assert.equal(call.originalColumn, 5);
+    const component = original(result, check ? '<_prose_Card' : '__prose_element(_prose_Card', 0);
+    assert.equal(component.originalLine, 2);
+    if (check) {
+      const closing = original(result, '_prose_Card>', -1);
+      assert.equal(closing.originalLine, 4);
+      assert.equal(closing.originalColumn, 2);
+    }
+  }
+});
+
 test("source maps are optional and preserve generated code and declaration output", () => {
   for (const source of ["", "print 1", "type Example is text", "export type Example is text", "export count is 1"]) {
     const plain = compile(source);

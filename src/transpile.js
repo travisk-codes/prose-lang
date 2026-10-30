@@ -3,6 +3,7 @@ import { checkPrelude } from "./check.js";
 import { inlineSourceMap, sourceMapBuilder } from "./source-map.js";
 import { callScopeKey, inferCallArities } from "./call-arity.js";
 import { explainLayoutError } from "./layout-diagnostics.js";
+import { markupPosition, readMarkup } from "./markup.js";
 
 const reserved = new Set([
   "if", "else", "for", "is", "to", "print", "and", "or", "not",
@@ -85,7 +86,7 @@ const builtinTypes = {
   nothing: "void", unset: "undefined", null: "null", true: "true", false: "false"
 };
 
-function tokenize(text, line, locations = false) {
+function tokenize(text, line, locations = false, context) {
   const tokens = [];
   let pos = 0;
   while (pos < text.length) {
@@ -94,6 +95,16 @@ function tokenize(text, line, locations = false) {
     const spaced = pos > 0 && /\s/.test(text[pos - 1]);
     const tokenStart = pos;
     const rest = text.slice(pos);
+    const previous = tokens.at(-1) ?? context?.previous;
+    const keywordOperand = previous?.type === 'word' &&
+      ['return', 'is', 'are', 'print', 'fail', 'with', 'then', 'else', 'if', 'and', 'or', 'otherwise', 'not', 'in'].includes(previous.value) &&
+      !['.', ':'].includes(tokens.at(-2)?.value);
+    const operand = !previous || keywordOperand || previous.type === 'symbol' && ![')', '.', ':'].includes(previous.value);
+    if (context && text[pos] === '<' && /[A-Za-z_>]/.test(text[pos + 1] ?? '') && operand) {
+      const token = context.element(pos); token.spaced = spaced; tokens.push(token);
+      Object.defineProperty(tokens, 'resumeOffset', { value: token.tree.end });
+      return tokens;
+    }
     const number = /^(?:\d+(?:\.\d+)?)/.exec(rest);
     const word = /^[A-Za-z_][A-Za-z_0-9]*/.exec(rest);
     if (number) {
@@ -131,9 +142,48 @@ function tokenize(text, line, locations = false) {
       pos += operator[0].length;
     }
     tokens.at(-1).spaced = spaced;
-    if (locations) tokens.at(-1).source = { raw: text.slice(tokenStart, pos), line, start: tokenStart };
+    if (locations) tokens.at(-1).source = { raw: text.slice(tokenStart, pos), line, start: tokenStart + (context?.column ?? 0) };
   }
   return tokens;
+}
+
+function lexSource(source) {
+  const starts = [0];
+  for (let at = 0; at < source.length; at++) if (source[at] === '\n') starts.push(at + 1);
+  const position = offset => {
+    let low = 0, high = starts.length;
+    while (low + 1 < high) { const mid = (low + high) >>> 1; if (starts[mid] <= offset) low = mid; else high = mid; }
+    return { line: low + 1, start: offset - starts[low] };
+  };
+  const element = offset => {
+    const tree = readMarkup(source, offset);
+    function expressions(node) {
+      if (node.kind === 'expression') node.tokens = range(node.start, node.end).flatMap(row => row.tokens);
+      else if (node.kind === 'element') {
+        node.attributes.forEach(attribute => expressions(attribute.value));
+        node.children.forEach(expressions);
+      }
+    }
+    expressions(tree);
+    const token = { type: 'markup', value: source.slice(offset, tree.end), tree,
+      source: { raw: source.slice(offset, tree.end), ...position(offset), end: position(tree.end) } };
+    Object.defineProperty(token, 'markupSource', { value: source }); return token;
+  };
+  function range(start = 0, end = source.length) {
+    const rows = []; let at = start, row = { line: position(start).line, tokens: [] };
+    while (at < end) {
+      const here = position(at), newline = source.indexOf('\n', at), stop = Math.min(newline < 0 ? end : newline, end);
+      const tokens = tokenize(source.slice(at, stop).replace(/\r$/, ''), here.line, true,
+        { column: here.start, previous: row.tokens.at(-1), element: pos => element(at + pos) });
+      row.tokens.push(...tokens);
+      if (tokens.resumeOffset !== undefined) { at = tokens.resumeOffset; continue; }
+      if (row.tokens.length) rows.push(row);
+      at = stop + 1; row = { line: position(at).line, tokens: [] };
+    }
+    if (row.tokens.length) rows.push(row);
+    return rows;
+  }
+  return range();
 }
 
 const precedence = {
@@ -176,7 +226,7 @@ class Expression {
       if (!this.loose) fail(this.line, "'-' here could start a negative argument or subtract. Write with before a negative argument (items:at with -1), or put spaces around a minus that subtracts.");
       return true;
     }
-    if (next.type === "number" || next.type === "string") return true;
+    if (next.type === "number" || next.type === "string" || next.type === 'markup') return true;
     if (next.type === "symbol") return next.value === "(";
     if (next.type === "pattern") return true;
     return !reserved.has(next.value) ||
@@ -397,7 +447,7 @@ class Expression {
     const next = this.peek();
     if (!next) return false;
     if (this.at("if") && this.trailingIf()) return false;
-    return ["number", "string", "pattern"].includes(next.type) || next.type === "symbol" && ["(", "-"].includes(next.value) ||
+    return ["number", "string", "pattern", "markup"].includes(next.type) || next.type === "symbol" && ["(", "-"].includes(next.value) ||
       next.type === "word" && (!reserved.has(next.value) || ["function", "if", "new", "not", "maybe", "array", "object", "unset", "true", "false", "null", "each"].includes(next.value));
   }
   // `takes` names, each optionally followed by `as` and a type, then an optional `giving` type.
@@ -580,7 +630,9 @@ class Expression {
     if (!token) fail(this.line, "Expected an expression.");
     const callStart = this.callStart ?? token.source;
     let left;
-    if (token.type === "number" || token.type === "string") {
+    if (token.type === 'markup') {
+      left = this.markup(token);
+    } else if (token.type === "number" || token.type === "string") {
       left = { type: "literal", value: token.value };
     } else if (token.type === "pattern") {
       left = this.pattern(token.value);
@@ -726,6 +778,52 @@ class Expression {
     }
     return left;
   }
+
+  markup(token) {
+    const at = node => ({ source: { ...markupPosition(token.markupSource, node.start), raw: node.name ?? '' } });
+    const expression = node => {
+      if (node.kind === 'literal') return located({ type: 'literal', value: node.value }, at(node));
+      if (node.kind === 'element') return element(node);
+      if (!node.tokens.length) return null;
+      const parser = new Expression(node.tokens, node.tokens[0].source.line, this.functions, this.callAnalysis, this.callScope, this.loose);
+      parser.signatureProbe = this.signatureProbe;
+      const value = parser.list(); parser.end();
+      if (parser.blockFunctions.length) fail(parser.line, 'Define a multiline callback before the markup and pass its name in braces.');
+      return value;
+    };
+    const element = node => {
+      const component = tag => {
+        const [first, ...rest] = tag.name.split('.');
+        let value = located({ type: 'name', value: first, line: at(tag).source.line }, at({ ...tag, name: first }));
+        let start = tag.start + first.length + 1;
+        for (const name of rest) {
+          value = located({ type: 'property', object: value, name, line: value.line }, at({ start, name }));
+          start += name.length + 1;
+        }
+        return value;
+      };
+      let tag = null;
+      if (node.tag.name) {
+        if (/^[a-z]/.test(node.tag.name)) tag = located({ type: 'literal', value: node.tag.name }, at(node.tag));
+        else {
+          tag = component(node.tag);
+        }
+      }
+      const seen = new Set();
+      const attributes = node.attributes.map(attribute => {
+        const name = camel(attribute.name);
+        if (seen.has(name)) fail(at(attribute).source.line, `Duplicate React property '${name}'.`);
+        seen.add(name);
+        const value = expression(attribute.value);
+        if (!value) fail(at(attribute).source.line, 'An attribute expression cannot be empty.');
+        return located({ name, value }, at(attribute));
+      });
+      const value = located({ type: 'element', tag, attributes, children: node.children.map(expression).filter(Boolean), line: at(node).source.line }, at(node));
+      if (tag?.type !== 'literal' && node.closingTag?.name) Object.defineProperty(value, 'closingTag', { value: component(node.closingTag) });
+      return value;
+    };
+    return element(token.tree);
+  }
 }
 
 function functionHeader(tokens, line) {
@@ -855,15 +953,14 @@ function pendingConditional(tokens) {
 // a comma or an operator, continues on the lines after it that are indented more.
 // Conditions also accept leading and/or at the header's indentation or deeper.
 // Indented if/else may continue a conditional value without opening a block.
-export function sourceLines(source, { locations = false } = {}) {
+export function sourceLines(source, { locations = false, embedded = false } = {}) {
   const lines = [];
   let open = null;
-  source.replace(/^﻿/, "").split(/\r?\n/).forEach((text, index) => {
-    if (!text.trim()) return;
+  const physical = source.split(/\r?\n/);
+  lexSource(source).forEach(({ line: physicalLine, tokens }) => {
+    const index = physicalLine - 1, text = physical[index].replace(/^\uFEFF/, '');
     const prefix = /^\s*/.exec(text)[0];
     const indent = prefix.replace(/\t/g, "    ").length;
-    const tokens = tokenize(text.slice(prefix.length), index + 1, locations);
-    if (locations) for (const token of tokens) token.source.start += prefix.length + (index === 0 && source.startsWith("\uFEFF") ? 1 : 0);
     // A header's parameters can each take a line, with its giving line back at the header's
     // indentation, like a closing bracket.
     const closes = indent === open?.indent && isWord(tokens[0], "giving");
@@ -895,7 +992,45 @@ export function sourceLines(source, { locations = false } = {}) {
     }
     if (!continues(open.tokens)) open = null;
   });
+  if (embedded) for (const line of lines) line.tokens = line.tokens.flatMap(function flatten(token) {
+    if (token.type !== 'markup') return [token];
+    const found = [];
+    function visit(node) {
+      if (node.kind === 'expression') found.push(...node.tokens.flatMap(flatten));
+      if (node.kind === 'element') {
+        const tag = value => {
+          if (!value || !/^[A-Z_]/.test(value.name)) return;
+          let start = value.start;
+          for (const [index, part] of value.name.split('.').entries()) {
+            if (index) { found.push({ type: 'symbol', value: '.', source: { ...markupPosition(sourceText, start), raw: '.' } }); start++; }
+            found.push({ type: 'word', value: part, source: { ...markupPosition(sourceText, start), raw: part } });
+            start += part.length;
+          }
+        };
+        const sourceText = token.markupSource;
+        tag(node.tag); node.attributes.forEach(attribute => visit(attribute.value)); node.children.forEach(visit); tag(node.closingTag);
+      }
+    }
+    visit(token.tree); return found;
+  });
+  if (!locations) for (const line of lines) for (const token of line.tokens) delete token.source;
   return lines;
+}
+
+/** The innermost brace expression at a cursor, for editor analysis. */
+export function markupExpressionAt(source, line, column) {
+  if (!source.includes('<')) return;
+  const rows = source.split('\n');
+  const offset = rows.slice(0, line - 1).reduce((sum, row) => sum + row.length + 1, 0) + column - 1;
+  let found;
+  const visit = node => {
+    if (node.kind === 'expression' && node.start <= offset && node.end >= offset) {
+      found = node;
+      for (const token of node.tokens) if (token.type === 'markup') visit(token.tree);
+    } else if (node.kind === 'element') { node.attributes.forEach(attribute => visit(attribute.value)); node.children.forEach(visit); }
+  };
+  try { for (const row of lexSource(source)) for (const token of row.tokens) if (token.type === 'markup') visit(token.tree); } catch { return; }
+  return found;
 }
 
 // The functions (with their parameters) and variables a Prose module exports, from its export lines.
@@ -1617,6 +1752,9 @@ function discoverCallArities(source, settings, readImports = true) {
 export function compile(source, options = {}) {
   if (![undefined, false, true, "inline"].includes(options.sourceMap)) throw new TypeError('sourceMap must be true, false, or "inline".');
   const program = parse(source, options);
+  const containsMarkup = node => node && typeof node === 'object' &&
+    (node.type === 'element' || Object.values(node).some(containsMarkup));
+  const hasMarkup = Boolean(containsMarkup(program));
   const mapper = options.sourceMap ? sourceMapBuilder(source, options.filename ?? "program.prose") : null;
   const mapped = (node, code) => mapper && node?.location
     ? mapper.mark(node.location, code, ["name", "call", "function"].includes(node.type) ? (node.value ?? node.name) : undefined) : code;
@@ -1708,6 +1846,13 @@ export function compile(source, options = {}) {
     const element = child => child.type === "spread" ? spread(child, scope, depth) : emit(child);
     const args = (nodes, filter = false) => nodes.map((child, index) => filter && index === 0 && child.type === "lambda"
       ? expression(child, scope, depth, true) : element(child)).join(", ");
+    if (node.type === 'element') {
+      const tag = value => value.type === 'literal' ? value.value : value.type === 'name' ? mapped(value, resolve(value, scope)) : `${tag(value.object)}.${mapped(value, camel(value.name))}`;
+      const name = node.tag ? tag(node.tag) : '';
+      const attributes = node.attributes.map(attribute => mapped(attribute, ` ${attribute.name}={${emit(attribute.value)}}`)).join('');
+      const closing = node.closingTag ? tag(node.closingTag) : name;
+      return `<${name}${attributes}>${node.children.map(child => `{${emit(child)}}`).join('')}</${closing}>`;
+    }
     if (node.type === "object") return checkObject(node, scope, depth);
     // An empty list can be added to later, so it isn't a list of nothing.
     if (node.type === "array" && !node.elements.length) return "([] as any[])";
@@ -1732,7 +1877,8 @@ export function compile(source, options = {}) {
       const predicate = checkedPredicate(node, inner, filterPredicate);
       const returns = node.returns ? `: ${mapped(node.returns, returnType(node))}` : predicate ? `: ${unmapped(predicate)}` : "";
       const async = awaits(node.body ?? node.value) ? "async " : "";
-      const variables = generic([...inner.ownTypeVariables]);
+      let variables = generic([...inner.ownTypeVariables]);
+      if (hasMarkup) variables = variables.replace(/^<([^,>]+)>$/, '<$1,>');
       if (node.body) return `(${async}${variables}(${params})${returns} => {\n${emitScope(node.body, inner, depth + 1)}\n${pad(depth)}})`;
       return `(${async}${variables}(${params})${returns} => ${expression(node.value, inner, depth)})`;
     }
@@ -1778,6 +1924,11 @@ export function compile(source, options = {}) {
 
   function expressionValue(node, scope, depth) {
     const emit = child => expression(child, scope, depth);
+    if (node.type === 'element') {
+      const tag = node.tag ? emit(node.tag) : '__prose_fragment';
+      const attributes = node.attributes.length ? `{${node.attributes.map(attribute => mapped(attribute, `${JSON.stringify(attribute.name)}: ${emit(attribute.value)}`)).join(', ')}}` : 'null';
+      return `__prose_element(${[tag, attributes, ...node.children.map(emit)].join(', ')})`;
+    }
     // Lists and arguments may spread a collection into them with `each of`.
     const element = child => child.type === "spread" ? spread(child, scope, depth) : emit(child);
     const list = nodes => `[${nodes.map(element).join(", ")}]`;
@@ -1974,13 +2125,14 @@ export function compile(source, options = {}) {
       exported || "export {};"
     ].join("\n") + "\n";
     const { code, map } = mapper ? mapper.finish(checkCode) : { code: checkCode, map: null };
-    return { code: options.sourceMap === "inline" ? code + inlineSourceMap(map) + "\n" : code, map, module: true, declarations: declarationsFor(program) };
+    return { code: options.sourceMap === "inline" ? code + inlineSourceMap(map) + "\n" : code, map, module: true, declarations: declarationsFor(program), ...(hasMarkup ? { jsx: true } : {}) };
   }
-  const module = Boolean(options.runtime) || imports.length > 0 || exports.size > 0 ||
+  const module = hasMarkup || Boolean(options.runtime) || imports.length > 0 || exports.size > 0 ||
     program.some(node => node.typeOnly || (node.type === "typeDeclaration" && node.exported));
   const markedCode = [
     module ? "" : '"use strict";',
     options.runtime ? `import { ${runtimeHelpers.join(", ")} } from ${JSON.stringify(options.runtime)};` : "",
+    hasMarkup ? 'import { createElement as __prose_element, Fragment as __prose_fragment } from "react";' : '',
     ...imports.map(node =>
       mapped(node, `import { ${node.names.map(name => `${camel(name)} as ${variable(name)}`).join(", ")} } from ${JSON.stringify(node.source)};`)),
     options.runtime ? "" : runtimeSource,
@@ -1988,7 +2140,7 @@ export function compile(source, options = {}) {
     exported
   ].filter(Boolean).join("\n") + "\n";
   const { code, map } = mapper ? mapper.finish(markedCode) : { code: markedCode, map: null };
-  return { code: options.sourceMap === "inline" ? code + inlineSourceMap(map) + "\n" : code, map, module, declarations: declarationsFor(program) };
+  return { code: options.sourceMap === "inline" ? code + inlineSourceMap(map) + "\n" : code, map, module, declarations: declarationsFor(program), ...(hasMarkup ? { jsx: true } : {}) };
 }
 
 /**

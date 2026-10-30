@@ -1,5 +1,10 @@
 # Prose Language for Visual Studio Code
 
+Version 0.1.31 adds React markup in `.prose` files: colored tags and attributes,
+Prose expressions in braces, React prop/event checking, and brace-expression
+completion, hover, navigation, and rename. Component rename updates both tags.
+Formatting preserves authored markup layout, including meaningful text spacing.
+
 Semantic and syntax highlighting, formatting, running, F5 debugging, type checking, autocomplete, parameter hints,
 references, and rename
 for `.prose` files, with a softened rainbow

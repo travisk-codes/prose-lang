@@ -7,7 +7,19 @@ import { inlineScript } from "./scripts.mjs";
 
 const strip = file => readFileSync(new URL("../src/" + file, import.meta.url), "utf8")
   .split("\n").filter(line => !line.startsWith("import ")).join("\n").replace(/^export /gm, "");
-const browserCompiler = inlineScript(`(() => {\n${strip("runtime.js")}\n${strip("check.js")}\n${strip("source-map.js")}\n${strip("call-arity.js")}\n${strip("layout-diagnostics.js")}\n${strip("transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`);
+const browserCompiler = inlineScript(`(() => {\n${strip("runtime.js")}\n${strip("check.js")}\n${strip("source-map.js")}\n${strip("call-arity.js")}\n${strip("layout-diagnostics.js")}\n${strip("markup.js")}\n${strip("transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`);
+
+test('the browser bundle compiles React markup with the same text and mappings', () => {
+  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const source = 'export function View takes props\n    return <p>\n        Hello {props.name}\n        again\n    </p>';
+  for (const check of [false, true]) {
+    const options = { check, sourceMap: true, filename: 'view.prose' };
+    const actual = browser.compile(source, options), expected = compile(source, options);
+    assert.equal(actual.code, expected.code);
+    assert.equal(JSON.stringify(actual.map), JSON.stringify(expected.map));
+    assert.equal(actual.jsx, true);
+  }
+});
 
 test("checking output also works in the browser bundle without TypeScript installed", () => {
   const browser = runInNewContext(browserCompiler, { TextEncoder });

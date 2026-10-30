@@ -3,6 +3,10 @@
     [
       "(",
       ")"
+    ],
+    [
+      "{",
+      "}"
     ]
   ],
   "autoClosingPairs": [
@@ -17,6 +21,14 @@
         "string",
         "comment"
       ]
+    },
+    {
+      "open": "{",
+      "close": "}",
+      "notIn": [
+        "string",
+        "comment"
+      ]
     }
   ],
   "surroundingPairs": [
@@ -27,6 +39,10 @@
     {
       "open": "\"",
       "close": "\""
+    },
+    {
+      "open": "{",
+      "close": "}"
     }
   ],
   "wordPattern": "[A-Za-z_][A-Za-z_0-9]*",

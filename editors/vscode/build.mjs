@@ -10,6 +10,7 @@ export function build(output = new URL("./dist/formatter/", import.meta.url)) {
     copyFileSync(new URL(`../../src/${name}`, import.meta.url), new URL(name, output));
   }
   writeFileSync(new URL("package.json", output), '{"type":"module"}\n');
+  copyFileSync(new URL('../../src/markup.js', import.meta.url), new URL('markup.js', output));
   const runtime = new URL('../runtime/', output);
   mkdirSync(new URL('bin/', runtime), { recursive: true });
   mkdirSync(new URL('src/', runtime), { recursive: true });

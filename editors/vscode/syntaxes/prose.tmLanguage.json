@@ -7,6 +7,9 @@
   ],
   "patterns": [
     {
+      "include": "#markup-root"
+    },
+    {
       "include": "#standalone-comments"
     },
     {
@@ -466,6 +469,170 @@
     "name-separators": {
       "match": "_",
       "name": "punctuation.separator.name.prose"
+    },
+    "markup-expression": {
+      "name": "meta.embedded.expression.prose",
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.embedded.begin.prose"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.embedded.end.prose"
+        }
+      },
+      "patterns": [
+        {
+          "include": "$self"
+        }
+      ]
+    },
+    "markup-header": {
+      "begin": "\\G",
+      "end": "(?=/>)|(?<=>)",
+      "patterns": [
+        {
+          "include": "#markup-expression"
+        },
+        {
+          "name": "string.quoted.double.prose",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.prose",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "name": "variable.other.property.prose",
+          "match": "[A-Za-z_][A-Za-z_0-9-]*",
+          "captures": {
+            "0": {
+              "patterns": [
+                {
+                  "include": "#name-separators"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "keyword.operator.prose",
+          "match": "="
+        },
+        {
+          "name": "punctuation.definition.tag.end.prose",
+          "match": ">"
+        }
+      ]
+    },
+    "markup-element": {
+      "name": "meta.markup.prose",
+      "begin": "(<)([A-Za-z_][A-Za-z_0-9.-]*|)(?=[\\s/>])",
+      "end": "(/>)|(</)(\\2)(\\s*>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.prose"
+        },
+        "2": {
+          "name": "entity.name.tag.prose",
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.end.prose"
+        },
+        "2": {
+          "name": "punctuation.definition.tag.begin.prose"
+        },
+        "3": {
+          "name": "entity.name.tag.prose",
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
+        },
+        "4": {
+          "name": "punctuation.definition.tag.end.prose"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#markup-header"
+        },
+        {
+          "include": "#markup-element"
+        },
+        {
+          "include": "#markup-expression"
+        },
+        {
+          "name": "constant.character.escape.prose",
+          "match": "&(?:#x[0-9a-fA-F]+|#\\d+|[A-Za-z]+);"
+        }
+      ]
+    },
+    "markup-root": {
+      "name": "meta.markup.prose",
+      "begin": "(?:(?<=\\breturn)|(?<=\\bis)|(?<=\\bare)|(?<=\\bprint)|(?<=\\bwith)|(?<=\\belse)|(?<=\\bthen)|(?<=\\bif)|(?<=\\band)|(?<=\\bor)|(?<=\\bfail)|(?<=\\botherwise)|(?<=[(,=+*/{])|^)\\s*(<)([A-Za-z_][A-Za-z_0-9.-]*|)(?=[\\s/>])",
+      "end": "(/>)|(</)(\\2)(\\s*>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.prose"
+        },
+        "2": {
+          "name": "entity.name.tag.prose",
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.end.prose"
+        },
+        "2": {
+          "name": "punctuation.definition.tag.begin.prose"
+        },
+        "3": {
+          "name": "entity.name.tag.prose",
+          "patterns": [
+            {
+              "include": "#name-separators"
+            }
+          ]
+        },
+        "4": {
+          "name": "punctuation.definition.tag.end.prose"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#markup-header"
+        },
+        {
+          "include": "#markup-element"
+        },
+        {
+          "include": "#markup-expression"
+        },
+        {
+          "name": "constant.character.escape.prose",
+          "match": "&(?:#x[0-9a-fA-F]+|#\\d+|[A-Za-z]+);"
+        }
+      ]
     }
   }
 }

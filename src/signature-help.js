@@ -1,9 +1,21 @@
-import { camel, continues, sourceLines } from "./transpile.js";
+import { camel, continues, sourceLines, markupExpressionAt } from "./transpile.js";
+import { markupPosition } from "./markup.js";
 import { hoverType } from "./check-hover.js";
 
 // The parser decides whether the cursor is an argument, including when a comma
 // actually starts an array element. These probes never enter the user's buffer.
 export function signatureContexts(source, line, column) {
+  const embedded = markupExpressionAt(source, line, column);
+  if (embedded) {
+    const start = markupPosition(source, embedded.start);
+    const localLine = line - start.line + 1, localColumn = line === start.line ? column - start.start : column;
+    return signatureContexts(source.slice(embedded.start, embedded.end), localLine, localColumn).map(context => {
+      let probe = context.probe;
+      while (source.includes(probe)) probe += '_';
+      return { ...context, probe, line, column, source: source.slice(0, embedded.start) +
+        context.source.replaceAll(context.probe, probe) + source.slice(embedded.end) };
+    });
+  }
   const rows = source.split('\n'), text = rows[line - 1]?.replace(/\r$/, ''), caret = column - 1;
   if (text === undefined || caret < 0 || caret > text.length) return [];
   let probe = '__prose_signature_probe_0', serial = 0;
@@ -83,7 +95,7 @@ export function collectSignatureHelp(ts, checker, generated, record, context) {
   if (!call) return;
   const position = generated.getLineAndCharacterOfPosition(call.getStart(generated));
   const original = record.lookup(position.line, position.character);
-  const words = sourceLines(record.source, { locations: true }).flatMap(row => row.tokens);
+  const words = sourceLines(record.source, { locations: true, embedded: true }).flatMap(row => row.tokens);
   const origin = original && words.find(token => token.source.line === original.line && token.source.start === original.column - 1);
   if (origin?.value === 'print' && ts.isPropertyAccessExpression(call.expression) && call.expression.getText(generated) === 'console.log') return;
   const callee = call.expression, type = checker.getNonNullableType(checker.getTypeAtLocation(callee));

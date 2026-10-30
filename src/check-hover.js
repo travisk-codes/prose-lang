@@ -72,7 +72,7 @@ function hoverSignature(ts, checker, signature, location, seen, internalLine = f
  * Compiler objects stay internal and are stripped before returning editor data.
  */
 export function collectSourceInfo(ts, checker, generated, record, { hover = true, explainAny, includeType = false } = {}) {
-  const lines = sourceLines(record.source, { locations: true });
+  const lines = sourceLines(record.source, { locations: true, embedded: true });
   const owners = new Map();
   for (const line of lines) for (const token of line.tokens) owners.set(token.source.line, line);
   const found = new Map(), computedNotes = new Map();

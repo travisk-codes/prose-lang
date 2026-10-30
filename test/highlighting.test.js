@@ -44,6 +44,22 @@ function hasScope(line, fragment, scope) {
   assert.ok(scopesAt(line, fragment).includes(scope), `${JSON.stringify(fragment)} should have ${scope}`);
 }
 
+test('markup highlights tags and attributes, with Prose expressions and literal child text', () => {
+  const lines = ['return <div class_name="hello">', '    if words are text <span>{book.title}</span>', '    <button disabled={true} on_click={function takes event return event.prevent_default run} />', '</div>', 'print count <limit'];
+  const tokens = tokenize(lines.join('\n'));
+  const scopes = (row, fragment) => tokens[row].find(token => token.start <= lines[row].indexOf(fragment) && token.end > lines[row].indexOf(fragment))?.scopes ?? [];
+  assert.ok(scopes(0, 'div').includes('entity.name.tag.prose'));
+  assert.ok(scopes(0, 'class').includes('variable.other.property.prose'));
+  assert.ok(scopes(1, 'span').includes('entity.name.tag.prose'));
+  assert.ok(!scopes(1, 'if').includes('keyword.control.prose'));
+  assert.ok(scopes(1, 'title').includes('variable.other.property.prose'));
+  assert.ok(scopes(2, 'true').includes('constant.language.prose'));
+  assert.ok(scopes(2, 'function').includes('storage.type.function.prose'));
+  assert.ok(scopes(3, 'div').includes('entity.name.tag.prose'));
+  assert.ok(scopes(4, '<').includes('keyword.operator.prose'));
+  assert.ok(!scopes(4, 'limit').includes('entity.name.tag.prose'));
+});
+
 test("the extension registers .prose and a resolvable grammar and configuration", () => {
   assert.ok(manifest.contributes.languages.some(language =>
     language.id === "prose" && language.extensions.includes(".prose")));
@@ -51,7 +67,7 @@ test("the extension registers .prose and a resolvable grammar and configuration"
   assert.equal(manifest.main, "./extension.cjs");
   assert.ok(readFileSync(new URL(manifest.main, extension), "utf8").length > 0);
   const config = JSON.parse(readFileSync(new URL("language-configuration.json", extension), "utf8"));
-  assert.deepEqual(config.brackets, [["(", ")"]]);
+  assert.deepEqual(config.brackets, [["(", ")"], ["{", "}"]]);
 });
 
 test("function declarations, parameters, and standard-library calls have theme scopes", () => {

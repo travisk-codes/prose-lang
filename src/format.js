@@ -259,6 +259,8 @@ function statementPrefixes(lines, physical, options) {
     const prefix = indentation(indents.length - 1, options);
     prefixes.set(line, prefix);
     block.push(line);
+    // Keep authored tag/text layout, including whitespace significant to JSX.
+    if (line.tokens.some(token => token.type === 'markup')) keepIndentation = true;
     const original = physical[line.line - 1];
     const first = line.tokens.filter(token => token.source.line === line.line);
     // Keep a block's indentation coherent if expanding it would make a fitting
@@ -293,6 +295,11 @@ export function format(source, options = {}) {
   for (const line of lines) {
     if (output.length && line.line > previousEnd + 1) output.push("");
     const prefix = prefixes.get(line);
+    if (line.tokens.some(token => token.type === 'markup')) {
+      previousEnd = Math.max(...line.tokens.map(token => token.source.end?.line ?? token.source.line));
+      output.push(...physical.slice(line.line - 1, previousEnd));
+      continue;
+    }
     const fits = line.tokens.every(token => columns(physical[token.source.line - 1], settings) <= width);
     output.push(...(fits ? keepLines(line, physical, prefix, settings) : headers.has(line.line)
       ? wrapHeader(line.tokens, headers.get(line.line), prefix, settings)
