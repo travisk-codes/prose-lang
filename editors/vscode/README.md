@@ -1,5 +1,8 @@
 # Prose Language for Visual Studio Code
 
+Version 0.2.0 aligns the extension version with the Prose compiler. Future
+releases use the same version number for both; the extension build checks this.
+
 Version 0.1.35 infers fixed method argument counts on known `Map`, `Set`,
 `WeakMap`, and `WeakSet` receivers: `counts.set key, value` needs no `with`.
 Formatting, checking, and parameter hints use the same call boundaries.
