@@ -43,6 +43,10 @@ files; see [Type checking](docs/type-checking.md).
 
 ## VS Code support
 
+[Quick fixes](editors/vscode/README.md#quick-fixes) (`Ctrl+.`) offer explicit
+argument-list and array readings for ambiguous calls, so you can choose their
+meaning directly in the editor.
+
 [Semantic highlighting](editors/vscode/README.md#semantic-highlighting) colors
 function values and aliases, scoped parameters, properties, and known numeric
 indexes using current project types, with the existing Prose palette.

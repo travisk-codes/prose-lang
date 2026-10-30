@@ -309,23 +309,30 @@ class Expression {
     const first = this.parse();
     if (!this.at(",")) return first;
     const elements = [first];
+    const separators = [];
     while (this.at(",")) {
-      this.take(",");
+      separators.push(this.take(",").source);
       if (allowTrailing && this.at(")")) break;
       elements.push(this.parse());
     }
-    return { type: "array", elements };
+    const array = { type: "array", elements };
+    Object.defineProperty(array, "separators", { value: separators });
+    return array;
   }
   // The arguments after `with`: every comma-separated value up to the end of the list.
-  arguments(explicit = true) {
+  arguments(explicit = true, callStart) {
     const first = this.peek();
     const nested = this.argumentDepth > 0;
     this.argumentDepth++;
     const args = [this.parse(60)];
     if (!explicit && this.at(",") && !this.loose) {
+      const comma = this.peek().source;
+      const point = source => source && { line: source.line, column: source.start + 1 };
       fail(this.tokens[this.pos].source?.line ?? this.line,
         "This call's parameter count is unknown, so the comma could separate arguments or array elements. Use with for arguments, or close the call in parentheses before the comma.",
-        { code: "PROSE_CALL_BOUNDARY", callBoundary: first?.source && { line: first.source.line, column: first.source.start, text: "with " } });
+        { code: "PROSE_CALL_BOUNDARY", ...(comma ? { column: comma.start + 1 } : {}),
+          callBoundary: first?.source && { line: first.source.line, column: first.source.start, text: "with " },
+          ...(callStart && first?.source && comma ? { callBoundaryInfo: { start: point(callStart), argument: point(first.source), comma: point(comma) } } : {}) });
     }
     while (this.at(",")) { this.take(","); args.push(this.parse(60)); }
     this.argumentDepth--;
@@ -561,13 +568,17 @@ class Expression {
     }
     return { type: "typeTest", value, kind, negated, line: this.line };
   }
-  parse(min = 0) {
+  parse(min = 0, callStart) {
     const token = this.peek();
-    return located(this.parseValue(min), token);
+    const previous = this.callStart;
+    this.callStart = callStart;
+    try { return located(this.parseValue(min), token); }
+    finally { this.callStart = previous; }
   }
   parseValue(min = 0) {
     const token = this.tokens[this.pos++];
     if (!token) fail(this.line, "Expected an expression.");
+    const callStart = this.callStart ?? token.source;
     let left;
     if (token.type === "number" || token.type === "string") {
       left = { type: "literal", value: token.value };
@@ -591,7 +602,7 @@ class Expression {
     } else if (token.value === "unset") {
       left = { type: "unset" };
     } else if (token.value === "maybe") {
-      left = this.parse(70);
+      left = this.parse(70, callStart);
       markMaybe(left);
     } else if (token.value === "function") {
       left = this.lambda(token);
@@ -616,7 +627,7 @@ class Expression {
         else args.push(...this.call(callee.value ?? "constructor", { params: new Array(count) }, callee).args);
       } else if (this.peek() && this.callsByAdjacency({ type: "name" })) {
         const count = this.calleeArity(callee);
-        args.push(...(count === null ? this.arguments(false) : this.call(callee.value ?? "constructor", { params: new Array(count) }, callee).args));
+        args.push(...(count === null ? this.arguments(false, callStart) : this.call(callee.value ?? "constructor", { params: new Array(count) }, callee).args));
       }
       left = { type: "new", callee, args, line: this.line };
     } else if (token.value === "not" || token.value === "-") {
@@ -691,7 +702,7 @@ class Expression {
       if (min <= 70 && this.callsByAdjacency(left)) {
         this.adjacentCall = true;
         const count = this.calleeArity(left);
-        left = count === null ? { type: "invoke", callee: left, args: this.arguments(false), line: this.line }
+        left = count === null ? { type: "invoke", callee: left, args: this.arguments(false, callStart), line: this.line }
           : this.call(left.value ?? "function", { params: new Array(count) }, left);
         continue;
       }

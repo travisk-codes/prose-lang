@@ -6,6 +6,7 @@ const { createCompletions } = require("./completing.cjs");
 const { createSignatureHelp } = require("./signatures.cjs");
 const { createRefactoring } = require("./refactoring.cjs");
 const { createSemanticHighlighting } = require("./semantic.cjs");
+const { createQuickFixes } = require("./quick-fixes.cjs");
 
 exports.activate = context => {
   let formatter;
@@ -22,4 +23,5 @@ exports.activate = context => {
   context.subscriptions.push(createSignatureHelp(vscode));
   context.subscriptions.push(createRefactoring(vscode));
   context.subscriptions.push(createSemanticHighlighting(vscode));
+  context.subscriptions.push(createQuickFixes(vscode));
 };

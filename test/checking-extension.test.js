@@ -527,3 +527,21 @@ test("packaged semantic worker matches source analysis of an unsaved buffer with
     assert.ok(manifest.files.includes('semantic.cjs'));
   } finally { f.close(); }
 });
+
+test("packaged quick-fix worker returns verified choices and dependency snapshots without execution or writes",async()=>{
+  const f=fixture();
+  try {
+    const startCheck=packagedChecker(f);
+    f.write('node_modules/typescript/package.json','{"main":"index.cjs"}');
+    f.write('node_modules/typescript/index.cjs',`module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+    const main=f.write('src/main.prose','print "saved"');
+    const source='function apply takes action\n    return action 1, 2\nfail "Never execute"';
+    const options={cwd:f.root,targets:[main],quickFixTargets:[main],overlays:[[main,source]]};
+    const before=snapshot(f.root),result=await startCheck(options).promise;
+    assert.deepEqual(result,checkProject(options));assert.equal(result.diagnostics[0].code,'PROSE_CALL_BOUNDARY');
+    assert.equal(result.diagnostics[0].quickFix.actions.length,2);assert.ok(result.quickFixSnapshot.files.some(item=>item.file===main));
+    assert.deepEqual(snapshot(f.root),before);
+    const manifest=JSON.parse(readFileSync(new URL('../editors/vscode/package.json',import.meta.url),'utf8'));
+    assert.equal(manifest.contributes.configuration.properties['prose.quickFixes.enabled'].default,true);assert.ok(manifest.files.includes('quick-fixes.cjs'));
+  } finally {f.close();}
+});

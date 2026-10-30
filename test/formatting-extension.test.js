@@ -132,6 +132,7 @@ test("extension activation registers the document formatter and disposes it with
   const signatures = { dispose() {} };
   const refactoring = { dispose() {} };
   const semantic = { dispose() {} };
+  const quickFixes = { dispose() {} };
   const source = readFileSync(new URL("../editors/vscode/extension.cjs", import.meta.url), "utf8");
   runInNewContext(source, { exports, require: name => name === "vscode" ? vscode
     : name === "./formatting.cjs" ? { createProvider } : name === "./checking.cjs" ? { createDiagnostics: api => {
@@ -140,7 +141,8 @@ test("extension activation registers the document formatter and disposes it with
     } } : name === "./completing.cjs" ? { createCompletions: api => { assert.equal(api, vscode); return completions; } }
       : name === "./signatures.cjs" ? { createSignatureHelp: api => { assert.equal(api, vscode); return signatures; } }
       : name === "./refactoring.cjs" ? { createRefactoring: api => { assert.equal(api, vscode); return refactoring; } }
-      : name === "./semantic.cjs" ? { createSemanticHighlighting: api => { assert.equal(api, vscode); return semantic; } } : { createLanguageFeatures: api => {
+      : name === "./semantic.cjs" ? { createSemanticHighlighting: api => { assert.equal(api, vscode); return semantic; } }
+      : name === "./quick-fixes.cjs" ? { createQuickFixes: api => { assert.equal(api,vscode); return quickFixes; } } : { createLanguageFeatures: api => {
       assert.equal(name, "./hovering.cjs");
       assert.equal(api, vscode);
       return hovers;
@@ -149,5 +151,5 @@ test("extension activation registers the document formatter and disposes it with
   exports.activate(context);
   assert.equal(registrations[0].language, "prose");
   assert.equal(typeof registrations[0].provider.provideDocumentFormattingEdits, "function");
-  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers, completions, signatures, refactoring, semantic]);
+  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers, completions, signatures, refactoring, semantic, quickFixes]);
 });

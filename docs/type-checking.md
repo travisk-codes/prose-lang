@@ -297,7 +297,7 @@ retain their existing behavior.
 
 ## VS Code diagnostics
 
-Prose Language 0.1.25 checks open, saved Prose files and their imported Prose
+Prose Language 0.1.26 checks open, saved Prose files and their imported Prose
 dependencies on open and save. Diagnostics appear as squiggles and in Problems.
 Use **Prose: Check Saved Files** to run immediately or disable checking with
 `prose.check.enabled`. Nested projects use separate configurations and workers.
@@ -310,6 +310,12 @@ exists) and in the Prose output channel. Highlighting and formatting do not
 require TypeScript or Workspace Trust.
 
 ## Current limits
+
+Editor [quick fixes](../editors/vscode/README.md#quick-fixes) offer explicit
+argument-list and array readings for `PROSE_CALL_BOUNDARY`. They compile the
+edited source and verify the chosen comma's parsed role without running code.
+Neither reading is preferred. Fixes use current buffers and reject stale edits;
+other syntax errors can prevent an alternative from being offered.
 
 Editor [semantic highlighting](../editors/vscode/README.md#semantic-highlighting)
 uses the same project types and current buffers to classify source names. It

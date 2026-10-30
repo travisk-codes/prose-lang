@@ -1,8 +1,8 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Semantic and syntax highlighting, formatting, type checking, autocomplete, parameter hints, navigation, references, and rename for Prose.",
-  "version": "0.1.25",
+  "description": "Semantic and syntax highlighting, formatting, type checking, quick fixes, autocomplete, parameter hints, navigation, references, and rename for Prose.",
+  "version": "0.1.26",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -96,6 +96,12 @@
           "default": true,
           "scope": "resource",
           "description": "Color function values, parameters, variables, properties, and known numeric indexes using project types and current buffers. Requires Workspace Trust and project TypeScript."
+        },
+        "prose.quickFixes.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Offer explicit argument-list and array readings for ambiguous calls through Quick Fix (Ctrl+.). Requires Workspace Trust and project TypeScript."
         },
         "prose.format.width": {
           "type": "integer",
@@ -423,6 +429,7 @@
     "signatures.cjs",
     "refactoring.cjs",
     "semantic.cjs",
+    "quick-fixes.cjs",
     "check-worker.cjs",
     "dist/**",
     "package.json",
