@@ -1621,6 +1621,9 @@ export function compile(source, options = {}) {
   const mapped = (node, code) => mapper && node?.location
     ? mapper.mark(node.location, code, ["name", "call", "function"].includes(node.type) ? (node.value ?? node.name) : undefined) : code;
   const unmapped = code => mapper ? mapper.mark(null, code) : code;
+  // V8 can place a return breakpoint just after its semicolon. Keep that line
+  // ending mapped to the final statement, while the generated brace is unmapped.
+  const closeBody = (nodes, depth, suffix = "}") => mapped(nodes.at(-1), "\n") + unmapped(pad(depth) + suffix);
   const imports = program.filter(node => node.type === "use" && !node.typeOnly);
   const programScope = createScope([], program, null);
   for (const node of imports) {
@@ -1832,7 +1835,7 @@ export function compile(source, options = {}) {
       const inner = createScope(node.params, node.body ?? [], scope);
       const params = node.params.map(variable).join(", ");
       const async = awaits(node.body ?? node.value) ? "async " : "";
-      if (node.body) return `(${async}(${params}) => {\n${emitScope(node.body, inner, depth + 1)}\n${pad(depth)}})`;
+      if (node.body) return `(${async}(${params}) => {\n${emitScope(node.body, inner, depth + 1)}${closeBody(node.body, depth, "})")}`;
       return `(${async}(${params}) => ${expression(node.value, inner, depth)})`;
     }
     if (node.type === "unary") {
@@ -1883,7 +1886,7 @@ export function compile(source, options = {}) {
           ? `${generic(typeVariables([...node.types, node.returns]))}(${parameterList(node, (name, index) => mapped({ location: node.params.locations?.[index] }, variable(name)), undefined, checkedParameter)})${node.returns ? `: ${mapped(node.returns, returnType(node))}` : ""}`
           : `(${node.params.map(variable).join(", ")})`;
         const documentation = check && node.doc ? docComment(node.doc, indent).join("\n") + "\n" : "";
-        return `${documentation}${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}${signature} {\n${emitScope(node.body, inner, depth + 1)}\n${indent}}`;
+        return `${documentation}${indent}${awaits(node.body) ? "async " : ""}function ${variable(node.name)}${signature} {\n${emitScope(node.body, inner, depth + 1)}${closeBody(node.body, depth)}`;
       }
       if (node.type === "assign" && check) {
         const extra = !scope.types.has(node.name) && later.get(scope)?.get(node.name);

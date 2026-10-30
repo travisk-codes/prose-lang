@@ -8,6 +8,7 @@ const { createRefactoring } = require("./refactoring.cjs");
 const { createSemanticHighlighting } = require("./semantic.cjs");
 const { createQuickFixes } = require("./quick-fixes.cjs");
 const { createRunner } = require("./running.cjs");
+const { createDebugging } = require("./debugging.cjs");
 
 exports.activate = context => {
   let formatter;
@@ -26,4 +27,5 @@ exports.activate = context => {
   context.subscriptions.push(createSemanticHighlighting(vscode));
   context.subscriptions.push(createQuickFixes(vscode));
   context.subscriptions.push(createRunner(vscode));
+  context.subscriptions.push(createDebugging(vscode));
 };

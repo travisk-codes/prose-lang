@@ -206,6 +206,21 @@ test("Node's debugger receives the inline map and stops on a mapped Prose statem
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });
 
+test('debug stepping does not map synthetic function and callback closing braces to their headers', () => {
+  const source = 'function double takes number\n    result is number * 2\n    return result\naction is function takes number\n    result is number * 2\n    return result\nprint double 2\nprint action 3';
+  const generated = compile(source, { sourceMap: true, filename: 'debug.prose' });
+  assert.equal(generated.code, compile(source).code);
+  const lookup = sourceMapLookup(generated.map);
+  let closures = 0;
+  const rows = generated.code.split('\n');
+  for (const [line, text] of rows.entries()) if (/^\s*\}\)?;?$/.test(text)) {
+    assert.equal(lookup(line, text.indexOf('}')), null, text); closures++;
+  }
+  assert.ok(closures >= 2);
+  const returns = rows.flatMap((row, line) => row.trim() === 'return _prose_result;' ? [{ row, line }] : []);
+  assert.deepEqual(returns.map(({ row, line }) => lookup(line, row.length)?.line), [3, 6]);
+});
+
 test("playground trace mapping handles real Function wrappers and Firefox frames", () => {
   const source = 'function decode takes text\n    return JSON.parse text\nprint decode "oops"';
   const result = compile(source, { sourceMap: true, filename: "playground.prose" });

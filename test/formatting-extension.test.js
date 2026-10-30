@@ -134,6 +134,7 @@ test("extension activation registers the document formatter and disposes it with
   const semantic = { dispose() {} };
   const quickFixes = { dispose() {} };
   const runner = { dispose() {} };
+  const debugging = { dispose() {} };
   const source = readFileSync(new URL("../editors/vscode/extension.cjs", import.meta.url), "utf8");
   runInNewContext(source, { exports, require: name => name === "vscode" ? vscode
     : name === "./formatting.cjs" ? { createProvider } : name === "./checking.cjs" ? { createDiagnostics: api => {
@@ -144,6 +145,7 @@ test("extension activation registers the document formatter and disposes it with
       : name === "./refactoring.cjs" ? { createRefactoring: api => { assert.equal(api, vscode); return refactoring; } }
       : name === "./semantic.cjs" ? { createSemanticHighlighting: api => { assert.equal(api, vscode); return semantic; } }
       : name === "./running.cjs" ? { createRunner: api => { assert.equal(api, vscode); return runner; } }
+      : name === "./debugging.cjs" ? { createDebugging: api => { assert.equal(api, vscode); return debugging; } }
       : name === "./quick-fixes.cjs" ? { createQuickFixes: api => { assert.equal(api,vscode); return quickFixes; } } : { createLanguageFeatures: api => {
       assert.equal(name, "./hovering.cjs");
       assert.equal(api, vscode);
@@ -153,5 +155,5 @@ test("extension activation registers the document formatter and disposes it with
   exports.activate(context);
   assert.equal(registrations[0].language, "prose");
   assert.equal(typeof registrations[0].provider.provideDocumentFormattingEdits, "function");
-  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers, completions, signatures, refactoring, semantic, quickFixes, runner]);
+  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers, completions, signatures, refactoring, semantic, quickFixes, runner, debugging]);
 });

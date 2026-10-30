@@ -1,6 +1,6 @@
 # Prose Language for Visual Studio Code
 
-Semantic and syntax highlighting, formatting, Run Current File, type checking, autocomplete, parameter hints,
+Semantic and syntax highlighting, formatting, running, F5 debugging, type checking, autocomplete, parameter hints,
 references, and rename
 for `.prose` files, with a softened rainbow
 palette for dark backgrounds matching the Prose website.
@@ -43,6 +43,37 @@ Imports use their saved contents. Save imported files to run their latest change
 the command saves only the selected file. A canceled or failed save stops the run.
 Untitled and virtual documents cannot run. Execution starts only when you invoke
 Run Current File. Opening a file, formatting, and editor analysis never run it.
+
+## Debugging
+
+With a Prose file open in its workspace folder, set a gutter breakpoint and press
+**F5**, or use **Prose: Debug Current File**. The command saves that file and starts
+VS Code's built-in Node debugger. Use **F10** to step over, **F11** to step into a
+function, **Shift+F11** to step out, and **Shift+F5** to stop. During a debug session,
+F5 retains its usual Continue behavior. JavaScript editors retain their normal
+F5 behavior.
+
+Breakpoints and stepping use the original Prose source, including imported Prose
+files. Inspect parameters and variables in **Variables**, hover a name, or add
+it to **Watch**. The debugger uses the inline source maps supplied by the Node
+loader; it does not create compiled JavaScript files in your project. Compiler
+runtime helpers and Node internals are skipped while stepping. Some compiler
+helper names and generated function names can still appear in the debugger.
+Watch expressions and conditional breakpoints use JavaScript expression syntax;
+mapped Prose binding names are available, but full Prose expressions are not
+interpreted by the debugger.
+
+Debugging shares Run Current File's Node executable setting, project/bundled CLI
+selection, working directory, Workspace Trust, and local-folder requirement.
+It saves only the selected file; imports use their saved contents. Program output
+appears in an integrated terminal. The debugger connects to a temporary inspector
+port on `127.0.0.1`, with startup paused so early breakpoints can bind. This launch
+debugs the program's Node process; automatically attaching to separate child
+processes is outside this command's scope.
+
+The command starts a session for the current file without writing `launch.json`.
+To use an existing custom launch configuration, start it through the Run and Debug
+view. F5 in an idle Prose editor always invokes Debug Current File.
 
 ## Semantic highlighting
 

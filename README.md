@@ -47,6 +47,10 @@ Click the editor's play button or use **Prose: Run Current File** to save and ru
 the selected file in a terminal. It uses the project or bundled CLI and requires
 Node 20.6 or newer; see [running files](editors/vscode/README.md#running-files).
 
+Set breakpoints in a Prose file and press **F5** to debug it, inspect variables,
+and step through imported functions using the Node debugger and inline source maps.
+See [debugging](editors/vscode/README.md#debugging) for controls and requirements.
+
 [Quick fixes](editors/vscode/README.md#quick-fixes) (`Ctrl+.`) offer explicit
 argument-list and array readings for ambiguous calls, so you can choose their
 meaning directly in the editor.

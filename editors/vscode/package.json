@@ -1,8 +1,8 @@
 {
   "name": "prose-language",
   "displayName": "Prose Language",
-  "description": "Highlighting, formatting, live type checking, autocomplete, navigation, and Run Current File for Prose.",
-  "version": "0.1.29",
+  "description": "Highlighting, formatting, live type checking, autocomplete, navigation, running, and F5 debugging for Prose.",
+  "version": "0.1.30",
   "main": "./extension.cjs",
   "extensionKind": ["workspace"],
   "activationEvents": ["onLanguage:prose"],
@@ -16,7 +16,8 @@
   },
   "categories": [
     "Programming Languages",
-    "Formatters"
+    "Formatters",
+    "Debuggers"
   ],
   "repository": {
     "type": "git",
@@ -45,6 +46,18 @@
       "category": "Prose",
       "icon": "$(play)",
       "enablement": "isWorkspaceTrusted && editorLangId == prose && resourceScheme == file && processExecutionSupported"
+    }, {
+      "command": "prose.debug",
+      "title": "Debug Current File",
+      "category": "Prose",
+      "icon": "$(debug-alt)",
+      "enablement": "isWorkspaceTrusted && editorLangId == prose && resourceScheme == file && processExecutionSupported"
+    }],
+    "breakpoints": [{ "language": "prose" }],
+    "keybindings": [{
+      "command": "prose.debug",
+      "key": "f5",
+      "when": "editorLangId == prose && resourceScheme == file && isWorkspaceTrusted && !inDebugMode"
     }],
     "menus": {
       "editor/title": [{
@@ -66,7 +79,7 @@
           "type": "string",
           "default": "node",
           "scope": "machine-overridable",
-          "description": "Node executable used by Run Current File (Node 20.6 or newer). Set a path to node.exe if Node is not on PATH; supply the executable only, without arguments."
+          "description": "Node executable used by Run Current File and Debug Current File (Node 20.6 or newer). Set a path to node.exe if Node is not on PATH; supply the executable only, without arguments."
         },
         "prose.check.enabled": {
           "type": "boolean",
@@ -456,6 +469,7 @@
     "semantic.cjs",
     "quick-fixes.cjs",
     "running.cjs",
+    "debugging.cjs",
     "check-worker.cjs",
     "dist/**",
     "package.json",
