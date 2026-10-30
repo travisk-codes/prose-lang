@@ -1,5 +1,8 @@
 # Prose Language for Visual Studio Code
 
+Version 0.1.33 adds `{like props}` to copy an object's properties into markup
+attributes, with type checking and editor features inside spread expressions.
+
 Version 0.1.32 adds explicit generic declarations such as `of item` and
 constraints such as `of choice as text`, including highlighting, type checking,
 and constraint information in hovers and parameter hints.

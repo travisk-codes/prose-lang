@@ -75,6 +75,14 @@ export function readMarkup(source, start) {
       if (source[at] === '>') { at++; break; }
       if (!tag.name) fail("A fragment opens with '<>' and cannot have attributes.");
       if (at === before) fail('Put a space between markup attributes.');
+      if (source[at] === '{') {
+        const start = at, value = expression();
+        const marker = /^\s*like\b/.exec(source.slice(value.start, value.end));
+        if (!marker) fail('Spread attributes use {like expression}.', start);
+        value.start += marker[0].length;
+        attributes.push({ spread: true, start, value });
+        continue;
+      }
       const attribute = name('attribute');
       if (attribute.name.includes('.')) fail('Attribute names cannot contain periods.', attribute.start);
       if (seen.has(attribute.name)) fail(`Duplicate attribute '${attribute.name}'.`, attribute.start);

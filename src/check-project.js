@@ -281,6 +281,13 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
     // The corresponding checking body reports these more accurately than its
     // generated import declaration, and cannot be skipped by skipLibCheck.
     if (entry?.declaration) continue;
+    // Prose explicitly allows later markup attributes/spreads to replace earlier
+    // ones. Keep TypeScript's prop-type errors, but omit its overwrite warning
+    // for generated JSX attributes. Ordinary TSX and object warnings still apply.
+    if (entry?.record.jsx && diagnostic.code === 2783 && diagnostic.start !== undefined &&
+        ts.isJsxAttribute(ts.getTokenAtPosition(diagnostic.file, diagnostic.start).parent)) {
+      ignored++; continue;
+    }
     const message = text(diagnostic);
     if (entry && untypedError(diagnostic.code, message)) { ignored++; continue; }
     const item = ordinaryDiagnostic(diagnostic, optionErrors.has(diagnostic) ? "configuration" : "typescript");

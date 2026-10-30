@@ -76,6 +76,11 @@ test('markup highlights tags and attributes, with Prose expressions and literal 
   assert.ok(!scopes(4, 'limit').includes('entity.name.tag.prose'));
 });
 
+test('markup spread keywords and expressions use ordinary Prose coloring', () => {
+  hasScope('return <input {like no_autofill} />', 'like', 'keyword.other.prose');
+  hasScope('return <input {like props.defaults} />', 'defaults', 'variable.other.property.prose');
+});
+
 test("the extension registers .prose and a resolvable grammar and configuration", () => {
   assert.ok(manifest.contributes.languages.some(language =>
     language.id === "prose" && language.extensions.includes(".prose")));

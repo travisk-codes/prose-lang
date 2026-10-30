@@ -1,5 +1,10 @@
 "Import these components into a React project with the Prose Vite plugin."
 
+no_autofill is object type is "search", auto_complete is "off"
+
+export function SearchInput
+    return <input {like no_autofill} aria-label="Search" placeholder="Search…" />
+
 export type EmptyStateProps is object
     title as text
     detail as text

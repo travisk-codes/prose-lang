@@ -1008,6 +1008,18 @@ Attribute names use the usual Prose conversion: `class_name` becomes `className`
 `on_click` becomes `onClick`, and `aria-label` and `data-id` stay as written.
 A bare boolean attribute such as `disabled` means `disabled={true}`.
 
+Use `{like expression}` to copy an object's properties into the attributes,
+just as `object like` copies properties into an object:
+
+```prose
+no_autofill is object type is "search", auto_complete is "off"
+view is <input {like no_autofill} placeholder="Find a tag…" />
+```
+
+Attributes are applied from left to right, so later attributes or spreads
+override earlier ones. A spread keeps the object's existing property names and
+copies its properties shallowly; the object itself stays unchanged.
+
 ```prose
 rows is books.map function takes book
     return <li key={book.id}>{book.title}</li>
@@ -1029,8 +1041,8 @@ The formatter preserves authored markup layout and formats surrounding Prose.
 
 For now, define callbacks with an indented body **before** the markup and pass
 their names in braces. Single-expression inline callbacks work inside braces.
-Attribute spreading, HTML comments, and JSX's JavaScript comment syntax are not
-supported. To pass a tag as a function argument, use `render (<Card />)` or
+HTML comments and JSX's JavaScript comment syntax are not supported.
+To pass a tag as a function argument, use `render (<Card />)` or
 `render with <Card />`; this keeps ordinary `a < b` comparisons unambiguous.
 See [react_components.prose](examples/react_components.prose) for typed components.
 

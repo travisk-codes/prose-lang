@@ -831,6 +831,11 @@ class Expression {
       }
       const seen = new Set();
       const attributes = node.attributes.map(attribute => {
+        if (attribute.spread) {
+          const value = expression(attribute.value);
+          if (!value) fail(at(attribute).source.line, 'A spread attribute needs an object expression.');
+          return located({ spread: true, value }, at(attribute));
+        }
         const name = camel(attribute.name);
         if (seen.has(name)) fail(at(attribute).source.line, `Duplicate React property '${name}'.`);
         seen.add(name);
@@ -1899,7 +1904,8 @@ export function compile(source, options = {}) {
     if (node.type === 'element') {
       const tag = value => value.type === 'literal' ? value.value : value.type === 'name' ? mapped(value, resolve(value, scope)) : `${tag(value.object)}.${mapped(value, camel(value.name))}`;
       const name = node.tag ? tag(node.tag) : '';
-      const attributes = node.attributes.map(attribute => mapped(attribute, ` ${attribute.name}={${emit(attribute.value)}}`)).join('');
+      const attributes = node.attributes.map(attribute => mapped(attribute, attribute.spread
+        ? ` {...${emit(attribute.value)}}` : ` ${attribute.name}={${emit(attribute.value)}}`)).join('');
       const closing = node.closingTag ? tag(node.closingTag) : name;
       return `<${name}${attributes}>${node.children.map(child => `{${emit(child)}}`).join('')}</${closing}>`;
     }
@@ -1976,7 +1982,8 @@ export function compile(source, options = {}) {
     const emit = child => expression(child, scope, depth);
     if (node.type === 'element') {
       const tag = node.tag ? emit(node.tag) : '__prose_fragment';
-      const attributes = node.attributes.length ? `{${node.attributes.map(attribute => mapped(attribute, `${JSON.stringify(attribute.name)}: ${emit(attribute.value)}`)).join(', ')}}` : 'null';
+      const attributes = node.attributes.length ? `{${node.attributes.map(attribute => mapped(attribute, attribute.spread
+        ? `...${emit(attribute.value)}` : `[${JSON.stringify(attribute.name)}]: ${emit(attribute.value)}`)).join(', ')}}` : 'null';
       return `__prose_element(${[tag, attributes, ...node.children.map(emit)].join(', ')})`;
     }
     // Lists and arguments may spread a collection into them with `each of`.

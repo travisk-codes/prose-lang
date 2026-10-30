@@ -55,6 +55,38 @@ print <><div class_name="greeting" data-id='x'>Hello <span>{name}</span>!</div><
   assert.doesNotMatch(compile('print 1').code, /from "react"/);
 });
 
+test('attribute spreads preserve property names, order, and single evaluation', () => {
+  const output = run(`defaults is object type is "search", auto_complete is "off"
+overrides is object type is "email", disabled is true
+print <input {like defaults} type="text" {like overrides} disabled={false} />
+print defaults
+state is object calls is 0
+function attributes
+    state.calls is state.calls + 1
+    return object title is "once"
+print <div {like attributes run} />
+print state.calls
+raw is object data_id is "copied"
+raw.("data-id") is "literal"
+print <div {like raw} />
+print <div {like unset} title="fine" />`);
+  assert.deepEqual(output[0].props, { type: 'email', autoComplete: 'off', disabled: false });
+  assert.deepEqual(output[1], { type: 'search', autoComplete: 'off' });
+  assert.deepEqual(output[2].props, { title: 'once' });
+  assert.equal(output[3], 1);
+  assert.deepEqual(output[4].props, { dataId: 'copied', 'data-id': 'literal' });
+  assert.deepEqual(output[5].props, { title: 'fine' });
+});
+
+test('spread syntax errors identify the attribute and keep duplicate definitions explicit', () => {
+  for (const [source, message] of [
+    ['print <div\n    {props}\n/>', /Line 2: Spread attributes use/],
+    ['print <div\n    {like}\n/>', /Line 2: A spread attribute needs/],
+    ['print <div {...props} />', /Spread attributes use/],
+    ['props is object\nprint <div title="a" {like props} title="b" />', /Duplicate attribute/]
+  ]) assert.throws(() => compile(source), message);
+});
+
 test('text follows JSX line trimming with exact strings and Unicode entities', () => {
   for (const eol of ['\n', '\r\n']) {
     const [node] = run(['print <p>', '    Hello', '\tworld &amp; &#x1F600; &nbsp;', '', '    again', '</p>'].join(eol));
@@ -131,6 +163,57 @@ test('React checking validates props and contextually types event callbacks at P
     f.write('main.prose', source);
     result = checkProject({ cwd: f.root, typescript: ts, targets: [file] });
     assert.equal(result.exitCode, 0, JSON.stringify(result.diagnostics));
+  } finally { f.close(); }
+});
+
+test('spread props check component requirements and source values at Prose positions', () => {
+  const f = fixture();
+  try {
+    const prefix = 'type Props is object\n    title as text\nfunction Card takes props as Props\n    return <div>{props.title}</div>\n';
+    const good = prefix + 'props is object title is "Prose"\nview is <Card {like props} />\n';
+    const file = f.write('main.prose', good);
+    assert.equal(checkProject({ cwd: f.root, typescript: ts, targets: [file] }).exitCode, 0);
+    f.write('main.prose', 'props is object disabled is false\nview is <button disabled {like props} />');
+    const overridden = checkProject({ cwd: f.root, typescript: ts, targets: [file] });
+    assert.equal(overridden.exitCode, 0, JSON.stringify(overridden.diagnostics));
+    f.write('other.tsx', 'const props = { disabled: false }; export const view = <button disabled {...props} />;');
+    f.write('main.prose', 'use view from "./other"\nprint <div>{view}</div>');
+    assert.ok(checkProject({ cwd: f.root, typescript: ts, targets: [file] }).diagnostics.some(item => item.code === 2783 && item.file.endsWith('other.tsx')));
+    f.write('main.prose', good.replace('title is "Prose"', 'title is 42'));
+    let result = checkProject({ cwd: f.root, typescript: ts, targets: [file] });
+    assert.ok(result.diagnostics.some(item => item.code === 2322 && item.line === 6), JSON.stringify(result.diagnostics));
+    f.write('main.prose', prefix + 'view is <Card {like object label is "missing"} />');
+    result = checkProject({ cwd: f.root, typescript: ts, targets: [file] });
+    assert.ok(result.diagnostics.some(item => item.code === 2741 && /title/.test(item.message)), JSON.stringify(result.diagnostics));
+    f.write('main.prose', 'props is object disabled is "bad"\nview is <button\n    {like props}\n/>');
+    result = checkProject({ cwd: f.root, typescript: ts, targets: [file] });
+    assert.ok(result.diagnostics.some(item => item.code === 2322 && item.line === 2), JSON.stringify(result.diagnostics));
+    f.write('main.prose', 'view is <div {like 42} />');
+    result = checkProject({ cwd: f.root, typescript: ts, targets: [file] });
+    assert.ok(result.diagnostics.some(item => item.code === 2698), JSON.stringify(result.diagnostics));
+  } finally { f.close(); }
+});
+
+test('spread expressions retain formatting, hover, completion, signature help and rename', () => {
+  const f = fixture();
+  try {
+    const prefix = 'function attributes takes title as text, giving object\n    return object title is title\nprops is object title is "Prose"\n';
+    for (const eol of ['\n', '\r\n']) {
+      const source = (prefix + 'view is <div\n    {like props}\n/>\n').replaceAll('\n', eol);
+      const file = f.write('main.prose', source);
+      const result = checkProject({ cwd: f.root, typescript: ts, targets: [file], hoverTargets: [file] });
+      assert.equal(result.exitCode, 0, JSON.stringify(result.diagnostics));
+      assert.ok(result.hovers.some(item => item.line === 5 && /props/.test(item.code)), JSON.stringify(result.hovers));
+      const renamed = refactorProject({ cwd: f.root, typescript: ts, refactor: { ...cursor(file, source, 'props is'), newName: 'defaults' } });
+      assert.equal(renamed.edits.length, 2, JSON.stringify(renamed));
+      assert.equal(format(source), source);
+    }
+    let source = prefix + 'view is <div {like props.} />', file = f.write('main.prose', source);
+    const completion = completeProject({ cwd: f.root, typescript: ts, completion: cursor(file, source, '} />') });
+    assert.ok(completion.items.some(item => item.label === 'title'), JSON.stringify(completion));
+    source = prefix + 'view is <div {like attributes with } />'; f.write('main.prose', source);
+    const help = signatureHelpProject({ cwd: f.root, typescript: ts, signature: cursor(file, source, '} />') }).signatureHelp;
+    assert.ok(help?.signatures.some(item => /attributes/.test(item.label)), JSON.stringify(help));
   } finally { f.close(); }
 });
 
