@@ -56,6 +56,8 @@ try {
     }
     const stale = [];
     for (const file of proseFiles(targets.map(target => resolve(target)))) {
+      const input = relative(process.cwd(), file);
+      if (!file.endsWith(".prose")) throw new Error(`${input}: expected a .prose file.`);
       const { declarations } = compileFile(file);
       if (!declarations) continue;
       const shown = relative(process.cwd(), declarationPath(file));

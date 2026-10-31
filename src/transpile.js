@@ -130,7 +130,8 @@ function tokenize(text, line, locations = false, context) {
         else if (char === '"') { closed = true; break; }
       }
       if (!closed) fail(line, "Unterminated string.");
-      if (isWord(tokens.at(-1), "pattern")) {
+      // After an accessor, `pattern` is a property name, not the start of a pattern literal.
+      if (isWord(tokens.at(-1), "pattern") && ![".", ":"].includes(tokens.at(-2)?.value)) {
         // After `pattern` the text is a regular expression, kept as typed except that \" is a quote.
         const pattern = tokens.at(-1);
         tokens[tokens.length - 1] = { type: "pattern", value: text.slice(start + 1, pos - 1).replace(/\\(.)/g, (all, char) => char === '"' ? '"' : all) };
@@ -916,10 +917,10 @@ export function continues(tokens) {
     else if (token.type === "symbol" && token.value === ")") depth--;
   }
   const last = tokens.at(-1);
-  const conditionalEnd = last.type === "word" && ["if", "else"].includes(last.value) && tokens.length > 1 &&
-    ![".", ":"].includes(tokens.at(-2)?.value);
+  const propertyWord = tokens.length > 1 && [".", ":"].includes(tokens.at(-2)?.value);
+  const conditionalEnd = last.type === "word" && ["if", "else"].includes(last.value) && tokens.length > 1 && !propertyWord;
   return depth > 0 || (last.type === "symbol" && continuingSymbols.has(last.value)) ||
-    (last.type === "word" && continuingWords.has(last.value)) || conditionalEnd;
+    (last.type === "word" && continuingWords.has(last.value) && !propertyWord) || conditionalEnd;
 }
 
 // Exclude object/type fields named `if` or `while` from conditional headers.
@@ -1598,6 +1599,25 @@ function awaits(node) {
   return node.type === "await" || Object.values(node).some(awaits);
 }
 
+// The first `wait for` outside a function or lambda. It needs module output, because
+// JavaScript only allows a top-level await in a module.
+function topLevelAwait(node) {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = topLevelAwait(child);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!node || typeof node !== "object" || node.type === "lambda" || node.type === "function") return null;
+  if (node.type === "await") return node;
+  for (const value of Object.values(node)) {
+    const found = topLevelAwait(value);
+    if (found) return found;
+  }
+  return null;
+}
+
 function createScope(params, body, parent) {
   const locals = assignedNames(body);
   for (const param of params) locals.delete(param);
@@ -1944,6 +1964,13 @@ export function compile(source, options = {}) {
   for (const node of program.filter(node => node.exported && node.type !== "typeDeclaration")) {
     if (exports.has(camel(node.name))) fail(node.line, `'${node.name}' is already exported.`);
     exports.set(camel(node.name), variable(node.name));
+  }
+  // Output that carries a value import, export, runtime import, or React import is a module.
+  // Type-only imports and exports add no such syntax, so they cannot make an await legal.
+  const moduleSyntax = hasMarkup || Boolean(options.runtime) || imports.length > 0 || exports.size > 0;
+  const topLevelWait = topLevelAwait(program);
+  if (topLevelWait && !moduleSyntax) {
+    fail(topLevelWait.line, "Top-level 'wait for' needs a module: add a value use or export, or move the wait into a function.");
   }
   let loopId = 0;
   // The checking output is TypeScript written to be type-checked, never run: plain property
@@ -2298,7 +2325,7 @@ export function compile(source, options = {}) {
     const { code, map } = mapper ? mapper.finish(checkCode) : { code: checkCode, map: null };
     return { code: options.sourceMap === "inline" ? code + inlineSourceMap(map) + "\n" : code, map, module: true, declarations: declarationsFor(program), ...(hasMarkup ? { jsx: true } : {}) };
   }
-  const module = hasMarkup || Boolean(options.runtime) || imports.length > 0 || exports.size > 0 ||
+  const module = moduleSyntax ||
     program.some(node => node.typeOnly || (node.type === "typeDeclaration" && node.exported));
   const markedCode = [
     module ? "" : '"use strict";',

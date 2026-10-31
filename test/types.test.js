@@ -284,6 +284,21 @@ test("the types command writes declarations, skips current files, and checks for
   }
 });
 
+test("the types command refuses explicit files that are not Prose", () => {
+  const folder = mkdtempSync(join(tmpdir(), "prose-types-"));
+  const cli = fileURLToPath(new URL("../bin/prose.js", import.meta.url));
+  const file = join(folder, "notes.txt");
+  try {
+    writeFileSync(file, "export answer is 42");
+    const result = spawnSync(process.execPath, [cli, "types", file], { encoding: "utf8", cwd: folder });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /notes\.txt: expected a \.prose file\./);
+    assert.equal(readFileSync(file, "utf8"), "export answer is 42");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 test("the Vite plugin writes declarations as it compiles when asked", () => {
   const folder = mkdtempSync(join(tmpdir(), "prose-vite-types-"));
   try {

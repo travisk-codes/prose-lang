@@ -52,6 +52,17 @@ test("blank lines, CRLF, BOM, tabs, and unary negatives", () => {
   assert.deepEqual(run('\uFEFFx is -2\r\n\r\nif x < 0\r\n\tprint -x\r\nprint 7'), [2, 7]);
 });
 
+test("property names that are continuation words keep an indented body", () => {
+  assert.deepEqual(run([
+    "record is object is is true, and is true",
+    "if record:is",
+    '    print "one"',
+    '    print "two"',
+    "if record:and",
+    '    print "three"'
+  ].join("\n")), ["one", "two", "three"]);
+});
+
 test("loop upper bound is evaluated once", () => {
   assert.deepEqual(run("limit is 3\nfor i is 1 to limit\n    print i\n    limit is 0"), [1, 2, 3]);
 });

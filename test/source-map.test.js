@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { compile, parse } from "../src/transpile.js";
+import { compile } from "../src/transpile.js";
 import { inlineSourceMap, mapStackTrace, sourceMapLookup } from "../src/source-map.js";
 import prose from "../src/vite.js";
 
@@ -129,7 +129,6 @@ test("all runnable examples emit identical JavaScript with maps enabled", () => 
   for (const name of readdirSync(folder).filter(name => name.endsWith(".prose"))) {
     const source = readFileSync(join(folder, name), "utf8");
     const readModule = path => readFileSync(resolve(folder, path), "utf8");
-    try { parse(source, { readModule }); } catch { continue; }
     const plain = compile(source, { readModule });
     const result = compile(source, { readModule, sourceMap: true, filename: name });
     assert.equal(result.code, plain.code, name);

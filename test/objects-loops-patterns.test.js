@@ -132,6 +132,14 @@ test("patterns are regular expressions with raw text, flag words, and Unicode al
   assert.throws(() => transpile('print pattern "\\-"'), /Line 1: This pattern isn't a valid regular expression/);
 });
 
+test("a property named pattern can be called with a string", () => {
+  assert.deepEqual(run([
+    'tool is object pattern is function takes text return "matched " + text',
+    'print tool.pattern "x"',
+    'print tool:("pattern") "y"'
+  ].join("\n")), ["matched x", "matched y"]);
+});
+
 test("assignment is recognized by its shape, so calls containing is are not assignments", () => {
   assert.deepEqual(run([
     "log is array", "log:push object level is \"info\"", "print log",

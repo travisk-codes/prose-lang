@@ -1,8 +1,12 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-/** The declaration file TypeScript reads for `name.prose`: `name.d.prose.ts`. */
-export const declarationPath = file => file.replace(/\.prose$/, ".d.prose.ts");
+/** The declaration file TypeScript reads for `name.prose`: `name.d.prose.ts`.
+ * Refuses other paths, which would otherwise name the input file itself. */
+export const declarationPath = file => {
+  if (!file.endsWith(".prose")) throw new Error(`Expected a .prose file: ${file}`);
+  return file.replace(/\.prose$/, ".d.prose.ts");
+};
 
 /** Whether a file already holds these declarations, ignoring line-ending differences. */
 export function declarationsCurrent(file, declarations) {
@@ -17,8 +21,8 @@ export function writeDeclarations(file, declarations) {
   return true;
 }
 
-// Folders a search skips: dependencies and build output, as `prose check` skips them too.
-const skippedFolders = new Set(["node_modules", "dist", "build", "coverage"]);
+// Folders a search skips: dependencies, build output, and design sketches.
+const skippedFolders = new Set(["node_modules", "dist", "build", "coverage", "sketches"]);
 
 /** The `.prose` files in some files and folders, searching folders recursively. Hidden
  * entries, symlinks, and dependency or build folders are skipped.

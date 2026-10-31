@@ -65,6 +65,8 @@ functions.
 - `-1 % 26` and `remainder -1 26` give **-1**; `-1 mod 26` gives **25**.
 
 The factorial, Fibonacci, FizzBuzz, array, object, and cipher examples are
-smaller programs. `MusicTicker.prose` is a design sketch that doesn't compile:
-it uses an older `await` and `catch` syntax (Prose now writes `wait for` and
-`on error`) and nested named functions, which aren't implemented.
+smaller programs. [sketches/MusicTicker.prose](sketches/MusicTicker.prose) is a
+design sketch that doesn't compile: it uses an older `await` and `catch` syntax
+(Prose now writes `wait for` and `on error`) and nested named functions, which
+aren't implemented. Design sketches live under `sketches/`, which folder searches
+skip.

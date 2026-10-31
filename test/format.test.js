@@ -189,6 +189,16 @@ test("format preserves documentation, types, object bodies, and inline function 
   assert.match(formatted, /return object\n        name is name/);
 });
 
+test("format keeps a body after a header ending in a continuation-word property", () => {
+  const source = [
+    "record is object is is true",
+    "if record:is",
+    '    print "one"',
+    '    print "two"'
+  ].join("\n");
+  assert.equal(format(source), source + "\n");
+});
+
 test("format preserves CRLF and supports editor indentation options", () => {
   const source = 'function greet\r\n  print "hello"\r\n';
   assert.equal(format(source, { tabWidth: 2 }), source);
@@ -213,8 +223,6 @@ test("format is stable and preserves meaning for every runnable example", () => 
   for (const name of readdirSync(folder).filter(name => name.endsWith(".prose"))) {
     const source = readFileSync(join(folder, name), "utf8");
     const options = { readModule: path => readFileSync(resolve(folder, path), "utf8") };
-    // Design sketches and unfinished user experiments can have unsupported syntax.
-    try { parse(source, options); } catch { continue; }
     const formatted = format(source, options);
     assert.equal(format(formatted, options), formatted, name);
     assert.equal(compile(source, options).declarations, compile(formatted, options).declarations, name);

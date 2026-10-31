@@ -35,7 +35,7 @@ function findConfig(start) {
 
 function filesUnder(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
-    if (entry.name.startsWith(".") || ["node_modules", "dist", "build", "coverage"].includes(entry.name) || entry.isSymbolicLink()) return [];
+    if (entry.name.startsWith(".") || ["node_modules", "dist", "build", "coverage", "sketches"].includes(entry.name) || entry.isSymbolicLink()) return [];
     const file = join(directory, entry.name);
     return entry.isDirectory() ? filesUnder(file) : file.endsWith(".prose") ? [file] : [];
   });

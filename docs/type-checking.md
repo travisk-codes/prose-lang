@@ -27,8 +27,8 @@ Prose's development dependency.
 - With no paths, check Prose files selected by the configuration's `files`,
   `include`, and `exclude` settings. Project ambient `.d.ts` files are included.
 - Explicit files and folders select the roots regardless of `include`/`exclude`.
-  Folder scans skip hidden entries, symlinks, `node_modules`, `dist`, `build`, and
-  `coverage`.
+  Folder scans skip hidden entries, symlinks, `node_modules`, `dist`, `build`,
+  `coverage`, and `sketches`.
 - Imported Prose modules are checked too, including imports outside the selected
   roots and imports reached through TypeScript modules. TypeScript dependencies
   are resolved using the project's normal module and path-alias settings.

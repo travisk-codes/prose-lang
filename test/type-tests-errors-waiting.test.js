@@ -102,6 +102,11 @@ test("wait for makes the function around it asynchronous", async () => {
   assert.match(code, /^function _prose_now/m);
 });
 
+test("top-level wait for requires a module", () => {
+  assert.throws(() => transpile("print wait for Promise:resolve 1"), /Line 1: Top-level 'wait for' needs a module/);
+  assert.doesNotThrow(() => transpile("export ready is 1\nprint wait for Promise:resolve ready"));
+});
+
 test("declarations give a waiting function's result as a promise", () => {
   const { declarations } = compile([
     "export function load takes key as text, giving number", "    return wait for (Promise:resolve 1)",
