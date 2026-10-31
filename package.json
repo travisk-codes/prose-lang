@@ -1,20 +1,60 @@
 {
   "name": "prose-lang",
   "version": "0.2.3",
-  "private": true,
   "description": "An experimental Prose to JavaScript transpiler",
+  "license": "MIT",
   "type": "module",
-  "exports": {
-    ".": "./src/transpile.js",
-    "./format": "./src/format.js",
-    "./check": "./src/check-project.js",
-    "./vite": "./src/vite.js"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/travisk-codes/prose-lang.git"
   },
+  "homepage": "https://github.com/travisk-codes/prose-lang#readme",
+  "bugs": {
+    "url": "https://github.com/travisk-codes/prose-lang/issues"
+  },
+  "keywords": [
+    "prose",
+    "language",
+    "compiler",
+    "transpiler",
+    "javascript",
+    "typescript"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/transpile.d.ts",
+      "default": "./src/transpile.js"
+    },
+    "./format": {
+      "types": "./src/format.d.ts",
+      "default": "./src/format.js"
+    },
+    "./check": {
+      "types": "./src/check-project.d.ts",
+      "default": "./src/check-project.js"
+    },
+    "./vite": {
+      "types": "./src/vite.d.ts",
+      "default": "./src/vite.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./src/transpile.d.ts",
   "bin": {
     "prose": "bin/prose.js"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "docs/",
+    "README.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test",
+    "typecheck": "tsc -p tsconfig.types.json",
     "format": "node bin/prose.js format",
     "check": "node bin/prose.js check",
     "example": "node bin/prose.js examples/fizzbuzz.prose --run",
@@ -31,9 +71,23 @@
   "engines": {
     "node": ">=20.6"
   },
+  "peerDependencies": {
+    "vite": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "^0.25.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^6.0.3",
+    "vite": "^6.4.5",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2"
   }

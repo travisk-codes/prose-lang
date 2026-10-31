@@ -30,7 +30,8 @@ Preview builds show a development banner and the actual passing/failing test cou
 | `syntax.mjs` | Shared JavaScript and TypeScript highlighting for the build and live playground |
 | `syntax.test.mjs` | Checks highlighting, HTML escaping, and browser/build consistency |
 | `vendor/prism/` | Bundled Prism grammars and their MIT license |
-| `build.mjs` | Fills the placeholders and writes the page |
+| `compiler-entry.js` | Browser entry point; esbuild bundles it from the compiler modules in `src/` |
+| `build.mjs` | Bundles the compiler, fills the placeholders, and writes the page |
 | `hero.prose` | The program on the left page of the opening spread |
 | `hero.js` | The same program written by hand in JavaScript, for the right page |
 | `play.prose` | The playground's starting program |
@@ -41,7 +42,8 @@ The build keeps the page truthful:
 - Compiled output, generated declarations, and error messages come from the compiler in `src/`.
 - `hero.js` must print exactly what `hero.prose` prints, or the build stops.
 - The test count is read from a run of the test suite, which must pass.
-- The playground embeds the compiler from `src/`, so it always matches this repository.
+- The playground embeds an esbuild bundle of the compiler modules in `src/`, so it
+  always matches this repository.
 
 The playground runs automatically by default. Turn off **Auto-run** to edit first, then use **Run** or Ctrl/Cmd+Enter. **Reset** restores the selected example. Tab inserts four spaces in the editor; Shift+Tab moves focus out.
 

@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { buildSync } from "esbuild";
 import { inlineScript } from "./scripts.mjs";
 import { syntaxSource, highlightCode } from "./syntax.mjs";
 
@@ -142,9 +143,19 @@ const errata = [
     note: "This one happens while the program runs, still with its line. Write maybe person:name when a value can be missing." }
 ];
 
-// The compiler itself, for the playground: runtime and transpiler in one script, exporting compile.
-const strip = file => readFileSync(repo + file, "utf8").split("\n").filter(line => !line.startsWith("import ")).join("\n").replace(/^export /gm, "");
-const compiler = `const Prose = (() => {\n${strip("src/runtime.js")}\n${strip("src/check.js")}\n${strip("src/source-map.js")}\n${strip("src/object-call-arity.js")}\n${strip("src/call-arity.js")}\n${strip("src/layout-diagnostics.js")}\n${strip("src/markup.js")}\n${strip("src/transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`;
+// The compiler itself, for the playground: a browser bundle of the same modules
+// the CLI uses, rather than source text concatenated by hand.
+const compiler = buildSync({
+  entryPoints: [fileURLToPath(new URL("compiler-entry.js", here))],
+  bundle: true,
+  format: "iife",
+  globalName: "Prose",
+  platform: "browser",
+  target: ["es2020"],
+  write: false,
+  legalComments: "none",
+  logLevel: "silent"
+}).outputFiles[0].text;
 
 const examples = [
   { name: "Reading list", source: readFileSync(new URL("play.prose", here), "utf8").trim() },

@@ -119,7 +119,7 @@ npm.cmd run format -- examples/fizzbuzz.prose
 ```
 
 Files and folders are accepted; folders are searched recursively, skipping
-hidden entries and `node_modules`. Formatting updates files in place. `--check`
+hidden entries, `node_modules`, and `sketches`. Formatting updates files in place. `--check`
 reports files that would change and exits with status 1 without writing them.
 Already formatted files are left alone. A syntax error stops the batch before
 any files are written; unfinished design sketches need valid syntax first.
@@ -733,6 +733,9 @@ function loadNotes takes url as text, giving list of text
     return wait for response:json run
 ```
 
+At the top level, `wait for` needs a module file (one with a value `use` or
+`export`); otherwise put it inside a function.
+
 The bit operators work on 32-bit integers as JavaScript's do: `a xor b` is
 `a ^ b`, `a shifted left by n` is `a << n`, and `a shifted right by n` is
 `a >>> n`, which fills with zeros, so its result is never negative.
@@ -1005,7 +1008,7 @@ with `use` or `export` compiles to an ES module. Exported names keep their
 spelling, so JavaScript sees `nextDay` and `week_length`.
 
 To use `.prose` files in a [Vite](https://vite.dev) project (including Vitest),
-add this repository as a development dependency and its plugin to the Vite
+install this package as a development dependency and add its plugin to the Vite
 configuration:
 
 ```ts
@@ -1329,12 +1332,17 @@ for each integer from 0 through 10 (two identical lines per input).
 
 `reading_list.prose` demonstrates `for each`, function values, and JavaScript
 methods; `habits.prose` adds `maybe` and imports between Prose files;
-`tour.prose` covers everything. `MusicTicker.prose` is a design sketch that
-doesn't compile.
+`tour.prose` covers most of the language. `sketches/MusicTicker.prose` is a design
+sketch that doesn't compile.
 
 Nested named functions and default imports aren't implemented. Unsupported
 syntax produces a line-numbered error.
 
 The library entry points are `compile` and `transpile` in `src/transpile.js`.
 The implementation parses expressions and indentation into an AST, resolves
-every name, then emits a standalone JavaScript script or an ES module.
+every name, then emits a standalone JavaScript script or an ES module. The full
+grammar reference is in [docs/grammar.md](docs/grammar.md).
+
+See [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
+[SECURITY.md](SECURITY.md) for release notes, development commands, and the
+execution/trust model.
