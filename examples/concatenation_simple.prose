@@ -1,0 +1,16 @@
+function find_substring takes
+    text as text,
+    words as list of text,
+giving list of number
+    size is length words.1
+    found is array
+    for start is 0 to length text - size * length words
+        remaining is words.slice run
+        position is start
+        while remaining.length
+            piece is text.slice with position, (position + size)
+            if not remaining.includes piece stop
+            remaining.splice with (remaining.index_of piece), 1
+            position is position + size
+        if not remaining.length then found.push start
+    return found

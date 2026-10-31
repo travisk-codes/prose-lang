@@ -1,0 +1,13 @@
+function max_area takes heights as list of number, giving number
+    most is 0
+    left is 1
+    right is length heights
+    while left < right
+        depth is Math.min with heights.left, heights.right
+        area is (right - left) * depth
+        most is Math.max with most, area
+        if heights.left <= heights.right
+            left is left + 1
+        else
+            right is right - 1
+    return most

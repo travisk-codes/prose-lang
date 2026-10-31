@@ -1,0 +1,4 @@
+function square takes n as number giving number
+	return n * n
+
+print square 10

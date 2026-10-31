@@ -1,0 +1,48 @@
+"Adds two numbers stored as linked lists of digits, ones digit first, as in the"
+"Add Two Numbers puzzle: 342 is the list 2, 4, 3."
+
+"One digit, and the node holding the next one (unset at the end of a list)."
+type ListNode is object
+    value as number
+    next as maybe ListNode
+
+function add_two_numbers takes
+    first as maybe ListNode,
+    second as maybe ListNode,
+giving maybe ListNode
+    head as ListNode is object value is 0
+    tail is head
+    carry is 0
+    while first or second or carry > 0
+        digit_one is maybe first:value otherwise 0
+        digit_two is maybe second:value otherwise 0
+        sum is carry + digit_one + digit_two
+        carry is Math:floor (sum / 10)
+        node is object value is sum mod 10
+        tail:next is node
+        tail is node
+        first is maybe first:next
+        second is maybe second:next
+    return head:next
+
+"A linked list of digits, ones digit first."
+function linked takes digits as list of number, giving maybe ListNode
+    head as ListNode is object value is 0
+    tail is head
+    for each digit in digits
+        node is object value is digit
+        tail:next is node
+        tail is node
+    return head:next
+
+"A linked list's digits as a list."
+function digits_in takes list as maybe ListNode, giving list of number
+    digits is array
+    while list
+        digits:push list:value
+        list is list:next
+    return digits
+
+"342 + 465 = 807, and 999 + 1 = 1000."
+print digits_in (add_two_numbers (linked (2, 4, 3)), (linked (5, 6, 4)))
+print digits_in (add_two_numbers (linked (9, 9, 9)), (linked (1,)))

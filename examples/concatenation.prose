@@ -1,0 +1,48 @@
+function find_substring takes
+  s as text,
+  words as list of text,
+giving list of number
+  word_length is words.1.length
+  number_of_words is words.length
+  total_length is word_length * number_of_words
+  word_count as map from text to number is new Map
+  result as list of number is array
+
+  "Create frequency map for words"
+  for each word in words
+    word_count.set with word, ((word_count.get word or 0) + 1)
+
+  "Check for each possible starting point of the window"
+  for i is 0 to word_length - 1
+    seen_words as map from text to number is new Map
+    left is i
+    right is i
+    count is 0
+
+    while right + word_length <= s.length
+      "Get the word from the right end of the window"
+      word is s.substring with right, (right + word_length)
+      right is right + word_length
+
+      if word_count.has word
+        seen_words.set with word, ((seen_words.get word or 0) + 1)
+        count is count + 1
+
+        "If the word is more than expected, move left pointer"
+        while seen_words.get word > word_count.get word
+          left_word is s.substring with left, (left + word_length)
+          seen_words.set with left_word,
+            ((seen_words.get left_word) - 1)
+          count is count - 1
+          left is left + word_length
+
+        "Check if all words are matched"
+        if count = number_of_words
+          result.push left
+      else
+        "Reset if the word is not in the frequency map"
+        seen_words.clear run
+        count is 0
+        left is right
+
+  return result

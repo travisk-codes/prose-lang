@@ -1,0 +1,11 @@
+function word_counts takes some_text as text giving Map
+	words is some_text.split " "
+	counts is new Map
+	for each word in words
+		if counts.has word
+			counts.set with word, (counts.get word + 1)
+		else
+			counts.set with word, 1
+	return counts
+
+print word_counts "hello world hello"

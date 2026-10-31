@@ -15,7 +15,8 @@ titles is finished.map function takes book return book.title
 print "Finished: " + titles.join ", "
 
 labels is books.map function takes book
-    return book.title + " (long)" if book.pages > 500
+    return book.title + " (long)" 
+        if book.pages > 500 
         else book.title
 print labels.join ", "
 

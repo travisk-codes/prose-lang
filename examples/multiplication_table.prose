@@ -1,0 +1,23 @@
+"Enter a positive whole number to print a square multiplication table."
+use create_interface from "node:readline/promises"
+
+options is object
+    input is process.stdin
+    output is process.stdout
+
+terminal is create_interface options
+answer is wait for terminal.question "Table size: "
+terminal.close run
+
+number is Number answer
+if not (Number.is_integer number) or number < 1
+    print "Please enter a positive whole number."
+else
+    largest is (number * number).to_string run
+    column_width is length largest + 1
+    for row is 1 to number
+        row_text is ""
+        for column is 1 to number
+            cell is (row * column).to_string run
+            row_text is row_text + (cell.pad_start column_width)
+        print row_text

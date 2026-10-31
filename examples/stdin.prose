@@ -1,0 +1,10 @@
+use create_interface from "node:readline/promises"
+
+options is object
+	input  is process.stdin
+	output is process.stdout
+
+terminal is create_interface options
+name is wait for terminal.question "What is your name? "
+print "Hello, " + name + "!"
+terminal.close run

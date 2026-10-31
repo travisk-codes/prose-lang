@@ -1,0 +1,26 @@
+"The length of the longest stretch of text with no repeated character, as in"
+"the Longest Substring Without Repeating Characters puzzle: abcabcbb gives 3."
+
+"The stretch runs from start to finish. Each step either takes in the character"
+"at finish or, when that one is already in the stretch, lets go of the one at"
+"start."
+function length_of_longest_substring takes text as text, giving number
+    seen is new Set
+    start is 1
+    finish is 1
+    longest is 0
+    while finish <= length text
+        if seen.has text.finish
+            seen.delete text.start
+            start is start + 1
+        else
+            seen.add text.finish
+            size is finish - start + 1
+            longest is Math.max with longest, size
+            finish is finish + 1
+    return longest
+
+print length_of_longest_substring "abcabcbb"
+print length_of_longest_substring "bbbbb"
+print length_of_longest_substring "pwwkew"
+print length_of_longest_substring ""

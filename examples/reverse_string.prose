@@ -1,0 +1,23 @@
+function reverse_1 takes some_text as text giving text
+	reversed is ""
+	for index is 1 to length some_text
+		reversed is reversed + some_text.(length some_text - index - 1)
+	return reversed
+
+function reverse_2 takes some_text as text giving text
+	reversed is ""
+	index is length some_text
+	while index > 0
+		reversed is reversed + some_text.index
+		index is index - 1
+	return reversed
+
+reverse_3 is function takes some_text as text giving text
+	reversed is ""
+	for each character in some_text
+		reversed is character + reversed
+	return reversed
+
+print reverse_1 "hello"
+print reverse_2 "hello"
+print reverse_3 "hello"

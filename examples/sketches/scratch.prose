@@ -1,0 +1,40 @@
+use create_interface from "node:readline/promises"
+
+options is object
+	input is process.stdin
+	output is process.stdout
+
+term is create_interface options
+
+function sum_to takes n as number giving number
+	total is 0
+	for i is 1 to n
+		total is total + i
+	return total
+
+function factorial takes n as number giving number
+	total is 1
+	for i is 1 to n
+		total is total * i
+	return total
+
+user_number is wait for term.question "Enter a number: "
+user_choice is wait for (term.question
+	"Would you like to calculate the sum or the factorial? ")
+if user_choice = "sum"
+	print sum_to (Number user_number)
+else if user_choice = "factorial"
+	print factorial (Number user_number)
+
+function multiplication_table takes n as number giving list of list of number
+	table is empty list
+	for i is 1 to n
+		row is empty list
+		for j is 1 to n
+			row is row.append i * j
+		table is table.append row
+	return table
+
+print multiplication_table (Number user_number)
+
+term.close run
