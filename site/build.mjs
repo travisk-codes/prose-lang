@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { buildSync } from "esbuild";
+import { browserCompiler } from "./compiler.mjs";
 import { inlineScript } from "./scripts.mjs";
 import { syntaxSource, highlightCode } from "./syntax.mjs";
 
@@ -145,17 +145,7 @@ const errata = [
 
 // The compiler itself, for the playground: a browser bundle of the same modules
 // the CLI uses, rather than source text concatenated by hand.
-const compiler = buildSync({
-  entryPoints: [fileURLToPath(new URL("compiler-entry.js", here))],
-  bundle: true,
-  format: "iife",
-  globalName: "Prose",
-  platform: "browser",
-  target: ["es2020"],
-  write: false,
-  legalComments: "none",
-  logLevel: "silent"
-}).outputFiles[0].text;
+const compiler = await browserCompiler();
 
 const examples = [
   { name: "Reading list", source: readFileSync(new URL("play.prose", here), "utf8").trim() },

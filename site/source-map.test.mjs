@@ -4,13 +4,12 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { compile } from "../src/transpile.js";
 import { inlineScript } from "./scripts.mjs";
+import { browserCompiler } from "./compiler.mjs";
 
-const strip = file => readFileSync(new URL("../src/" + file, import.meta.url), "utf8")
-  .split("\n").filter(line => !line.startsWith("import ")).join("\n").replace(/^export /gm, "");
-const browserCompiler = inlineScript(`(() => {\n${strip("runtime.js")}\n${strip("check.js")}\n${strip("source-map.js")}\n${strip("object-call-arity.js")}\n${strip("call-arity.js")}\n${strip("layout-diagnostics.js")}\n${strip("markup.js")}\n${strip("transpile.js")}\nreturn { compile, inlineSourceMap, mapStackTrace };\n})();`);
+const browserBundle = inlineScript(`${await browserCompiler()}\nProse;`);
 
 test('object methods have the same argument boundaries in the playground and CLI', () => {
-  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const browser = runInNewContext(browserBundle, { TextEncoder });
   const source = 'calculator is object\n    add is function takes a, b return a + b\nprint calculator.add 2, 3, 4';
   const options = { sourceMap: true, filename: 'playground.prose' };
   const actual = browser.compile(source, options), expected = compile(source, options);
@@ -22,7 +21,7 @@ test('object methods have the same argument boundaries in the playground and CLI
 });
 
 test('browser imports preserve exported object method signatures without Node or TypeScript', () => {
-  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const browser = runInNewContext(browserBundle, { TextEncoder });
   const source = 'use calculator from "./tools.prose"\nprint calculator.add 2, 3, 4';
   const options = { sourceMap: true, filename: 'playground.prose', readModule: () =>
     'export calculator is object\n    add is function takes a, b return a + b' };
@@ -32,7 +31,7 @@ test('browser imports preserve exported object method signatures without Node or
 });
 
 test('the browser bundle compiles React markup with the same text and mappings', () => {
-  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const browser = runInNewContext(browserBundle, { TextEncoder });
   const source = 'export function View takes props\n    return <p>\n        Hello {props.name}\n        again\n    </p>';
   for (const check of [false, true]) {
     const options = { check, sourceMap: true, filename: 'view.prose' };
@@ -44,7 +43,7 @@ test('the browser bundle compiles React markup with the same text and mappings',
 });
 
 test("checking output also works in the browser bundle without TypeScript installed", () => {
-  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const browser = runInNewContext(browserBundle, { TextEncoder });
   const source = 'export function twice takes n as number, giving number\n    return n * 2';
   const options = { check: true, sourceMap: true, filename: 'twice.prose' };
   const actual = browser.compile(source, options);
@@ -54,7 +53,7 @@ test("checking output also works in the browser bundle without TypeScript instal
 });
 
 test("browser layout diagnostics match the CLI compiler", () => {
-  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const browser = runInNewContext(browserBundle, { TextEncoder });
   const source = 'total is 1\n    + 2';
   let expected;
   try { compile(source); } catch (error) { expected = error; }
@@ -67,7 +66,7 @@ test("browser layout diagnostics match the CLI compiler", () => {
 });
 
 test("the browser compiler emits the same maps as the Node compiler", () => {
-  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const browser = runInNewContext(browserBundle, { TextEncoder });
   const source = 'word is "héllo 😀 </script>"\nprint word.to_upper_case run';
   const options = { sourceMap: true, filename: "playground.prose" };
   const actual = browser.compile(source, options);
@@ -78,7 +77,7 @@ test("the browser compiler emits the same maps as the Node compiler", () => {
 });
 
 test("the actual playground worker returns printed output and a mapped error location", () => {
-  const browser = runInNewContext(browserCompiler, { TextEncoder });
+  const browser = runInNewContext(browserBundle, { TextEncoder });
   const playground = readFileSync(new URL("playground.js", import.meta.url), "utf8");
   const literal = playground.match(/const workerSource = (`[\s\S]*?`);/)[1];
   const worker = runInNewContext(literal);

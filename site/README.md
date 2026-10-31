@@ -31,6 +31,7 @@ Preview builds show a development banner and the actual passing/failing test cou
 | `syntax.test.mjs` | Checks highlighting, HTML escaping, and browser/build consistency |
 | `vendor/prism/` | Bundled Prism grammars and their MIT license |
 | `compiler-entry.js` | Browser entry point; esbuild bundles it from the compiler modules in `src/` |
+| `compiler.mjs` | Builds that browser compiler bundle for the page and its tests |
 | `build.mjs` | Bundles the compiler, fills the placeholders, and writes the page |
 | `hero.prose` | The program on the left page of the opening spread |
 | `hero.js` | The same program written by hand in JavaScript, for the right page |
