@@ -3,7 +3,7 @@
 Status: descriptive reference for Prose **0.2.3**, derived from the implementation in
 [`src/lexer.js`](../src/lexer.js), [`src/layout.js`](../src/layout.js),
 [`src/expression.js`](../src/expression.js), [`src/parser.js`](../src/parser.js),
-[`src/transpile.js`](../src/transpile.js), [`src/markup.js`](../src/markup.js), and
+[`src/emitter.js`](../src/emitter.js), [`src/markup.js`](../src/markup.js), and
 [`src/call-arity.js`](../src/call-arity.js).
 Where this document and the [README](../README.md) disagree, the code is
 authoritative. Nothing here is a change proposal.
@@ -707,8 +707,9 @@ arity-parameterized** grammar plus a static-semantics fixed point, not a single
 | Types | `Expression.typeExpression`/`singleType` in `src/expression.js` |
 | Markup | `src/markup.js`, `Expression.markup` in `src/expression.js` |
 | Arity inference | `discoverCallArities` in `src/parser.js`, `src/call-arity.js` |
-| Name resolution | `resolve`/`createScope` in `src/transpile.js` |
-| Checking output | `compile(..., { check: true })` in `src/transpile.js` |
+| Name resolution | `resolve`/`createScope` in `src/scope.js` |
+| Declarations and type spelling | `src/types.js` |
+| Checking output | `compile(..., { check: true })` in `src/emitter.js` |
 
 ## 9. Not in the grammar (unsupported)
 

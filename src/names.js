@@ -20,4 +20,7 @@ export function camel(name) {
   return acronymNames.get(plain) ?? plain;
 }
 
+/** The JavaScript binding used for a Prose name. */
+export const variable = name => `_prose_${name}`;
+
 

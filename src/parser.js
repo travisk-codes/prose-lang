@@ -5,7 +5,9 @@ import { fail } from "./errors.js";
 import { isWord, reserved } from "./syntax.js";
 import { callScopeKey, inferCallArities } from "./call-arity.js";
 import { camel } from "./names.js";
-import { conditionOnly, sourceLines, valueOnly } from "./layout.js";
+import { conditionOnly, continues, sourceLines, valueOnly } from "./layout.js";
+import { explainLayoutError } from "./layout-diagnostics.js";
+import { validateGenericParameters } from "./types.js";
 
 function functionHeader(tokens, line) {
   const expr = new Expression(tokens, line);
@@ -553,10 +555,25 @@ function discoverCallArities(source, settings, readImports = true) {
   fail(1, "Call boundaries could not be inferred consistently. Use with to make the argument lists explicit.");
 }
 
-/**
- * Compile Prose to JavaScript: a script, or an ES module if it uses modules or imports its runtime.
- * `declarations` is a TypeScript declaration file for the module's exports, or null.
- * `sourceMap: true` returns a map; "inline" also embeds it. `filename` identifies the source.
- */
+
+export function parse(source, options = {}) {
+  const modules = new Map();
+  const settings = { ...options, exportCache: new Map(), readModule: options.readModule && (specifier => {
+    if (!modules.has(specifier)) modules.set(specifier, options.readModule(specifier));
+    return modules.get(specifier);
+  }) };
+  try {
+    const { analysis } = discoverCallArities(source, settings);
+    const final = new Parser(source, settings, analysis, false);
+    const result = final.program();
+    final.validateContinuations();
+    validateGenericParameters(result);
+    const exportedValues = result.filter(node => node.type === "assign" && node.exported).map(node => node.name);
+    if (exportedValues.length) Object.defineProperty(result, "exportSignatures", { value: analysis.valueSignatures(exportedValues) });
+    return result;
+  } catch (error) {
+    throw explainLayoutError(error, source, () => sourceLines(source, { locations: true }), continues);
+  }
+}
 
 export { Parser, discoverCallArities };

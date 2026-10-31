@@ -27,8 +27,9 @@
 - Non-compiling design sketches moved to `examples/sketches/`, which folder
   searches skip. Example sweeps now require every top-level example to compile.
 - The lexer, layout/continuation rules, expression grammar, name/AST helpers,
-  shared syntax words, statement parser, export signature discovery, and arity
-  inference moved out of `src/transpile.js` into focused modules.
+  shared syntax words, statement parser, export signature discovery, arity
+  inference, scopes, type spelling/declaration generation, and the compiler
+  emitters moved out of `src/transpile.js` into focused modules.
 
 ## 0.2.3
 
