@@ -2,8 +2,9 @@
 
 Status: descriptive reference for Prose **0.2.3**, derived from the implementation in
 [`src/lexer.js`](../src/lexer.js), [`src/layout.js`](../src/layout.js),
-[`src/expression.js`](../src/expression.js), [`src/transpile.js`](../src/transpile.js),
-[`src/markup.js`](../src/markup.js), and [`src/call-arity.js`](../src/call-arity.js).
+[`src/expression.js`](../src/expression.js), [`src/parser.js`](../src/parser.js),
+[`src/transpile.js`](../src/transpile.js), [`src/markup.js`](../src/markup.js), and
+[`src/call-arity.js`](../src/call-arity.js).
 Where this document and the [README](../README.md) disagree, the code is
 authoritative. Nothing here is a change proposal.
 
@@ -699,13 +700,13 @@ arity-parameterized** grammar plus a static-semantics fixed point, not a single
 | Tokens, strings, numbers, `pattern`, markup token | `tokenize` in `src/lexer.js` |
 | Physical → logical lines, markup trees | `lexSource` in `src/lexer.js` |
 | Indentation and continuations | `sourceLines` and `continues` in `src/layout.js` |
-| Statement grammar | `Parser.block` / `Parser.simple` in `src/transpile.js` |
-| Function headers and `use` | `functionHeader`, `useStatement` in `src/transpile.js` |
+| Statement grammar | `Parser.block` / `Parser.simple` in `src/parser.js` |
+| Function headers and `use` | `functionHeader`, `useStatement` in `src/parser.js` |
 | Expression grammar and precedence | `Expression.parseValue`, `precedence` in `src/expression.js` |
 | Calls, `with`, `run`, arity checks | `Expression.call`/`arguments`/`callsByAdjacency` in `src/expression.js` |
 | Types | `Expression.typeExpression`/`singleType` in `src/expression.js` |
 | Markup | `src/markup.js`, `Expression.markup` in `src/expression.js` |
-| Arity inference | `discoverCallArities` in `src/transpile.js`, `src/call-arity.js` |
+| Arity inference | `discoverCallArities` in `src/parser.js`, `src/call-arity.js` |
 | Name resolution | `resolve`/`createScope` in `src/transpile.js` |
 | Checking output | `compile(..., { check: true })` in `src/transpile.js` |
 
