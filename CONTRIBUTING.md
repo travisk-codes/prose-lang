@@ -27,8 +27,15 @@ TypeScript 5 job.
 
 ## Layout
 
-- `src/transpile.js` — lexer, parser, name resolution, arity inference, emitters,
-  declarations, and source maps.
+- `src/lexer.js` — tokens, contextual `pattern` and markup tokens, and the
+  editor's brace-expression lookup.
+- `src/layout.js` — physical-to-logical lines, indentation, continuation rules,
+  and conditional-value continuations.
+- `src/expression.js` — expression, call, accessor, and type parsing.
+- `src/transpile.js` — statement parser, scopes, name resolution, arity
+  inference, declarations, source maps, and the JavaScript/checking emitters.
+- `src/names.js`, `src/ast.js`, `src/syntax.js` — camelCase names, AST location
+  helpers, and shared syntax words.
 - `src/format.js` — the formatter; it reparses its output and refuses changes that
   alter program meaning.
 - `src/check-project.js` and `src/check-*.js` — the TypeScript-backed checker and

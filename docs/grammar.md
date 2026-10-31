@@ -1,10 +1,11 @@
 # Prose grammar
 
 Status: descriptive reference for Prose **0.2.3**, derived from the implementation in
-[`src/transpile.js`](../src/transpile.js), [`src/markup.js`](../src/markup.js), and
-[`src/call-arity.js`](../src/call-arity.js). Where this document and the
-[README](../README.md) disagree, the code is authoritative. Nothing here is a change
-proposal.
+[`src/lexer.js`](../src/lexer.js), [`src/layout.js`](../src/layout.js),
+[`src/expression.js`](../src/expression.js), [`src/transpile.js`](../src/transpile.js),
+[`src/markup.js`](../src/markup.js), and [`src/call-arity.js`](../src/call-arity.js).
+Where this document and the [README](../README.md) disagree, the code is
+authoritative. Nothing here is a change proposal.
 
 ## 1. The grammar has four layers
 
@@ -695,18 +696,18 @@ arity-parameterized** grammar plus a static-semantics fixed point, not a single
 
 | Concern | Where |
 | --- | --- |
-| Tokens, strings, numbers, `pattern`, markup token | `tokenize` (transpile.js ~96-155) |
-| Physical → logical lines, markup trees | `lexSource` (~157-194) |
-| Indentation and continuations | `sourceLines` (~995-1057), `continues` (~912-923) |
-| Statement grammar | `Parser.block`/`Parser.simple` (~1376-1549) |
-| Function headers and `use` | `functionHeader`, `useStatement` (~868-906) |
-| Expression grammar and precedence | `Expression.parseValue` (~653-814), `precedence` (~196-201) |
-| Calls, `with`, `run`, arity checks | `Expression.call`/`arguments`/`callsByAdjacency` (~227-464) |
-| Types | `Expression.typeExpression`/`singleType` (~514-583) |
-| Markup | `markup.js`, `Expression.markup` (~816-865) |
-| Arity inference | `discoverCallArities` (~1888-1913), `call-arity.js` |
-| Name resolution | `resolve`/`createScope` (~1601-1637) |
-| Checking output | `compile(..., { check: true })` (~1920-2315) |
+| Tokens, strings, numbers, `pattern`, markup token | `tokenize` in `src/lexer.js` |
+| Physical → logical lines, markup trees | `lexSource` in `src/lexer.js` |
+| Indentation and continuations | `sourceLines` and `continues` in `src/layout.js` |
+| Statement grammar | `Parser.block` / `Parser.simple` in `src/transpile.js` |
+| Function headers and `use` | `functionHeader`, `useStatement` in `src/transpile.js` |
+| Expression grammar and precedence | `Expression.parseValue`, `precedence` in `src/expression.js` |
+| Calls, `with`, `run`, arity checks | `Expression.call`/`arguments`/`callsByAdjacency` in `src/expression.js` |
+| Types | `Expression.typeExpression`/`singleType` in `src/expression.js` |
+| Markup | `src/markup.js`, `Expression.markup` in `src/expression.js` |
+| Arity inference | `discoverCallArities` in `src/transpile.js`, `src/call-arity.js` |
+| Name resolution | `resolve`/`createScope` in `src/transpile.js` |
+| Checking output | `compile(..., { check: true })` in `src/transpile.js` |
 
 ## 9. Not in the grammar (unsupported)
 
