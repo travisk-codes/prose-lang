@@ -12,7 +12,7 @@ print "Hello world!"
 
 ## Try it
 
-Requires Node.js 20.6 or newer. The compiler has no runtime dependencies or installation step. On Windows PowerShell, use `npm.cmd`
+Requires Node.js 20.19 or newer. The compiler has no runtime dependencies or installation step. On Windows PowerShell, use `npm.cmd`
 to avoid the script execution policy restriction on `npm.ps1`.
 
 ```sh
@@ -45,7 +45,7 @@ files; see [Type checking](docs/type-checking.md).
 
 Click the editor's play button or use **Prose: Run Current File** to save and run
 the selected file in a terminal. It uses the project or bundled CLI and requires
-Node 20.6 or newer; see [running files](editors/vscode/README.md#running-files).
+Node 20.19 or newer; see [running files](editors/vscode/README.md#running-files).
 
 Set breakpoints in a Prose file and press **F5** to debug it, inspect variables,
 and step through imported functions using the Node debugger and inline source maps.

@@ -69,7 +69,7 @@
     "site": "node site/build.mjs"
   },
   "engines": {
-    "node": ">=20.6"
+    "node": ">=20.19"
   },
   "peerDependencies": {
     "vite": ">=5"

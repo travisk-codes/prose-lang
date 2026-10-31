@@ -30,6 +30,9 @@
   shared syntax words, statement parser, export signature discovery, arity
   inference, scopes, type spelling/declaration generation, and the compiler
   emitters moved out of `src/transpile.js` into focused modules.
+- Node 20.19 is now the oldest supported version; Node 20.6 crashes when loading
+  the TypeScript checker. The API type fixture moved to `type-tests/` so Node's
+  test runner does not execute it as a test.
 
 ## 0.2.3
 

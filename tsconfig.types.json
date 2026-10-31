@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["test/types-consumer.ts"]
+  "include": ["type-tests/types-consumer.ts"]
 }

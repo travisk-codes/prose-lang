@@ -2,7 +2,7 @@
 
 ## Setup
 
-Prose requires Node.js 20.6 or newer.
+Prose requires Node.js 20.19 or newer.
 
 ```sh
 npm install
@@ -22,7 +22,7 @@ for the test suite, checking, and the site/editor builds.
 | `node site/build.mjs` | The single-file landing page and playground; production builds require a green suite |
 | `node editors/vscode/build.mjs` | Copies the formatter, parser, checker, and runtime into `editors/vscode/dist` |
 
-CI runs the suite on Node 20.6, 22, and 24 on Ubuntu, Node 22 on Windows, and a
+CI runs the suite on Node 20.19, 22, and 24 on Ubuntu, Node 22 on Windows, and a
 TypeScript 5 job.
 
 ## Layout

@@ -69,7 +69,7 @@ The working directory is the nearest package directory, then the file's workspac
 folder. Relative module imports remain relative to the source
 file, as with the CLI. Programs can import Prose and JavaScript files.
 
-Running requires Workspace Trust and **Node 20.6 or newer** on PATH. Set
+Running requires Workspace Trust and **Node 20.19 or newer** on PATH. Set
 `prose.run.nodePath` to a Node executable path if needed; supply the executable
 only, without arguments. No TypeScript installation is required to run a file.
 
