@@ -10,7 +10,7 @@ giving list of number
 
   "Create frequency map for words"
   for each word in words
-    word_count.set with word, ((word_count.get word or 0) + 1)
+    word_count.set word, ((word_count.get word or 0) + 1)
 
   "Check for each possible starting point of the window"
   for i is 0 to word_length - 1
@@ -21,17 +21,17 @@ giving list of number
 
     while right + word_length <= s.length
       "Get the word from the right end of the window"
-      word is s.substring with right, (right + word_length)
+      word is s.substring right, (right + word_length)
       right is right + word_length
 
       if word_count.has word
-        seen_words.set with word, ((seen_words.get word or 0) + 1)
+        seen_words.set word, ((seen_words.get word or 0) + 1)
         count is count + 1
 
         "If the word is more than expected, move left pointer"
         while seen_words.get word > word_count.get word
-          left_word is s.substring with left, (left + word_length)
-          seen_words.set with left_word,
+          left_word is s.substring left, (left + word_length)
+          seen_words.set left_word,
             ((seen_words.get left_word) - 1)
           count is count - 1
           left is left + word_length

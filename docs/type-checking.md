@@ -316,33 +316,10 @@ require TypeScript or Workspace Trust.
 
 ## Current limits
 
-Editor [quick fixes](../editors/vscode/README.md#quick-fixes) offer explicit
-argument-list and array readings for `PROSE_CALL_BOUNDARY`. They compile the
-edited source and verify the chosen comma's parsed role without running code.
-Neither reading is preferred. Fixes use current buffers and reject stale edits;
-other syntax errors can prevent an alternative from being offered.
-
-Editor [semantic highlighting](../editors/vscode/README.md#semantic-highlighting)
-uses the same project types and current buffers to classify source names. It
-tracks callable values and aliases, scoped parameters, property names, and known
-numeric indexes, while preserving the Prose palette and dim separators. Invalid
-syntax or unavailable TypeScript falls back to grammar coloring; uncertain dots
-keep their lexical treatment.
-
-Editor [references and rename](../editors/vscode/README.md#references-and-rename)
-track local value bindings and link exported bindings across direct `.prose`
-imports in the project, including closed consumers. Rename validates every
-connected module's binding identities to reject capture, export collisions, and
-changed contextual indexes. It preserves shorthand property names and uses
-current buffers. Known JavaScript/TypeScript or path-alias consumers prevent
-partial export rename. Types, property keys, and other import forms remain outside
-rename support; see the editor guide for the project search boundary.
-
 Editor [parameter hints](../editors/vscode/README.md#parameter-hints) use the
 same types and current buffers to show call signatures and the active argument.
-The parser preserves the distinction between argument commas and array commas.
 Temporary cursor probes recover unfinished calls for analysis; normal compilation
-still rejects missing arguments and ambiguous call boundaries.
+still rejects missing arguments.
 
 Type-aware [member autocomplete](../editors/vscode/README.md#autocomplete) uses
 the same project TypeScript and current editor buffers. It handles unfinished

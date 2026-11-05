@@ -21,15 +21,15 @@ test("grouping remains a scalar; a trailing comma makes a single-item array", ()
   ].join("\n")), ["Ada", ["Ada"], 1, 0, undefined, 9]);
 });
 
-test("function arity determines comma boundaries and parentheses pass one array argument", () => {
+test("a call takes every comma, and parentheses pass one array argument", () => {
   assert.deepEqual(run([
     "function combine takes first, second", '    return first + second',
     'print combine "Ada", "Grace"',
     "function join takes names", '    return names.1 + names.2',
     'print join ("Ada", "Grace")',
     "function double takes value", "    return value * 2",
-    "results is double 2, double 3", "print results",
-    "print double 2, 3", "print combine (double 2), (double 3)"
+    "results is (double 2), (double 3)", "print results",
+    "print (double 2), 3", "print combine (double 2), (double 3)"
   ].join("\n")), ["AdaGrace", "AdaGrace", [4, 6], [4, 3], 10]);
 });
 
@@ -82,8 +82,8 @@ test("malformed comma lists and missing function arguments retain line-numbered 
     ["items is 1,", /Line 1: Expected an expression/],
     ["items is 1,,2", /Line 1: Unexpected token/],
     ["items is (,)", /Line 1: Unexpected token/],
-    ["function pair takes a, b\n    return a + b\nprint pair 1", /Line 3: Expected ','/],
-    ["function pair takes a, b\n    return a + b\nprint pair (1, 2)", /Line 3: Expected ','/]
+    ["function pair takes a, b\n    return a + b\nprint pair 1", /Line 3: 'pair' takes 2 arguments, but this call gives 1/],
+    ["function pair takes a, b\n    return a + b\nprint pair (1, 2)", /Line 3: 'pair' takes 2 arguments, but this call gives 1/]
   ]) assert.throws(() => transpile(source), expected);
 });
 

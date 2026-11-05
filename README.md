@@ -51,10 +51,6 @@ Set breakpoints in a Prose file and press **F5** to debug it, inspect variables,
 and step through imported functions using the Node debugger and inline source maps.
 See [debugging](editors/vscode/README.md#debugging) for controls and requirements.
 
-[Quick fixes](editors/vscode/README.md#quick-fixes) (`Ctrl+.`) offer explicit
-argument-list and array readings for ambiguous calls, so you can choose their
-meaning directly in the editor.
-
 [Semantic highlighting](editors/vscode/README.md#semantic-highlighting) colors
 function values and aliases, scoped parameters, properties, and known numeric
 indexes using current project types, with the existing Prose palette.
@@ -285,7 +281,7 @@ builds it to `site/dist/index.html`.
 - Bit operators `xor`, `shifted left by`, and `shifted right by`.
 - Computed property names: `settings:(name)`.
 - Modules: `use name from "path"` and `export`, plus a Vite plugin. Functions
-  imported from other `.prose` files keep their argument counts.
+  imported from other `.prose` files are called like local ones.
 - Compile-time errors for names that are never assigned, imported, or provided
   by JavaScript, and for calls whose arguments could be read two ways.
 - Optional type annotations that generate TypeScript declaration files.
@@ -360,12 +356,10 @@ print (multiply 2, 3) + 4
 
 These print `14` and `10`, respectively. With several arguments, arithmetic
 right after the last one could belong to it or to the call's result, so
-`multiply 2, 3 + 4` is a syntax error, as it is for JavaScript calls. A call
-consumes the declared number of arguments. This also applies to function values,
-aliases, and callbacks with a known function type. Nested calls follow the same
-rule; parentheses make grouping explicit.
-Missing arguments produce a syntax error. A comma after a complete call starts
-another array element, as described below.
+`multiply 2, 3 + 4` is a syntax error. A call takes every comma after it, as
+described below, and parentheses end it early. Leaving out an argument is a
+syntax error unless `with` says it's intended: `multiply with 2` leaves `right`
+unset.
 
 Declare a zero-argument function with `function greet` and call it with
 `greet run`. Calls can appear as standalone statements or inside expressions.
@@ -481,8 +475,8 @@ two integer indexes. Variable indexes can chain directly: `nested.i.j`.
 
 ### Calls and commas
 
-Each call consumes exactly its declared argument count. Commas separate those
-arguments; any commas left after a complete expression form an array:
+**A call takes every comma after it. Parentheses end it early**, and any other
+commas form an array:
 
 ```text
 function combine takes first, second
@@ -493,12 +487,19 @@ result is combine "Ada", "Grace"
 function double takes number
     return number * 2
 
-results is double 2, double 3
+results is (double 2), (double 3)
 ```
 
-`result` is `"AdaGrace"`; `results` is the array `4, 6`. Parentheses around
-each call are optional. To pass one array argument, put the entire array in
-parentheses:
+`result` is `"AdaGrace"`; `results` is the array `4, 6`. Without the parentheses,
+`double 2, double 3` passes everything to the first `double`, which takes one
+argument, so it's an error. The same goes for a call that isn't last in another
+call's arguments: write `combine (double 2), 3`. `length`, `char_to_number`, and
+`number_to_char` always take one value, so `length a, length b` is an array.
+
+Because this rule doesn't depend on what's being called, a line means the same
+thing whatever it calls, and an edit to another file can never change it.
+
+To pass one array argument, put the entire array in parentheses:
 
 ```text
 function first takes values
@@ -759,7 +760,7 @@ before other arguments (`later with function, 5`), but only one per line, and
 not in `if`, `while`, or `for` lines or inline conditionals. Call a function
 value by putting its arguments after it (`shout "hi"`), or `run` when it takes none.
 
-Named functions and function values use the same argument boundaries:
+Named functions and function values are called the same way:
 
 ```text
 function add takes left, right
@@ -767,72 +768,44 @@ function add takes left, right
 
 add_value is function takes left, right return left + right
 alias is add_value
-print add 1, 2, 3
-print add_value 1, 2, 3
-print alias 1, 2, 3
+print add 1, 2
+print add_value 1, 2
+print alias 1, 2
+print (add 1, 2), 3
 ```
 
-All three print `[3, 3]`: the two-argument call finishes before the last comma.
-A named function can also be used as a value (`alias is add`). A function type
-supplies the same boundary for a callback:
+The first three print `3`. The last prints `[3, 3]`: parentheses end the call
+before the last comma. A named function can also be used as a value
+(`alias is add`).
 
-```text
-function apply takes action as function taking number and number giving number
-    return action 1, 2, 3
-```
-
-Inference uses all assignments to a binding in its function or program scope,
-including branches and loops. Implementations with the same parameter count
-keep that count. Different counts, an untyped parameter, or a value whose
-signature cannot be proved leave the count unknown. Reassignment is allowed;
-Prose does not guess boundaries from a runtime function's `length`.
-
-Methods defined on Prose objects use the same inference:
+Methods work the same way, with `.` or `:`:
 
 ```text
 calculator is object
     add is function takes left, right return left + right
 
 print calculator.add 2, 3
-results is calculator.add 2, 3, 9
+results is (calculator.add 2, 3), 9
 ```
 
-This prints `5` and assigns `[5, 9]` to `results`: the two-argument call finishes
-before the last comma. Object aliases, nested properties, `like` copies, local
-object type fields, and declared result types can supply signatures. Replacing
-a method with another function of the same count preserves inference. Different
-counts, unknown receiver values, and dynamic property writes require an explicit
-boundary. Literal computed keys such as `calculator.("add")` work too.
-See [object_methods.prose](examples/object_methods.prose) for a runnable example.
+This prints `5` and assigns `[5, 9]` to `results`. Literal computed keys such as
+`calculator.("add")` work too. See
+[object_methods.prose](examples/object_methods.prose) for a runnable example.
 
-Objects exported from a `.prose` module preserve these signatures in importers:
-
-```text
-use calculator from "./object_method_tools.prose"
-print calculator.add 2, 3
-```
-
-Nested methods, exported aliases of the same object, and declared object result
-types retain their signatures too. Forwarding an imported object preserves its
-signature through further modules:
+Objects exported from a `.prose` module work the same way in importers, and can
+be forwarded through further modules:
 
 ```text
 use calculator from "./object_method_tools.prose"
 export math is calculator
 ```
 
-Consumers can then call `math.add 2, 3` without `with`. Aliases through different
-import paths retain their shared identity. Import analysis reads source text;
-it does not execute modules. Opaque values and unresolved circular forwarding
-still require explicit boundaries. See
+Consumers can then call `math.add 2, 3`. See
 [imported_object_methods.prose](examples/imported_object_methods.prose).
 
-An unknown-count call can take one argument or use `run`. A comma requires an
-explicit boundary: `action with 1, 2` passes two arguments, while `(action 1), 2`
-is an array containing a one-argument call and `2`. For a two-argument call
-followed by an array element, write `(action with 1, 2), 3`. Parentheses alone
-can contain an array, so `(action 1, 2)` still needs `with`. These are parsing
-rules; whether the arguments have valid types is checked separately.
+Prose checks how many arguments a function declared in Prose receives, but that
+only reports mistakes; it never changes how a line reads. For function values and
+JavaScript, `prose check` reports a wrong count when the types are known.
 
 Function values can read the variables around them. Like named functions,
 assigning a name inside one creates a local: it does not change an outer
@@ -850,19 +823,18 @@ When no Prose variable has the name, common JavaScript globals are available:
 `Promise`, `console`, `document`, `window`, `localStorage`, `fetch`, and more.
 
 A name, property, position, or parenthesized value followed directly by a
-value is a call. For an unknown parameter count, use `with` before multiple
-arguments. `run` calls with no arguments. Create objects with `new`:
+value is a call, and it takes every comma after it. `run` calls with no
+arguments. Create objects with `new`:
 
 ```text
 print name:toUpperCase run
 print words:join ", "
 seen is new Set ("a", "b", "a")
-print Math:max with 3, 9, 4
-date is new Date with 2026, 0, 1
+print Math:max 3, 9, 4
+date is new Date 2026, 0, 1
 ```
 
-Prose recognizes fixed method signatures on known `Map`, `Set`, `WeakMap`, and
-`WeakSet` values. For example, `Map.set` takes two arguments:
+Methods take commas like any other call. Keep compound arguments in parentheses:
 
 ```text
 counts is new Map
@@ -871,21 +843,10 @@ counts.set "hello", (counts.get "hello" + 1)
 print counts.get "hello"
 ```
 
-Collection constructors, type annotations, aliases, and declared function result
-types can establish the receiver's kind. As with Prose functions, a comma after
-the method's declared arguments starts an array element: `counts.set "a", 1, 2`
-is an array containing the map and `2`. Both `.` and `:` support these signatures.
 `run` is still required for zero-argument calls such as `counts.clear run`.
 
-Unknown receivers and methods with optional or variable argument counts still
-use the rules above: `items.map callback` takes one argument, and
-`items.map with callback, context` takes two. Mixed receiver assignments or
-visible writes replacing collection methods withdraw the affected signatures.
-This syntax analysis does not load TypeScript or execute imports; arbitrary
-JavaScript method signatures shown by editor hovers are not yet used for parsing.
-
-`with` also works with one argument (`words:join with ", "`), and can introduce a
-negative first argument. Prose reads
+`with` is optional. It also works with one argument (`words:join with ", "`), and
+can introduce a negative first argument. Prose reads
 `items:at -1` as ambiguous (the space before the minus but not after suggests
 a negative number) and asks for `items:at with -1`, `items:at (-1)`, or a
 spaced `items:at - 1` to subtract.
@@ -992,8 +953,7 @@ export week_length is 7
 ```
 
 When the path names a `.prose` file, the compiler reads that file's `export`
-lines, so its functions are called just like this file's own, with the same
-argument counts:
+lines, so its functions are called just like this file's own:
 
 ```text
 use pluralize from "./text.prose"

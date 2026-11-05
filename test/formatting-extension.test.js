@@ -49,7 +49,7 @@ test("VS Code formatter returns a bounded edit and respects indentation and CRLF
 });
 
 test("VS Code formatter reads imported signatures without executing modules", async () => {
-  const source = 'use double from "./math.prose"\nprint  double 2, double 3';
+  const source = 'use double from "./math.prose"\nprint  (double 2), double 3';
   const { document, provider, reads, errors } = editor(source, {
     imports: { "/project/math.prose": 'export function double takes n\n    fail "Must never execute"' }
   });
@@ -183,7 +183,6 @@ test("extension activation registers the document formatter and disposes it with
   const signatures = { dispose() {} };
   const refactoring = { dispose() {} };
   const semantic = { dispose() {} };
-  const quickFixes = { dispose() {} };
   const runner = { dispose() {} };
   const debugging = { dispose() {} };
   const source = readFileSync(new URL("../editors/vscode/extension.cjs", import.meta.url), "utf8");
@@ -197,7 +196,7 @@ test("extension activation registers the document formatter and disposes it with
       : name === "./semantic.cjs" ? { createSemanticHighlighting: api => { assert.equal(api, vscode); return semantic; } }
       : name === "./running.cjs" ? { createRunner: api => { assert.equal(api, vscode); return runner; } }
       : name === "./debugging.cjs" ? { createDebugging: api => { assert.equal(api, vscode); return debugging; } }
-      : name === "./quick-fixes.cjs" ? { createQuickFixes: api => { assert.equal(api,vscode); return quickFixes; } } : { createLanguageFeatures: api => {
+      : { createLanguageFeatures: api => {
       assert.equal(name, "./hovering.cjs");
       assert.equal(api, vscode);
       return hovers;
@@ -206,5 +205,5 @@ test("extension activation registers the document formatter and disposes it with
   exports.activate(context);
   assert.equal(registrations[0].language, "prose");
   assert.equal(typeof registrations[0].provider.provideDocumentFormattingEdits, "function");
-  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers, completions, signatures, refactoring, semantic, quickFixes, runner, debugging]);
+  assert.deepEqual(context.subscriptions, [disposable, diagnostics, hovers, completions, signatures, refactoring, semantic, runner, debugging]);
 });

@@ -23,11 +23,11 @@ Each program is standalone. Quoted strings on their own lines explain the code.
 
 | Program | What it demonstrates |
 | --- | --- |
-| [camp_budget.prose](camp_budget.prose) | Nested objects, object returns, arrays of objects, array appending, decimal arithmetic, inferred call boundaries, `for`, conditionals, booleans, and `null` |
+| [camp_budget.prose](camp_budget.prose) | Nested objects, object returns, arrays of objects, array appending, decimal arithmetic, calls ended with parentheses, `for`, conditionals, booleans, and `null` |
 | [postcard_station.prose](postcard_station.prose) | Unicode strings, `length`, character conversions, mathematical `mod`, negative rotations, string replacement/appending, unset declarations, `while`, zero-argument calls, early returns, and escapes |
 | [pascal_triangle.prose](pascal_triangle.prose) | Recursion, returning arrays, empty and one-item arrays, nested arrays, calculated indexes, and copied array arguments |
 | [copy_workshop.prose](copy_workshop.prose) | Shared arrays and objects, copying with `slice`, changes made through function arguments, empty objects, missing properties, division, `%`, and prefix `remainder` |
-| [call_boundaries.prose](call_boundaries.prose) | Matching argument boundaries for named functions, assigned function values, aliases, typed callbacks, and explicit `with` for unknown counts |
+| [call_boundaries.prose](call_boundaries.prose) | How calls take commas: named functions, function values, aliases, callbacks, JavaScript, and parentheses that end a call early |
 | [interop_boundaries.prose](interop_boundaries.prose) | Prose and JavaScript positions, Unicode code points and UTF-16 lengths, contextual dots, explicit colons, and literal JSON keys |
 | [reading_list.prose](reading_list.prose) | `for each` with several variables, trailing `if`/`else` values, functions as values with inline and indented bodies, JavaScript methods called with the values after them or `run`, `new Map`, `Math`, and `otherwise` |
 | [habits.prose](habits.prose) and [habit_rules.prose](habit_rules.prose) | One Prose file importing another and calling its functions like local ones, `with` for optional arguments, `maybe` on properties and methods, Map entries in `for each`, and the parentheses a call needs when arithmetic follows it |

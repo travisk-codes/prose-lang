@@ -206,10 +206,10 @@ test("format preserves CRLF and supports editor indentation options", () => {
   assert.equal(format(source, { endOfLine: "\n" }), 'function greet\n    print "hello"\n');
 });
 
-test("format uses imported Prose argument counts and reports invalid syntax", () => {
+test("format reads imported Prose functions and reports invalid syntax", () => {
   const readModule = () => 'export function double takes value\n    return value * 2';
-  const source = 'use double from "./math.prose"\nprint double 2, double 3';
-  assert.equal(format(source, { width: 25, readModule }), 'use double from "./math.prose"\nprint double 2, double 3\n');
+  const source = 'use double from "./math.prose"\nprint (double 2), double 3';
+  assert.equal(format(source, { width: 30, readModule }), 'use double from "./math.prose"\nprint (double 2), double 3\n');
   assert.throws(() => format(source), /readModule/);
   assert.throws(() => format('if true\nprint 1'), /Line 1: Expected an indented body/);
   assert.throws(() => format('print 1', { width: 0 }), /width/);
@@ -238,7 +238,7 @@ test("format CLI checks, writes recursively, skips dependencies, and resolves im
     mkdirSync(join(folder, "node_modules"));
     writeFileSync(join(folder, "node_modules", "broken.prose"), "not valid prose!");
     writeFileSync(join(folder, "math.prose"), 'export function double takes value\n\treturn value*2');
-    writeFileSync(join(folder, "main.prose"), 'use double from "./math.prose"\nprint  double 2, double 3');
+    writeFileSync(join(folder, "main.prose"), 'use double from "./math.prose"\nprint  (double 2), double 3');
     const before = readFileSync(join(folder, "main.prose"), "utf8");
     const check = command(".", "--check");
     assert.equal(check.status, 1, check.stderr);

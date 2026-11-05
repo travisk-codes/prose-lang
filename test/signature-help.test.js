@@ -62,10 +62,10 @@ test('nested calls select the inner call and resume the outer argument after its
   } finally { f.close(); }
 });
 
-test('function values and typed parameters use the same call boundaries as the compiler', () => {
+test('function values and typed parameters show the same arguments as the compiler reads', () => {
   const g = fixture();
   try {
-    assert.equal(g.help('double is function takes value as number giving number return value * 2\ndouble 2, |'), undefined);
+    assert.equal(g.help('double is function takes value as number giving number return value * 2\ndouble 2, |').activeParameter, 1);
     assert.equal(active(g.help('action is function takes left as number, right as number giving number return left + right\nalias is action\nprint alias 1, |')), 'right as number');
     assert.match(selected(g.help('function apply takes action as function taking text and number giving text\n    return action with "hello", |')).label, /arg2 as number/);
     assert.equal(g.help('function apply takes action\n    return action with 1, |'), undefined);
@@ -87,37 +87,37 @@ test('native methods keep Prose names and optional/rest parameters', () => {
   } finally { f.close(); }
 });
 
-test('known collection methods show parameters without with and stop at their boundary', () => {
+test('collection methods show parameters without with', () => {
   const f = fixture();
   try {
     const prefix = 'counts as map from text to number is new Map\n';
     assert.equal(active(f.help(prefix + 'counts.set |')), 'key as text');
     assert.equal(active(f.help(prefix + 'counts.set "hello", |')), 'value as number');
     assert.equal(active(f.help(prefix + 'counts.set "hello",\n    |')), 'value as number');
-    assert.equal(f.help(prefix + 'counts.set "hello", 1, |'), undefined);
+    assert.equal(f.help(prefix + 'counts.set "hello", 1, |').activeParameter, 2);
     assert.equal(active(f.help(prefix + 'counts.get |')), 'key as text');
   } finally { f.close(); }
 });
 
-test('Prose object methods show arguments without with and stop at the declared count', () => {
+test('Prose object methods show arguments without with', () => {
   const f = fixture();
   try {
     const prefix = 'calculator is object\n    add is function takes left as number, right as number giving number return left + right\n';
     assert.equal(active(f.help(prefix + 'calculator.add |')), 'left as number');
     assert.equal(active(f.help(prefix + 'calculator.add 1, |')), 'right as number');
     assert.equal(active(f.help(prefix + 'alias is calculator\nalias.add 1, |')), 'right as number');
-    assert.equal(f.help(prefix + 'calculator.add 1, 2, |'), undefined);
+    assert.equal(f.help(prefix + 'calculator.add 1, 2, |').activeParameter, 2);
   } finally { f.close(); }
 });
 
-test('imported object signatures track unsaved module changes and declared call boundaries', () => {
+test('imported object signatures track unsaved module changes', () => {
   const f = fixture();
   try {
     const source = 'export calculator is object\n    add is function takes left as number, right as number giving number return left + right';
     const file = f.write('tools.prose', source);
     const prefix = 'use calculator from "./tools.prose"\n';
     assert.equal(active(f.help(prefix + 'calculator.add 1, |')), 'right as number');
-    assert.equal(f.help(prefix + 'calculator.add 1, 2, |'), undefined);
+    assert.equal(f.help(prefix + 'calculator.add 1, 2, |').activeParameter, 2);
     const changed = source.replace('right as number giving', 'right as number, bonus as number giving');
     assert.equal(active(f.help(prefix + 'calculator.add 1, 2, |', { overlays: [[file, changed]] })), 'bonus as number');
     assert.equal(readFileSync(file, 'utf8'), source);
@@ -178,7 +178,7 @@ test('non-call contexts and unrelated syntax errors do not produce guessed signa
   try {
     for (const source of ['print "hello | world"', 'value is 1, |', 'word is "hello"\nword:|', 'type Value is |', cipher + 'broken is (\ncipher |']) assert.equal(f.help(source), undefined, source);
     assert.deepEqual(signatureContexts('word.', 1, 100), []);
-    assert.throws(() => compile(cipher + 'cipher "hi"'), /Expected ','/);
+    assert.throws(() => compile(cipher + 'cipher "hi"'), /'cipher' takes 2 arguments, but this call gives 1/);
     assert.throws(() => compile(cipher + 'cipher "hi",'), /Expected an expression/);
   } finally { f.close(); }
 });

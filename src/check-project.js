@@ -1,5 +1,4 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { compile } from "./transpile.js";
@@ -13,7 +12,6 @@ import { collectCompletions } from "./completions.js";
 import { collectSignatureHelp } from "./signature-help.js";
 import { collectReferences } from "./check-references.js";
 import { collectSemanticTokens } from "./check-semantic.js";
-import { callBoundaryFixes } from "./call-quick-fixes.js";
 import { definitionResolver } from "./check-definition.js";
 
 export class CheckSetupError extends Error {
@@ -44,20 +42,13 @@ function filesUnder(directory) {
 /** Check Prose and its imported Prose dependencies without writing or executing
  * anything. Resolve TypeScript from the selected project, never from this tool.
  */
-export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], referenceTargets = [], referenceAll = false, semanticTargets = [], quickFixTargets = [], overlays = [], strict = false, completionProbe, signatureProbe } = {}) {
+export function checkProject({ cwd = process.cwd(), project, targets = [], typescript, hoverTargets = [], definitionTargets = [], referenceTargets = [], referenceAll = false, semanticTargets = [], overlays = [], strict = false, completionProbe, signatureProbe } = {}) {
   cwd = resolve(cwd);
   const bufferKey = file => process.platform === "win32" ? resolve(file).toLowerCase() : resolve(file);
   const buffers = new Map(overlays.map(([file, source]) => [bufferKey(file), source]));
   const exists = file => buffers.has(bufferKey(file)) || existsSync(file);
   const directory = file => existsSync(file) && statSync(file).isDirectory();
-  const fixSources = new Map();
-  const rememberFixSource = (file, source) => {
-    if (!quickFixTargets.length || source === undefined) return source;
-    const key = bufferKey(file);
-    if (!fixSources.has(key)) fixSources.set(key, { file: resolve(file), source });
-    return fixSources.get(key).source;
-  };
-  const sourceText = file => fixSources.get(bufferKey(file))?.source ?? rememberFixSource(file, buffers.get(bufferKey(file)) ?? readFileSync(file, "utf8"));
+  const sourceText = file => buffers.get(bufferKey(file)) ?? readFileSync(file, "utf8");
   const paths = targets.map(target => resolve(cwd, target));
   for (const path of paths) {
     if (!exists(path)) throw new CheckSetupError(`Input does not exist: ${path}`);
@@ -102,10 +93,9 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
   };
   let parsed;
   if (configFile) {
-    const configHost = quickFixTargets.length ? { ...ts.sys, readFile: file => rememberFixSource(file, ts.sys.readFile(file)) } : ts.sys;
-    const config = ts.readConfigFile(configFile, configHost.readFile);
+    const config = ts.readConfigFile(configFile, ts.sys.readFile);
     if (config.error) throw new CheckSetupError("Could not read the project configuration.", [ordinaryDiagnostic(config.error, "configuration")]);
-    parsed = ts.parseJsonConfigFileContent(config.config, configHost, projectRoot, {}, configFile, undefined,
+    parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, projectRoot, {}, configFile, undefined,
       [{ extension: ".prose", isMixedContent: false, scriptKind: ts.ScriptKind.Deferred }]);
     const errors = parsed.errors.filter(diagnostic => diagnostic.code !== 18003);
     if (errors.length) throw new CheckSetupError("Invalid project configuration.", errors.map(diagnostic => ordinaryDiagnostic(diagnostic, "configuration")));
@@ -125,7 +115,6 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
   const selected = paths.length ? paths.flatMap(path => directory(path) ? filesUnder(path) : [path])
     : parsed ? parsed.fileNames.filter(file => file.endsWith(".prose")) : filesUnder(cwd);
   const records = new Map(), virtual = new Map(), sourceErrors = [];
-  const quickFixFiles = new Set(quickFixTargets.map(file=>canonical(resolve(cwd,file))));
   const proseForDeclaration = name => {
     if (!name.endsWith(".d.prose.ts")) return null;
     const file = name.slice(0, -".d.prose.ts".length) + ".prose";
@@ -172,11 +161,9 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
       record.declarations = result.declarations ?? "export {};";
       record.lookup = sourceMapLookup(result.map);
     } catch (error) {
-      const quickFix = quickFixFiles.has(key) ? callBoundaryFixes(record.source,error,{readModule}) : undefined;
-      sourceErrors.push({ source: "prose", code: error.code === "PROSE_CALL_BOUNDARY" ? error.code : "PROSE", severity: "error", file,
+      sourceErrors.push({ source: "prose", code: "PROSE", severity: "error", file,
         line: error.line ?? null, column: error.column ?? (error.line ? 1 : null),
         message: String(error.message).replace(/^Line \d+:\s*/, ""),
-        ...(quickFix ? { quickFix } : {}),
         ...(error.relatedInformation ? { relatedInformation: error.relatedInformation.map(item => ({ file, ...item })) } : {}) });
     }
     return record;
@@ -232,7 +219,6 @@ export function checkProject({ cwd = process.cwd(), project, targets = [], types
   if (definitionTargets.length) result.definitions = [];
   if (referenceTargets.length || referenceAll) result.references = [];
   if (semanticTargets.length) result.semanticTokens = [];
-  if (quickFixTargets.length) result.quickFixSnapshot = { files: [...fixSources.values()].map(item=>({ file: item.file, hash: createHash('sha256').update(item.source).digest('hex') })), directories: [] };
   if (completionProbe) result.completions = [];
   if (sourceErrors.length) return result;
   for (const file of semanticTargets) {

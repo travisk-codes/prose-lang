@@ -1,5 +1,9 @@
 # Prose Language for Visual Studio Code
 
+The next version follows the language change where a call takes every comma after it,
+whatever it calls. Formatting, checking, and parameter hints read calls the same way,
+and the argument-count quick fixes are gone because nothing is ambiguous any more.
+
 Version 0.2.3 preserves method signatures and types through forwarding modules.
 Formatting and parameter hints read transitive unsaved Prose buffers, and Vite
 watches the underlying signature sources. Unresolved cycles keep explicit calls.
@@ -222,43 +226,6 @@ declarations in memory, and never runs application code or writes output files.
 It shares the CLI's strict checking and untyped-value policy; see
 [type checking](../../docs/type-checking.md) for current limits.
 
-## Quick fixes
-
-Use **Quick Fix** (`Ctrl+.` on Windows) on a call with an unknown parameter count
-and an ambiguous comma. For example:
-
-```prose
-function apply takes action
-    return action 1, 2
-```
-
-**Use with for arguments** changes the return to `action with 1, 2`.
-**Make an array (put the call in parentheses)** changes it to `(action 1), 2`.
-Neither action is preferred, and there is no Fix All action for this ambiguity.
-Choose the reading you mean.
-
-The compiler reports `PROSE_CALL_BOUNDARY` at the ambiguous comma. Fixes use
-parser positions, compile each proposed result, and verify whether that comma
-becomes an argument separator or an array separator. Receivers, computed members,
-constructors, `maybe`, wrapped lines, and Unicode positions keep their boundaries.
-An alternative is offered only when it parses as advertised; other Prose syntax
-errors or more involved nesting can prevent a fix. Normal type checking can still
-report other errors after the ambiguity is resolved.
-
-Fixes read current buffers, including unsaved Prose dependencies. Diagnostic
-checking supplies automatic lightbulbs; manually invoking Quick Fix also analyzes
-a dirty file or a file with checking disabled. The edits are prepared only when
-selected, with source versions and dependency contents rechecked. Changed or
-canceled requests cannot supply stale edits. Applying a fix uses VS Code's normal
-undoable workspace edit and leaves saving to the editor.
-
-This requires Workspace Trust, a local file, and the project's TypeScript 5 or 6.
-Set `prose.quickFixes.enabled` to `false` to disable these actions independently
-of checking and other editor features. Setup details appear in **Prose Quick
-Fixes** Output. Analysis never executes the program or imported modules.
-This version targets unknown-count call/comma ambiguity; other diagnostics retain
-their existing guidance.
-
 ## Autocomplete
 
 Start typing a variable, parameter, or function name, or press **Ctrl+Space** in
@@ -316,9 +283,7 @@ overloads, and available documentation appear in the tooltip. Types use Prose
 spelling, and the method name keeps its source spelling.
 
 The existing parser selects the call and argument, including nested and wrapped
-calls. A comma that starts another array element does not advance a completed
-call's parameter. Unknown parameter counts still require `with` for several
-arguments, following the normal language rules. Unfinished strings are supported;
+calls. Unfinished strings are supported;
 unrelated syntax errors can prevent hints. Unknown or untyped callees do not
 receive guessed signatures.
 

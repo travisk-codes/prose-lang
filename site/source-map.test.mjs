@@ -8,9 +8,9 @@ import { browserCompiler } from "./compiler.mjs";
 
 const browserBundle = inlineScript(`${await browserCompiler()}\nProse;`);
 
-test('object methods have the same argument boundaries in the playground and CLI', () => {
+test('object method calls compile the same in the playground and CLI', () => {
   const browser = runInNewContext(browserBundle, { TextEncoder });
-  const source = 'calculator is object\n    add is function takes a, b return a + b\nprint calculator.add 2, 3, 4';
+  const source = 'calculator is object\n    add is function takes a, b return a + b\nprint (calculator.add 2, 3), 4';
   const options = { sourceMap: true, filename: 'playground.prose' };
   const actual = browser.compile(source, options), expected = compile(source, options);
   assert.equal(actual.code, expected.code);
@@ -20,9 +20,9 @@ test('object methods have the same argument boundaries in the playground and CLI
   assert.deepEqual(output, [[5, 4]]);
 });
 
-test('browser imports preserve exported object method signatures without Node or TypeScript', () => {
+test('browser imports compile object method calls without Node or TypeScript', () => {
   const browser = runInNewContext(browserBundle, { TextEncoder });
-  const source = 'use calculator from "./tools.prose"\nprint calculator.add 2, 3, 4';
+  const source = 'use calculator from "./tools.prose"\nprint (calculator.add 2, 3), 4';
   const options = { sourceMap: true, filename: 'playground.prose', readModule: () =>
     'export calculator is object\n    add is function takes a, b return a + b' };
   const actual = browser.compile(source, options), expected = compile(source, options);

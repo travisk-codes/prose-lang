@@ -3,13 +3,13 @@ word is "😀"
 print length word
 print word:length
 print word.1
-print word:slice with 0, 2
+print word:slice 0, 2
 
 "Prose starts at 1; JavaScript list methods start at 0."
 words is "first", "second", "third"
 print words.1
 print words:at 0
-print words:slice with 0, 2
+print words:slice 0, 2
 js_position is words:index_of "second"
 if js_position >= 0
     print words.(js_position + 1)

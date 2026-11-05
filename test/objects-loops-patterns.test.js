@@ -47,7 +47,6 @@ test("indented object bodies accept like lines, and inline objects may hold an i
 test("inline objects follow the comma rules and reject other entries", () => {
   for (const [source, expected] of [
     ["print object a is 1, 2", /Line 1: Expected an object entry/],
-    ["print object a is Math:max with 1, 2", /Line 1:.*needs parentheses/],
     ["x is object a is 1\n    b is 2", /Line 2: Unexpected indentation/],
     ["value is 1\nprint object like", /Line 2: Expected an expression/]
   ]) assert.throws(() => transpile(source), expected, source);

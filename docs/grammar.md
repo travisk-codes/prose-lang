@@ -3,8 +3,7 @@
 Status: descriptive reference for Prose **0.2.3**, derived from the implementation in
 [`src/lexer.js`](../src/lexer.js), [`src/layout.js`](../src/layout.js),
 [`src/expression.js`](../src/expression.js), [`src/parser.js`](../src/parser.js),
-[`src/emitter.js`](../src/emitter.js), [`src/markup.js`](../src/markup.js), and
-[`src/call-arity.js`](../src/call-arity.js).
+[`src/emitter.js`](../src/emitter.js), and [`src/markup.js`](../src/markup.js).
 Where this document and the [README](../README.md) disagree, the code is
 authoritative. Nothing here is a change proposal.
 
@@ -16,11 +15,9 @@ Prose cannot be described by a single context-free grammar. It is described here
 | --- | --- | --- |
 | **Lexical** | tokens, contextual `pattern` and markup | `tokenize`, `lexSource` |
 | **Layout** | indentation, continuation lines, blocks | `sourceLines`, `continues` |
-| **Phrase grammar `G(Γ)`** | statements, expressions, types | `Parser`, `Expression` |
-| **Static semantics** | scopes, name resolution, call arities | `resolve`, `discoverCallArities`, `call-arity.js` |
+| **Phrase grammar** | statements, expressions, types | `Parser`, `Expression` |
+| **Static semantics** | scopes and name resolution | `resolve` |
 
-`Γ` is the **arity environment**: a partial map from callable bindings to argument
-counts. `G(Γ)` is the part of the grammar that looks context-free once `Γ` is known.
 Section 7 explains why this decomposition is necessary.
 
 Notation: `X?` optional, `X*` zero or more, `X+` one or more, `|` alternatives,
@@ -159,14 +156,10 @@ after `.` or `:` and object entry names may be reserved words
 ### 4.2 Spacing and minus
 
 The lexer records whether whitespace preceded each token, and one rule depends on it.
-When the callee is a **property, method, or unknown-arity value**, a following `-` is
-ambiguous: `f - 1` subtracts (spaces on both sides), `f-1` subtracts, and `f -1`
-(space before, none after) is rejected with a message asking for `f (-1)` or
-`f with -1`. When the callee is a **known-arity function name with at least one
-parameter**, the `-` is the first argument's sign instead: `f - 1`, `f -1`, and
-`f-1` all mean `f(-1)`. To subtract from the result of such a call, write
-`(f 1) - 1`. A zero-parameter function name behaves like a value, so `f - 1`
-subtracts. See 6.3.4.
+After a value that could be called, `f - 1` subtracts (spaces on both sides) and `f-1`
+subtracts. `f -1` (space before, none after) passes a negative argument when `f` is a
+function declared in Prose; on anything else it is rejected with a message asking
+for `f (-1)` or `f with -1`. See 6.3.3.
 
 ### 4.3 `pattern` lexing
 
@@ -196,10 +189,10 @@ argument (`render <Card />` compares). A markup token owns all of its source,
 including newlines; expressions inside `{...}` are tokenized and parsed as ordinary
 Prose expressions (5.7).
 
-## 5. Phrase grammar `G(Γ)`
+## 5. Phrase grammar
 
-The grammar below assumes layout has produced logical lines and that `Γ` is known.
-Call rules that depend on `Γ` are summarized in 6.2.
+The grammar below assumes layout has produced logical lines. The call rules are
+summarized in 6.2.
 
 ### 5.1 Programs and statements
 
@@ -384,7 +377,7 @@ argument    ::= unary
 list        ::= expr ( ',' expr )*
 ```
 
-`call` is subject to the arity rules in 6.2; `list` is the comma form used by
+`call` is subject to the call rules in 6.2; `list` is the comma form used by
 `print`, `return`, assignments, `are`, `for each`, and parentheses.
 
 Details that are easy to get wrong:
@@ -437,8 +430,8 @@ primary     ::= NUMBER | STRING | PATTERN
   applies to the awaited result.
 - `remainder a b` is prefix `%`; its two operands are parsed at level 60, so
   compound operands need parentheses.
-- `each of` spreads into a list, `print`, or a call of unknown arity; it may not
-  spread into a fixed-arity Prose call.
+- `each of` spreads into a list, `print`, or a call; it may not spread into a call
+  of a function declared in Prose, whose parameters are fixed.
 - A `function` with an indented body may appear anywhere on a line, but only one
   per line, and not in `if`, `while`, `for`, or inline-conditional headers.
 
@@ -453,7 +446,9 @@ object-entry   ::= 'like' unary
 
 - `object` with no entries is empty. Inline entries are separated by commas and the
   object consumes every following comma at its level, like a call; parenthesize it
-  when more arguments or list items follow.
+  when more arguments or list items follow. A call inside an entry runs to the next
+  `, name is` or `, like`, so a bare `NAME` entry after a call needs the call in
+  parentheses.
 - `like other` copies all of another object's properties shallowly; later entries
   override earlier ones.
 - A bare `NAME` entry is shorthand for `NAME is NAME`.
@@ -556,87 +551,64 @@ type-variable ::= NAME        (* lowercase, not a builtin or type keyword *)
 6. Reading a missing property of an object gives unset; reading a property of
    `null`/unset is a runtime error (use `maybe`). The checker knows the difference.
 
-### 6.2 Call arity `Γ`
+### 6.2 Calls
 
-`Γ` maps each callable **binding** (not just its spelling) to an arity: `0`, `n ≥
-1`, or `⊥` (unknown). The sources of arity are:
+A call takes every comma-separated value after it, up to the end of the enclosing
+list, a closing parenthesis, or the next entry of a one-line object. This never
+depends on what is being called, so a line has the same shape whatever its callee is.
 
-- named functions: parameter count from `takes`;
-- lambdas: parameter count;
-- builtins `length`, `char_to_number`, `number_to_char`: `1`;
-- variables assigned only functions of one parameter count (including aliases and
-  branches/loops): that count; differing counts or an untyped source: `⊥`;
-- Prose imports: the exporting module's declaration, read from source without
-  executing it; forwarding modules are followed (depth ≤ 128); unresolved cycles:
-  `⊥`;
-- methods of object literals (`calculator.add`), including aliases, `like` copies,
-  nested objects, and declared object result types: the property's function arity;
-- fixed JavaScript collection methods on values known to be a collection:
-  `Map` (`get` 1, `set` 2, `has` 1, `delete` 1, `clear` 0, `keys`/`values`/`entries`
-  0), `Set` (`add` 1, `has` 1, `delete` 1, `clear` 0, `keys`/`values`/`entries` 0),
-  `WeakMap` (`get` 1, `set` 2, `has` 1, `delete` 1), `WeakSet` (`add` 1, `has` 1,
-  `delete` 1);
-- everything else (JavaScript globals, methods of unknown receivers, values from
-  untyped parameters): `⊥`.
-
-Because a variable's arity can depend on another variable's arity, the compiler
-computes `Γ` as a **fixed point**: parse with the current `Γ`, infer arities, reparse,
-and repeat until the inferred environment's fingerprint stops changing (at most 64
-rounds). If it does not converge, compilation fails with
-`Call boundaries could not be inferred consistently. Use with to make the argument
-lists explicit.`
-
-Given `callee` with arity `a`:
-
-| `a` | call by adjacency (`f x`) | `f with ...` | `f run` |
-| --- | --- | --- | --- |
-| `n ≥ 1` | exactly `n` comma-separated arguments | 1..n arguments; omitted trailing arguments are unset (builtins require all) | error |
-| `0` | error (`Expected 'run'`) | error (no value to read) | allowed |
-| `⊥` | exactly one argument | one or more arguments | allowed |
+| Form | Arguments |
+| --- | --- |
+| `f x, y` | every comma-separated value after it |
+| `f with x, y` | the same; `with` can also start with a negative number and leave a Prose function's trailing arguments unset |
+| `f run` | none |
 
 - Each argument is parsed at level 60, so it may be a call, literal, grouped
   expression, lambda, prefix conditional, or unary expression, but not a top-level
   binary expression or trailing conditional.
-- A call consumes its declared arguments **before** the surrounding expression
-  continues: `fibonacci n - 1` is `fibonacci(n) - 1`; `f 1, 2 + 3` is ambiguous and
-  rejected (6.3.2).
+- A call with one argument finishes **before** the surrounding expression continues:
+  `fibonacci n - 1` is `fibonacci(n) - 1`. After several arguments this is ambiguous
+  and rejected: `f 1, 2 + 3` (6.3.2).
+- A comma directly before a closing parenthesis is a one-item list's trailing comma,
+  not an argument separator.
+- The standard functions `length`, `char_to_number`, and `number_to_char` take exactly
+  one value, so `length a, length b` is a list.
+- Functions declared in this file, or imported from a `.prose` file, have their
+  argument count checked once the call is read: too many is an error, and too few
+  is an error unless the call uses `with`. The check only reports mistakes; it never
+  changes how a line is read.
 - A call with no arguments must use `run`; a bare name is a value (and a bare
   single-name statement is an unset declaration).
-- `new` uses the call rules for arguments, but omitting arguments is always allowed
-  (`new Foo` constructs with none); a known constructor consumes its arity after
-  `new`, an unknown one takes one argument or `with`, and `run` is not used.
-- `with` consumes every comma-separated value that follows it at that nesting
-  level; commas inside the call's own parentheses belong to it.
-- A fixed-arity Prose function rejects spread arguments (`each of`), because its
-  parameter count is fixed.
+- `new` reads arguments the same way, but omitting them is always allowed
+  (`new Foo` constructs with none), and `run` is not used.
+- A function's result (`function takes x return ...`) is its own expression, so a
+  call there takes commas even when the function is another call's argument. A comma
+  after a body that isn't a call belongs to the surrounding call:
+  `items.reduce function takes sum, item return sum + item, 0`.
+- A function declared in Prose rejects spread arguments (`each of`), because its
+  parameters are fixed.
 
 ### 6.3 Ambiguity rules and their diagnostics
 
 These are the places where a reader could parse two ways; the compiler refuses to
 guess.
 
-1. **Unknown-arity comma.** In a call of unknown arity, `f x, y` could be two
-   arguments or an array element after a one-argument call. It is a
-   `PROSE_CALL_BOUNDARY` syntax error; write `f with x, y` or `(f x), y`.
-2. **Arithmetic after arguments.** After an explicit argument list (a known call
-   with more than one parameter, or any `with` list), a following `+ - * / % mod
-   xor shifted` is ambiguous: `f a, b + 1`. Parenthesize the last argument or the
-   whole call.
-3. **A multi-argument call inside another call's arguments** needs parentheses:
-   `outer with (inner with 1, 2)`, not `outer with inner with 1, 2`.
-4. **Negative-argument spacing.** With a property, method, or unknown-arity callee,
-   `f - 1` subtracts, `f-1` subtracts, and `f -1` is rejected: the space before `-`
-   but not after it suggests a negative argument, so write `f (-1)` or
-   `f with -1`. With a known-arity function name that takes at least one parameter,
-   all three spell `f(-1)`; subtract from its result with `(f 1) - 1`.
-5. **`if` condition ending in a call.** `if ready count is 5` reads `ready count` as
+1. **A call inside another call's arguments** needs parentheses to take a comma:
+   `outer a, (inner b, c)` or `outer (inner a), b`, not `outer inner a, b`.
+2. **Arithmetic after arguments.** After several arguments, or any `with` list, a
+   following `+ - * / % mod xor shifted` is ambiguous: `f a, b + 1`. Parenthesize the
+   last argument or the whole call.
+3. **Negative-argument spacing.** `f - 1` subtracts and `f-1` subtracts. On anything
+   but a function declared in Prose, `f -1` is rejected: the space before `-` but not
+   after it suggests a negative argument, so write `f (-1)` or `f with -1`.
+4. **`if` condition ending in a call.** `if ready count is 5` reads `ready count` as
    a call and then cannot tell whether `is 5` is the body. Write
    `if ready then count is 5` or give the `if` an indented body.
-6. **Nested trailing conditionals** need parentheses:
+5. **Nested trailing conditionals** need parentheses:
    `a if b else (c if d else e)`.
-7. **Inline object followed by commas.** An inline object consumes following
+6. **Inline object followed by commas.** An inline object consumes following
    commas; parenthesize it to pass more arguments or list items.
-8. **Markup versus comparison.** `<` is markup only in operand position; to pass a
+7. **Markup versus comparison.** `<` is markup only in operand position; to pass a
    tag as an argument use `render (<Card />)` or `render with <Card />`.
 
 ### 6.4 Placement restrictions
@@ -663,35 +635,29 @@ guess.
 
 ## 7. Why a plain context-free grammar cannot express Prose
 
-Prose is not context-free in three independent ways:
+Prose is not context-free in two independent ways:
 
 1. **Layout.** Statement boundaries are indentation, and continuation depends on the
    tokens at the end of the previous line (including an open parenthesis and the
    last word). This is the usual offside-rule context sensitivity.
-2. **Call boundaries depend on `Γ`.** `f a, b` is a two-argument call, a one-argument
-   call followed by an array element, or an error, depending on `f`'s inferred arity
-   — which may come from another module, an object literal, or a fixed point over
-   this program. No finite set of productions can encode all arities; the grammar is
-   an infinite family `G(Γ)`.
-3. **Contextual dot and markup.** `.name` is a position on strings/lists and a
+2. **Contextual dot and markup.** `.name` is a position on strings/lists and a
    property elsewhere, depending on scope and types; `<` is markup or comparison
    depending on operand position. These are resolved with local context and semantic
    predicates.
 
+Call boundaries need no context: where a call ends depends only on the tokens of its
+own line.
+
 Practical formulations:
 
-- **Parameterized grammar.** Use the EBNF above with `Γ` as an inherited attribute;
-  a parser generator that supports semantic predicates or a hand-written recursive
-  descent parser passes `Γ` down. This is what the implementation does.
-- **Scannerless PEG / GLL with predicates.** Encode the arity rules as predicates on
-  the call production. The fixed-point driver around the parser computes `Γ`; it is
-  not part of the grammar.
-- **Attribute grammar.** Treat indentation, `Γ`, and name resolution as inherited
-  attributes; the "parse" relation is then well-defined, but not as a CFG.
+- **Layout tokens.** A pass over the lines can turn indentation and continuations
+  into `INDENT`, `DEDENT`, and `NEWLINE` tokens, leaving the phrase grammar above.
+- **Semantic predicates.** Contextual dots and markup need local predicates in a
+  parser generator, or a hand-written recursive descent parser, which is what the
+  implementation uses.
 
-In other words: a formal grammar exists, but it is a **layout-sensitive,
-arity-parameterized** grammar plus a static-semantics fixed point, not a single
-`LALR(1)` or `EBNF` file.
+In other words: a formal grammar exists, but it is a **layout-sensitive** grammar with
+a few contextual predicates, not a single `LALR(1)` or `EBNF` file.
 
 ## 8. Implementation map
 
@@ -703,10 +669,9 @@ arity-parameterized** grammar plus a static-semantics fixed point, not a single
 | Statement grammar | `Parser.block` / `Parser.simple` in `src/parser.js` |
 | Function headers and `use` | `functionHeader`, `useStatement` in `src/parser.js` |
 | Expression grammar and precedence | `Expression.parseValue`, `precedence` in `src/expression.js` |
-| Calls, `with`, `run`, arity checks | `Expression.call`/`arguments`/`callsByAdjacency` in `src/expression.js` |
+| Calls, `with`, `run`, argument checks | `Expression.call`/`arguments`/`callsByAdjacency` in `src/expression.js` |
 | Types | `Expression.typeExpression`/`singleType` in `src/expression.js` |
 | Markup | `src/markup.js`, `Expression.markup` in `src/expression.js` |
-| Arity inference | `discoverCallArities` in `src/parser.js`, `src/call-arity.js` |
 | Name resolution | `resolve`/`createScope` in `src/scope.js` |
 | Declarations and type spelling | `src/types.js` |
 | Checking output | `compile(..., { check: true })` in `src/emitter.js` |

@@ -225,7 +225,7 @@ test("run is still needed with no arguments, and remainder keeps its two values 
   ].join("\n")), [3, 2, 2, 3]);
 });
 
-test("Prose calls without with take single values, so calls in their arguments need parentheses", () => {
+test("calls can sit in each other's arguments when each takes one value", () => {
   assert.deepEqual(run([
     "function twice takes n", "    return n * 2",
     "items is 4, 5", "previous is 1, 2, 3",
@@ -233,7 +233,7 @@ test("Prose calls without with take single values, so calls in their arguments n
     "print twice (items:indexOf 5)",
     "print twice ((1, 2):map function takes n return n * 10):length"
   ].join("\n")), [2, 2, 4]);
-  assert.throws(() => transpile("function twice takes n\n    return n * 2\nitems is 1, 2\nprint twice items:indexOf 2"), /Line 4: Unexpected token 2/);
+  assert.deepEqual(run("function twice takes n\n    return n * 2\nitems is 1, 2\nprint twice items:indexOf 2"), [2]);
 });
 
 test("a minus with a space before and none after is ambiguous next to a value that could be called", () => {
@@ -288,8 +288,7 @@ test("a call with several with arguments inside another call's arguments needs p
   for (const source of [
     "print Math:max with Math:min with 1, 2",
     "print Math:max with 0, Math:min with 1, 2",
-    "function f takes a, b\n    return a\nprint f 1, Math:min with 2, 3",
-    "items is (1, 2)\nprint items:map with function takes x return Math:max with x, 1"
+    "function f takes a, b\n    return a\nprint f 1, Math:min with 2, 3"
   ]) assert.throws(() => transpile(source), /needs parentheses: \(f a, b\)/, source);
   assert.deepEqual(run([
     "print Math:max with (Math:min with 1, 2), 5", "print Math:max with 0, (Math:min with 1, 2)",

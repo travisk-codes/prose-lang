@@ -16,7 +16,7 @@ function length_of_longest_substring takes text as text, giving number
         else
             seen.add text.finish
             size is finish - start + 1
-            longest is Math.max with longest, size
+            longest is Math.max longest, size
             finish is finish + 1
     return longest
 

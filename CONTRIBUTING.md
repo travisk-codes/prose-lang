@@ -32,8 +32,8 @@ TypeScript 5 job.
 - `src/layout.js` — physical-to-logical lines, indentation, continuation rules,
   and conditional-value continuations.
 - `src/expression.js` — expression, call, accessor, and type parsing.
-- `src/parser.js` — the statement parser, export/import signature discovery, call
-  arity inference, and `parse`.
+- `src/parser.js` — the statement parser, export/import signature discovery, and
+  `parse`.
 - `src/emitter.js` — `compile`, the JavaScript emitter, the checking emitter,
   declarations, and source maps.
 - `src/scope.js`, `src/types.js`, `src/awaits.js` — scopes and name resolution,

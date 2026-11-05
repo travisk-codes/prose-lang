@@ -6,7 +6,6 @@ export interface CheckDiagnostic {
   line: number | null;
   column: number | null;
   message: string;
-  quickFix?: unknown;
   relatedInformation?: unknown[];
 }
 
@@ -22,7 +21,6 @@ export interface CheckOptions {
   referenceTargets?: string[];
   referenceAll?: boolean;
   semanticTargets?: string[];
-  quickFixTargets?: string[];
   completionProbe?: unknown;
   signatureProbe?: unknown;
 }
@@ -42,7 +40,6 @@ export interface CheckResult {
   semanticTokens?: unknown[];
   completions?: unknown[];
   signatureHelp?: unknown;
-  quickFixSnapshot?: unknown;
 }
 
 export class CheckSetupError extends Error {

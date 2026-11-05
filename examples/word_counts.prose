@@ -3,9 +3,9 @@ function word_counts takes some_text as text giving Map
 	counts is new Map
 	for each word in words
 		if counts.has word
-			counts.set with word, (counts.get word + 1)
+			counts.set word, (counts.get word + 1)
 		else
-			counts.set with word, 1
+			counts.set word, 1
 	return counts
 
 print word_counts "hello world hello"

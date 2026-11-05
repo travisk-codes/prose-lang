@@ -135,12 +135,6 @@
           "scope": "resource",
           "description": "Color function values, parameters, variables, properties, and known numeric indexes using project types and current buffers. Requires Workspace Trust and project TypeScript."
         },
-        "prose.quickFixes.enabled": {
-          "type": "boolean",
-          "default": true,
-          "scope": "resource",
-          "description": "Offer explicit argument-list and array readings for ambiguous calls through Quick Fix (Ctrl+.). Requires Workspace Trust and project TypeScript."
-        },
         "prose.format.width": {
           "type": "integer",
           "minimum": 20,
@@ -468,7 +462,6 @@
     "signatures.cjs",
     "refactoring.cjs",
     "semantic.cjs",
-    "quick-fixes.cjs",
     "running.cjs",
     "debugging.cjs",
     "check-worker.cjs",

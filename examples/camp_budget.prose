@@ -42,8 +42,8 @@ for i is 1 to length basket
     item is basket.i
     print item.name + ": " + line_total item
 
-"Each call consumes one argument, so these three results make an array."
-line_totals is line_total lantern, line_total water, line_total snacks
+"Parentheses end each call, so these three results make an array."
+line_totals is (line_total lantern), (line_total water), (line_total snacks)
 print line_totals
 
 bill is make_bill basket

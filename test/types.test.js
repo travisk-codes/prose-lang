@@ -30,18 +30,18 @@ test('inferred object method declarations retain possibly absent values', () => 
     'export tools is object method',
     'export choice is (object add is function takes value as number giving number return value) if true else null'
   ].join('\n'));
-  assert.match(result, /"method": .*null \| undefined/);
-  assert.match(result, /export let choice: .*null \| undefined/);
+  assert.match(result, /"method": .*\| undefined;/);
+  assert.match(result, /export let choice: .*\| \(null\);/);
 });
 
-test('inferred object declarations do not leak a factory generic into module scope', () => {
+test('values made by calling a factory stay any, without leaking its generic into module scope', () => {
   const result = declarations([
     'type Box of item is object', '    apply as function taking item giving item',
     'function create of item takes value as item giving Box of item',
     '    return object apply is function takes other return other',
     'export box is create 1'
   ].join('\n'));
-  assert.match(result, /export let box: \{ "apply": any; \};/);
+  assert.match(result, /export let box: any;/);
 });
 
 test("annotated functions declare their parameter and result types, with docs from comments", () => {

@@ -4,8 +4,8 @@ print calculator.add 2, 3
 print arithmetic.multiply 4, 5
 print tools.calculator.add 6, 7
 
-"The call finishes after two arguments, before the final array element."
-results is calculator.add 2, 3, 9
+"Parentheses finish the call before the final array element."
+results is (calculator.add 2, 3), 9
 print results
 
 "A local alias and a like copy keep their method signatures."

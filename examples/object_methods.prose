@@ -1,4 +1,4 @@
-"Object methods follow the same argument-count rule as named functions."
+"Object methods are called like any other function."
 calculator is object
     add is function takes left as number, right as number giving number
         return left + right
@@ -6,7 +6,7 @@ calculator is object
         return left * right
 
 print calculator.add 2, 3
-results is calculator.add 2, 3, calculator.multiply 4, 5
+results is (calculator.add 2, 3), (calculator.multiply 4, 5)
 print results
 
 "An alias refers to the same object."
@@ -20,5 +20,5 @@ copy.add is function takes left as number, right as number giving number
 print copy.add 2, 3
 print calculator.add 2, 3
 
-"A comma after the method's arguments starts the next array element."
-print calculator.add 2, 3, 9
+"Parentheses end the method's arguments, so the next comma starts a list."
+print (calculator.add 2, 3), 9

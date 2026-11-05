@@ -1,10 +1,8 @@
-// Statement parsing, export/import signature discovery, and call-arity inference.
+// Statement parsing, and the export signatures that imports need.
 import { Expression } from "./expression.js";
 import { located, memberLocated } from "./ast.js";
 import { fail } from "./errors.js";
 import { isWord, reserved } from "./syntax.js";
-import { callScopeKey, inferCallArities } from "./call-arity.js";
-import { camel } from "./names.js";
 import { conditionOnly, continues, sourceLines, valueOnly } from "./layout.js";
 import { explainLayoutError } from "./layout-diagnostics.js";
 import { validateGenericParameters } from "./types.js";
@@ -37,9 +35,8 @@ function useStatement(tokens, line) {
   return { type: "use", names, source: source.value, typeOnly, line };
 }
 
-// Endings that carry a line on to the next, more indented one: a comma or an operator.
 // The functions (with their parameters) and variables a Prose module exports, from its export lines.
-function exportsOf(source, options = {}) {
+function exportsOf(source) {
   const functions = new Map();
   const values = new Set();
   for (const { line, indent, tokens } of sourceLines(source)) {
@@ -51,66 +48,22 @@ function exportsOf(source, options = {}) {
       values.add(tokens[1].value);
     }
   }
-  // Publish names before resolving forwarded values so cycles can return an
-  // unknown signature instead of recursing or inventing a parameter count.
-  const exported = { functions, values, valueArities: new Map([...values].map(name => [name, null])),
-    valueSignatures: new Map([...values, ...functions.keys()].map(name => [name, [{ kind: "unknown" }]])) };
-  options.exportCache?.set(options.modulePath, exported);
-  const { analysis } = discoverCallArities(source, options, false);
-  exported.valueSignatures = analysis.valueSignatures([...values, ...functions.keys()]);
-  for (const name of values) {
-    const signatures = exported.valueSignatures.get(name).filter(value => value.kind !== "absent");
-    const counts = new Set(signatures.map(value => value.kind === "function" ? value.arity : null));
-    exported.valueArities.set(name, counts.size === 1 ? [...counts][0] : null);
-  }
-  return exported;
+  return { functions, values };
 }
 
-function exportCacheKey(specifier) {
-  if (!/^\.{1,2}\//.test(specifier)) return specifier;
-  const parts = [];
-  for (const part of specifier.split("/")) {
-    if (part === "." || part === "") continue;
-    if (part === ".." && parts.length && parts.at(-1) !== "..") parts.pop();
-    else parts.push(part);
-  }
-  return "./" + parts.join("/");
-}
-
-function importedModulePath(specifier, importer) {
-  if (!importer || !/^\.{1,2}\//.test(specifier)) return exportCacheKey(specifier);
-  const combined = importer.slice(0, importer.lastIndexOf("/") + 1) + specifier;
-  if (/^\.{1,2}\//.test(combined)) return exportCacheKey(combined);
-  // Absolute paths, URL specifiers, and package subpaths keep their prefix.
-  const parts = [];
-  for (const part of combined.split("/")) {
-    if (part === ".") continue;
-    if (part === ".." && parts.length && parts.at(-1) !== "..") parts.pop();
-    else parts.push(part);
-  }
-  return parts.join("/");
-}
-
-function readExports(use, options) {
-  const { readModule, exportCache: cache } = options;
-  const key = importedModulePath(use.source, options.modulePath);
-  if (cache?.has(key)) return cache.get(key);
+function readExports(use, readModule) {
   if (!readModule) {
     fail(use.line, `To import "${use.source}", compile with a readModule option; the CLI and Vite plugin provide one.`);
   }
   let source;
   try {
-    source = readModule(options.modulePath ? key : use.source);
+    source = readModule(use.source);
   } catch (error) {
     fail(use.line, `Can't read "${use.source}": ${error.message}`);
   }
   try {
-    if ((options.moduleDepth ?? 0) >= 128) fail(use.line, "Import signature discovery exceeded 128 modules in one chain.");
-    const exported = exportsOf(source, { ...options, modulePath: key, moduleDepth: (options.moduleDepth ?? 0) + 1 });
-    cache?.set(key, exported);
-    return exported;
+    return exportsOf(source);
   } catch (error) {
-    cache?.delete(key);
     fail(use.line, `In "${use.source}", ${error.message}`);
   }
 }
@@ -145,14 +98,12 @@ function destructuresAt(tokens, pos) {
 }
 
 class Parser {
-  constructor(source, options = {}, analysis = null, loose = true, readImports = true) {
+  constructor(source, options = {}) {
     this.pos = 0;
     // How many loops enclose the line being parsed, within the current function.
     this.loopDepth = 0;
     this.lines = sourceLines(source, { locations: true });
-    this.callAnalysis = analysis; this.callScope = analysis?.root ?? null; this.loose = loose;
     this.signatureProbe = options.signatureProbe;
-    this.lineScopes = new Map(); this.valueArities = new Map(); this.valueSignatures = new Map();
     // Discover top-level signatures before parsing calls, supporting forward recursion.
     this.functions = new Map(["length", "char_to_number", "number_to_char"].map(name =>
       [name, { name, params: ["value"], builtin: true }]
@@ -168,14 +119,8 @@ class Parser {
     for (const line of this.lines.filter(line => line.indent === 0 && isWord(line.tokens[0], "use"))) {
       const use = useStatement(line.tokens, line.line);
       if (use.typeOnly) continue;
-      const exported = readImports && use.source.endsWith(".prose") ? readExports(use, options) : null;
+      const exported = use.source.endsWith(".prose") ? readExports(use, options.readModule) : null;
       for (const name of use.names) {
-        const supplied = result => {
-          if (!result.functions.has(name) && !result.values.has(name)) fail(use.line, `"${use.source}" doesn't export '${name}'.`);
-          return { values: result.valueSignatures.get(name) ?? [{ kind: "unknown" }], reference: { source: use.source, name: camel(name), steps: [] } };
-        };
-        if (exported) this.valueSignatures.set(name, supplied(exported));
-        else if (!readImports && options.readModule && use.source.endsWith(".prose")) this.valueSignatures.set(name, () => supplied(readExports(use, options)));
         const header = exported?.functions.get(name);
         if (header) {
           if (this.functions.has(name)) fail(use.line, `Duplicate function '${name}'.`);
@@ -184,7 +129,6 @@ class Parser {
           fail(use.line, `"${use.source}" doesn't export '${name}'.`);
         } else {
           values.push([name, use.line]);
-          this.valueArities.set(name, exported?.valueArities.get(name) ?? null);
         }
       }
     }
@@ -194,22 +138,21 @@ class Parser {
     for (const [name, line] of values) this.checkVariable(name, line);
   }
   validateContinuations() {
-    // Recheck with declared/imported argument counts: a string after the last
-    // argument can already be an inline body, rather than part of a call.
+    // Recheck with the file's functions known: a string after the last argument
+    // can already be an inline body, rather than part of a call.
     for (const line of this.lines) for (const continuation of line.leading ?? []) {
-      if (!conditionOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions, this.callAnalysis, this.lineScopes.get(line), this.loose)) {
+      if (!conditionOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions)) {
         fail(continuation.line, "A leading 'and' or 'or' can only continue a condition before its body starts.", { layout: { kind: "leading-condition", start: line.line } });
       }
     }
     for (const line of this.lines) for (const continuation of line.conditionalValues ?? []) {
-      if (!valueOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions, this.callAnalysis, this.lineScopes.get(line), this.loose)) {
+      if (!valueOnly({ ...line, tokens: line.tokens.slice(0, continuation.at) }, this.functions)) {
         fail(continuation.line, "An indented trailing 'if' must follow a complete value, not a block header.", { layout: { kind: "conditional-value", start: line.line } });
       }
     }
   }
   expression(line, tokens = line.tokens) {
-    this.lineScopes.set(line, this.callScope);
-    const expression = new Expression(tokens, line.line, this.functions, this.callAnalysis, this.callScope, this.loose);
+    const expression = new Expression(tokens, line.line, this.functions);
     expression.signatureProbe = this.signatureProbe;
     return expression;
   }
@@ -259,17 +202,15 @@ class Parser {
     if (functions.length > 1 || (functions.length && value?.type === "object" && !value.inline)) {
       fail(line.line, "Only one indented body can follow a line.");
     }
-    if (functions.length) functions[0].body = this.functionBody(line, functions[0]);
+    if (functions.length) functions[0].body = this.functionBody(line);
     else if (value?.type === "object" && !value.inline) this.objectBody(value, line);
   }
   // A function's body starts outside any loop, so skip and stop can't reach a loop around the function.
-  functionBody(line, fn) {
+  functionBody(line) {
     const loops = this.loopDepth;
-    const scope = this.callScope;
     this.loopDepth = 0;
-    this.callScope = this.callAnalysis?.scopes.get(fn ? callScopeKey(fn) : callScopeKey(line.tokens[0])) ?? null;
     try { return this.body(line, true); }
-    finally { this.loopDepth = loops; this.callScope = scope; }
+    finally { this.loopDepth = loops; }
   }
   loopBody(line, inFunction) {
     this.loopDepth++;
@@ -398,7 +339,7 @@ class Parser {
       const startsCall = first?.value === "(" || isWord(first, "new") || isWord(first, "maybe") ||
         (first?.type === "word" && !reserved.has(first.value));
       const value = startsCall ? expr.parse() : null;
-      if (!startsCall || !this.loose && !["call", "invoke", "new", "await"].includes(value?.type)) {
+      if (!startsCall || !["call", "invoke", "new", "await"].includes(value?.type)) {
         fail(expr.line, "Expected assignment, print, return, a string expression, or a function call; this syntax is not supported yet.");
       }
       node = { type: "expression", value };
@@ -528,52 +469,16 @@ function docAbove(nodes, line) {
 }
 
 
-function discoverCallArities(source, settings, readImports = true) {
-  const discovery = new Parser(source, settings, null, true, readImports);
-  const invalidated = new Set();
-  const infer = (program, parser) => ({ ...inferCallArities(program, parser.functions, parser.valueArities, invalidated, camel, parser.valueSignatures, !readImports), partialImports: !readImports });
-  let analysis = infer(discovery.program(), discovery);
-  for (let iteration = 0; iteration < 64; iteration++) {
-    const parser = new Parser(source, settings, analysis, true, readImports);
-    const program = parser.program();
-    let next = infer(program, parser);
-    for (const [key, before] of analysis.scopes) for (const [name, count] of before.bindings) {
-      if (count !== null && next.scopes.get(key)?.bindings.get(name) !== count) invalidated.add(`${key}/${name}`);
-    }
-    for (const [key, before] of analysis.scopes) for (const [name, kind] of before.kinds) {
-      if (kind !== null && next.scopes.get(key)?.kinds.get(name) !== kind) invalidated.add(`kind:${key}/${name}`);
-    }
-    for (const [key, count] of analysis.propertyArities) {
-      if (count !== null && next.propertyArities.get(key) !== count) invalidated.add(key);
-    }
-    next = infer(program, parser);
-    if (next.fingerprint === analysis.fingerprint) {
-      return { analysis: next };
-    }
-    analysis = next;
-  }
-  fail(1, "Call boundaries could not be inferred consistently. Use with to make the argument lists explicit.");
-}
-
-
 export function parse(source, options = {}) {
-  const modules = new Map();
-  const settings = { ...options, exportCache: new Map(), readModule: options.readModule && (specifier => {
-    if (!modules.has(specifier)) modules.set(specifier, options.readModule(specifier));
-    return modules.get(specifier);
-  }) };
   try {
-    const { analysis } = discoverCallArities(source, settings);
-    const final = new Parser(source, settings, analysis, false);
-    const result = final.program();
-    final.validateContinuations();
+    const parser = new Parser(source, options);
+    const result = parser.program();
+    parser.validateContinuations();
     validateGenericParameters(result);
-    const exportedValues = result.filter(node => node.type === "assign" && node.exported).map(node => node.name);
-    if (exportedValues.length) Object.defineProperty(result, "exportSignatures", { value: analysis.valueSignatures(exportedValues) });
     return result;
   } catch (error) {
     throw explainLayoutError(error, source, () => sourceLines(source, { locations: true }), continues);
   }
 }
 
-export { Parser, discoverCallArities };
+export { Parser };

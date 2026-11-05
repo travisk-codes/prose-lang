@@ -27,11 +27,11 @@ function conditionStart(tokens) {
   return !start || ["is", "as"].some(word => isWord(tokens[start], word)) ? 0 : start;
 }
 
-// Once function argument counts are known, make sure no inline body has started.
-function conditionOnly(line, functions, analysis, scope, loose) {
+// Once the file's functions are known, make sure no inline body has started.
+function conditionOnly(line, functions) {
   const start = conditionStart(line.tokens);
   if (!start) return false;
-  const expr = new Expression(line.tokens.slice(start), line.line, functions, analysis, scope, loose);
+  const expr = new Expression(line.tokens.slice(start), line.line, functions);
   expr.parse();
   return !expr.peek() && !expr.blockFunctions.length;
 }
@@ -55,10 +55,10 @@ function valueStart(tokens) {
   return start;
 }
 
-function valueOnly(line, functions, analysis, scope, loose) {
+function valueOnly(line, functions) {
   const start = valueStart(line.tokens);
   if (start < 0 || start >= line.tokens.length) return false;
-  const expr = new Expression(line.tokens.slice(start), line.line, functions, analysis, scope, loose);
+  const expr = new Expression(line.tokens.slice(start), line.line, functions);
   const value = expr.list();
   const objectBody = value.type === "object" && !value.inline && !value.grouped;
   return !expr.peek() && !expr.blockFunctions.length && !objectBody;

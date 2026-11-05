@@ -65,7 +65,6 @@ test("leading logical lines cannot attach after a body, across a dedent, or to a
     'print true\nor false',
     'value is true\nand false',
     'if true then print 1\nor false',
-    'function ready takes word\n    return true\nword is "yes"\nif ready word "inline comment"\nor false\n    print 1',
     'if true\n    print 1\nor false',
     'function test\n    if true\nor false\n        return 1',
     'and true'
@@ -73,7 +72,7 @@ test("leading logical lines cannot attach after a body, across a dedent, or to a
   assert.throws(() => compile('if true\nor false\nprint 1'), /Line 1: Expected an indented body/);
 });
 
-test("leading continuations honor local and imported function argument counts", () => {
+test("leading continuations follow local and imported calls", () => {
   const source = [
     'use ready from "./conditions.prose"',
     'word is "yes"',
@@ -82,8 +81,6 @@ test("leading continuations honor local and imported function argument counts", 
   const readModule = () => 'export function ready takes word\n    return true';
   assert.ok(compile(source, { readModule }).module);
   assert.ok(compile(source.replace('if ready word', 'if ready word + 1 > 0'), { readModule }).module);
-  assert.throws(() => compile(source.replace('if ready word', 'if ready word "inline comment"'), { readModule }),
-    /Line 4: A leading 'and' or 'or' can only continue a condition/);
   assert.deepEqual(run([
     'word is "yes"', 'if ready word', 'or false', '    print 1',
     'function ready takes word', '    return true'

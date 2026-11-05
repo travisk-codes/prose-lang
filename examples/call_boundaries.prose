@@ -1,25 +1,29 @@
-"Known function counts leave the remaining commas for the array."
+"A call takes every comma after it."
 function add takes left, right
     return left + right
 
 add_value is function takes left, right return left + right
 alias is add
-print add 1, 2, 3
-print add_value 1, 2, 3
-print alias 1, 2, 3
+print add 1, 2
+print add_value 1, 2
+print alias 1, 2
 
-"A callback type supplies its parameter count."
+"Parentheses end a call early, leaving the next comma for the list."
+print (add 1, 2), 3
+print (add_value 1, 2), 3
+print (alias 1, 2), 3
+
+"A callback is called the same way."
 type Binary is function taking number and number giving number
 function apply takes action as Binary
-    return action 1, 2, 3
+    return (action 1, 2), 3
 print apply add_value
 
-"Different implementations may have different parameter counts."
-if true
-    action is function takes left, right return left + right
-else
-    action is function takes number return number * 2
-print (action with 1, 2), 3
+"Inside another call's arguments, a call with several arguments needs them too."
+print add 1, (add 2, 3)
 
-"JavaScript method signatures are unknown; with marks their argument list."
-print Math.max with 4, 9, 2
+"JavaScript's functions work the same way."
+print Math.max 4, 9, 2
+
+"with is for a negative first argument, or for leaving arguments unset."
+print Math.max with -1, -2

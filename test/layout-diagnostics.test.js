@@ -99,7 +99,7 @@ test('tabs, CRLF, blank lines, and quoted keyword text keep physical source loca
   assert.equal(error.layout.kind, 'indent');
   assert.equal(failure('print "unterminated').layout, undefined);
   assert.equal(failure('print missing').layout, undefined);
-  assert.equal(failure('print Math.max 1, 2').layout, undefined);
+  assert.equal(failure('print Math.max with Math.min with 1, 2').layout, undefined);
   assert.equal(failure('point is object\n    giving is 1\n        nested is 2').layout.kind, 'object');
 });
 

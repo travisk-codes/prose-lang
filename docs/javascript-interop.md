@@ -80,20 +80,13 @@ Computed numeric dot keys select Prose positions on text and lists, and ordinary
 JavaScript property keys on other receivers. Computed numeric colon keys always
 use ordinary JavaScript property keys.
 
-## Fixed method argument counts
+## Method arguments
 
-On known `Map`, `Set`, `WeakMap`, and `WeakSet` receivers, fixed method signatures
-determine the call boundary. `counts.set key, value` needs no `with`; a further
-comma starts an array element. Keep compound arguments in parentheses:
-`counts.set key, (counts.get key + 1)`.
-
-The receiver can be known from a constructor, type annotation, alias, or declared
-function result type. Unknown receivers and optional/rest signatures still need
-`with` for multiple arguments, such as `words.slice with 0, 2` and
-`counts.for_each with callback, context`. These parsing rules do not depend on
-TypeScript's richer signatures in editor hovers. Accessing a method without
-calling it still produces the ordinary JavaScript function value; it does not
-bind that function to its receiver.
+A method takes every comma after it, like any call: `counts.set key, value` and
+`words.slice 0, 2`. Keep compound arguments in parentheses:
+`counts.set key, (counts.get key + 1)`. Accessing a method without calling it
+still produces the ordinary JavaScript function value; it does not bind that
+function to its receiver.
 
 ## VS Code reminders
 
