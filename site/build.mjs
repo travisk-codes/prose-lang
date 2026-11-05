@@ -1,10 +1,12 @@
 // Builds the landing page (site/dist/index.html) from template.html. Prose uses the VS Code grammar;
 // JavaScript and TypeScript use Prism with the same palette. Outputs and errors come from the real compiler.
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { transformSync } from "esbuild";
+import { aloudHtml, symbolCount, wordCount } from "./aloud.mjs";
 import { browserCompiler } from "./compiler.mjs";
 import { inlineScript } from "./scripts.mjs";
 import { syntaxSource, highlightCode } from "./syntax.mjs";
@@ -61,11 +63,11 @@ function highlight(source) {
   }).join("\n");
 }
 
-// Wraps the nth span whose text is exactly `token` in a proofreader's mark.
+// Underlines the nth span whose text is exactly `token`.
 function mark(html, token, nth = 1) {
   let seen = 0;
   const marked = html.replace(new RegExp(`(<span class="[^"]*">)(${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})(</span>)`, "g"),
-    (all, open, text, close) => ++seen === nth ? `${open}<mark class="erratum">${text}</mark>${close}` : all);
+    (all, open, text, close) => ++seen === nth ? `${open}<mark>${text}</mark>${close}` : all);
   if (!seen) throw new Error(`Token ${token} not found`);
   return marked;
 }
@@ -89,12 +91,31 @@ function outputOf(source) {
   return lines.join("\n");
 }
 
-const hero = readFileSync(new URL("hero.prose", here), "utf8").trim();
-// The hero compares Prose with JavaScript as a person would write it, so both must print the same thing.
-const heroJsPath = new URL("hero.js", here);
-const heroJs = readFileSync(heroJsPath, "utf8").trim();
-const heroJsOutput = execFileSync(process.execPath, [fileURLToPath(heroJsPath)], { encoding: "utf8" }).trim();
-if (heroJsOutput !== outputOf(hero)) throw new Error(`hero.js prints:\n${heroJsOutput}\nbut the Prose prints:\n${outputOf(hero)}`);
+// The opening comparison: a function from Datums and the TypeScript it replaced.
+// Both have to do the same thing to the same charts, or the build stops.
+const withoutProse = readFileSync(new URL("without.prose", here), "utf8").replace(/\r\n/g, "\n").trim();
+const withoutTs = readFileSync(new URL("without.ts", here), "utf8").replace(/\r\n/g, "\n").trim();
+const proseResult = outputOf([
+  "function chart_key takes ref",
+  "    return ref:chart",
+  withoutProse,
+  'charts is (object chart is "steps"), (object chart is "sleep"), (object chart is "steps")',
+  'print JSON:stringify (without charts, (object chart is "steps"))'
+].join("\n"));
+const tsResult = [];
+runInNewContext(transformSync([
+  "const chartKey = (ref: ChartRef) => ref.chart",
+  withoutTs,
+  'const charts = [{ chart: "steps" }, { chart: "sleep" }, { chart: "steps" }]',
+  'console.log(JSON.stringify(without(charts, { chart: "steps" })))'
+].join("\n"), { loader: "ts" }).code, { console: { log: value => tsResult.push(value) } });
+if (tsResult.join("\n") !== proseResult || proseResult !== '[{"chart":"sleep"}]') {
+  throw new Error(`without.ts gives ${tsResult.join("\n")}, but without.prose gives ${proseResult}`);
+}
+// The header that puts the types back, which the page offers as the honest alternative.
+const withoutTyped = "function without takes refs as list of ChartRef, ref as ChartRef";
+check(withoutTyped + "\n    return refs", "type ChartRef is object\n    chart as text\n");
+const typeSymbols = symbolCount(withoutTs) - symbolCount(withoutTs.replace(/: ChartRef(\[\])?/g, ""));
 
 const features = {
   words: check('label is if pages > 500 then "long" else "short"\nif count = 1 then print "one entry"', "pages is 1\ncount is 1\n"),
@@ -107,14 +128,14 @@ const features = {
 const positionsOutput = outputOf(features.positions);
 
 const interop = check([
-  'use addDays, dateFromKey, localDateKey from "./dates.js"',
+  'use add_days, date_from_key, local_date_key from "./dates.js"',
   "",
   '"The day after a YYYY-MM-DD key."',
-  "export function nextDay takes key as text, giving text",
-  "    return localDateKey (addDays with (dateFromKey key), 1)",
+  "export function next_day takes key as text, giving text",
+  "    return local_date_key (add_days (date_from_key key), 1)",
   "",
   'seen is new Set ("a", "b", "a")',
-  'print Math:max with 4, 9, 2',
+  "print Math:max 4, 9, 2",
   'document:title is "Written in Prose"'
 ].join("\n"));
 
@@ -127,7 +148,9 @@ const typed = check([
   "    length as number",
   "",
   '"Every run, longest first."',
-  "export function streakRuns takes days as list of text, giving list of StreakRun",
+  "export function streak_runs takes",
+  "    days as list of text,",
+  "giving list of StreakRun",
   "    return array"
 ].join("\n"));
 const declarations = compile(typed).declarations.split("\n").slice(1).join("\n").trim();
@@ -135,7 +158,7 @@ const declarations = compile(typed).declarations.split("\n").slice(1).join("\n")
 const errata = [
   { source: "total is 3\nprint totl", token: "totl", message: errorOf("total is 3\nprint totl"),
     note: "Every name has to be assigned, imported, or part of JavaScript, so a typo stops the build." },
-  { source: 'counts is new Map\ncount is 0\ncounts:set with "read", count + 1', token: "+", message: errorOf('counts is new Map\ncount is 0\ncounts:set with "read", count + 1'),
+  { source: 'counts is new Map\ncount is 0\ncounts:set "read", count + 1', token: "+", message: errorOf('counts is new Map\ncount is 0\ncounts:set "read", count + 1'),
     note: "Does the 1 go to the count, or to the result? Prose asks instead of guessing." },
   { source: "ready is true\nif ready count is 5", token: "count", message: errorOf("ready is true\nif ready count is 5"),
     note: "The error message includes the fix." },
@@ -179,9 +202,16 @@ const values = {
   play_source: escape(play),
   play_output: escape(outputOf(play)),
   play_js: highlightCode(body(compile(play, { runtime: "prose-runtime" }).code)),
-  hero_prose: highlight(hero),
-  hero_js: highlightCode(heroJs),
-  hero_output: escape(outputOf(hero)),
+  without_prose: highlight(withoutProse),
+  without_ts: highlightCode(withoutTs, "typescript"),
+  without_typed: highlight(withoutTyped),
+  without_prose_aloud: aloudHtml(withoutProse),
+  without_ts_aloud: aloudHtml(withoutTs),
+  without_prose_symbols: String(symbolCount(withoutProse)),
+  without_ts_symbols: String(symbolCount(withoutTs)),
+  without_prose_words: String(wordCount(withoutProse)),
+  without_ts_words: String(wordCount(withoutTs)),
+  without_type_symbols: String(typeSymbols),
   f_words: highlight(features.words),
   f_loops: highlight(features.loops),
   f_functions: highlight(features.functions),
@@ -196,13 +226,12 @@ const values = {
   types_dts: highlightCode(declarations, "typescript"),
   errata: errata.map(({ source, token, message, note }) => {
     const [, line, text] = /^Line (\d+): (.*)$/.exec(message);
-    return `<li class="erratum-entry">
-          <pre class="code slab"><code>${mark(highlight(source), token)}</code></pre>
-          <div class="note"><span class="note-line">Line ${line}</span><blockquote>${escape(text)}</blockquote><p>${escape(note)}</p></div>
+    return `<li class="row">
+          <div><h3>Line ${line}: ${escape(text)}</h3><p>${escape(note)}</p></div>
+          <pre class="code"><code>${mark(highlight(source), token)}</code></pre>
         </li>`;
   }).join("\n        "),
-  test_count: String(testCount),
-  test_summary: failures ? `${testCount} passing tests; ${failures} checks in progress` : `${testCount} tests that keep all of it honest`,
+  test_summary: failures ? `${testCount} passing tests, with ${failures} checks in progress` : `${testCount} tests`,
   preview_notice: preview ? `<aside class="preview-notice">Local development preview · ${testCount} tests passing${failures ? ` · ${failures} checks still in progress` : ""}</aside>` : "",
   playground: inlineScript(readFileSync(new URL("playground.js", here), "utf8")),
   syntax: inlineScript(syntaxSource),

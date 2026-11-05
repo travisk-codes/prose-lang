@@ -1,0 +1,3 @@
+function without takes refs, ref
+    return refs:filter function takes item return
+        chart_key item != chart_key ref
