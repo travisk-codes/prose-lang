@@ -24,6 +24,9 @@
 
 ### Changed
 
+- The README is now a short introduction. The language reference moved to
+  [docs/guide.md](docs/guide.md), and the notes on the CLI, formatter, debugging,
+  Vite, and the compiler API to [docs/tools.md](docs/tools.md).
 - A call now takes every comma after it, and parentheses end it early, whatever it
   calls. Parsing no longer infers argument counts, so a line can't change meaning
   when another file does, and `with` is optional for every call. Calls that aren't

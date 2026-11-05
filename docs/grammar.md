@@ -4,7 +4,7 @@ Status: descriptive reference for Prose **0.2.3**, derived from the implementati
 [`src/lexer.js`](../src/lexer.js), [`src/layout.js`](../src/layout.js),
 [`src/expression.js`](../src/expression.js), [`src/parser.js`](../src/parser.js),
 [`src/emitter.js`](../src/emitter.js), and [`src/markup.js`](../src/markup.js).
-Where this document and the [README](../README.md) disagree, the code is
+Where this document and the [guide](guide.md) disagree, the code is
 authoritative. Nothing here is a change proposal.
 
 ## 1. The grammar has four layers
@@ -678,7 +678,7 @@ a few contextual predicates, not a single `LALR(1)` or `EBNF` file.
 
 ## 9. Not in the grammar (unsupported)
 
-Documented in the README and confirmed by the parser:
+Documented in the guide and confirmed by the parser:
 
 - nested named functions and default imports;
 - `break`/`continue` (use `skip`/`stop`), `switch`, `class`, `try`/`catch`;

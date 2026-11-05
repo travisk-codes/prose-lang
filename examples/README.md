@@ -3,7 +3,7 @@
 Run these from the repository root with Node.js; no package installation is
 needed to run the compiler.
 
-For editor and CLI type checking, run `npm.cmd install` once. The examples'
+For editor and CLI type checking, run `npm install` once. The examples'
 `tsconfig.json` enables the included Node type definitions, including
 `process.stdin` and imports such as `node:readline/promises`.
 
@@ -70,3 +70,13 @@ design sketch that doesn't compile: it uses an older `await` and `catch` syntax
 (Prose now writes `wait for` and `on error`) and nested named functions, which
 aren't implemented. Design sketches live under `sketches/`, which folder searches
 skip.
+
+`fibonacci.prose`, `factorial.prose`, and `caesar_cipher.prose` define functions
+without calling them; each one's `_demo` file adds the calls.
+`npm run example:factorial` prints both factorial implementations' answers for
+each integer from 0 through 10 (two identical lines per input).
+
+`npm run example:cipher` encodes `hello` as `khoor`, decodes it again, and shows
+wrapping in both directions. The cipher uses `mod 26`, so negative rotations wrap
+too, and starts from an empty string, so empty input returns `""`. It targets
+lowercase `a–z` and applies that same mapping to every input character.

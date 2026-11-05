@@ -49,6 +49,7 @@ TypeScript 5 job.
 - `src/vite.js`, `src/node-hooks.js` — integration entry points.
 - `editors/vscode/` — the extension; `dist/` is generated and ignored.
 - `site/` — the landing page and playground builder.
+- `docs/guide.md` — the language guide; `docs/tools.md` — the tools around it.
 - `docs/grammar.md` — the grammar reference; update it when syntax changes.
 
 ## Examples
@@ -67,6 +68,6 @@ Language changes usually touch several layers:
 3. `src/*.d.ts` — public API types, when an exported signature changes.
 4. Tests — compiler behavior, errors, formatting stability, source maps, and
    editor features where relevant.
-5. `README.md` and `docs/grammar.md` — user-facing syntax and semantics.
+5. `docs/guide.md` and `docs/grammar.md` — user-facing syntax and semantics.
 
 Run `node --check` on edited JavaScript files as a quick syntax check.
